@@ -162,10 +162,22 @@ function runSetup() {
   );
 }
 
+function runPipeline() {
+  buildCleanEvents();
+  buildIdentityAndPeople();
+  SpreadsheetApp.getUi().alert(
+    'Analytics MVP',
+    'Pipeline complete: clean_events → identity_map → people',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Analytics MVP')
     .addItem('Run setup', 'runSetup')
+    .addSeparator()
+    .addItem('▶ Run full pipeline', 'runPipeline')
     .addSeparator()
     .addItem('Build clean_events', 'buildCleanEvents')
     .addItem('Build identity + people', 'buildIdentityAndPeople')
