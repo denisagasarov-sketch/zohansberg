@@ -168,5 +168,6 @@ function onOpen() {
     .addItem('Run setup', 'runSetup')
     .addSeparator()
     .addItem('Build clean_events', 'buildCleanEvents')
+    .addItem('Build identity + people', 'buildIdentityAndPeople')
     .addToUi();
 }
