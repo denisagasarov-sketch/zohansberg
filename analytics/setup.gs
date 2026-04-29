@@ -166,9 +166,10 @@ function runPipeline() {
   buildCleanEvents();
   buildIdentityAndPeople();
   buildFunnel();
+  buildDashboard();
   SpreadsheetApp.getUi().alert(
     'Analytics MVP',
-    'Pipeline complete: clean_events → identity_map → people → funnel',
+    'Pipeline complete: clean_events → identity_map → people → funnel → dashboard',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -183,6 +184,7 @@ function onOpen() {
     .addItem('Build clean_events', 'buildCleanEvents')
     .addItem('Build identity + people', 'buildIdentityAndPeople')
     .addItem('Build funnel', 'buildFunnel')
+    .addItem('Build dashboard', 'buildDashboard')
     .addSeparator()
     .addItem('[DEV] Load test data', 'loadTestData')
     .addToUi();
