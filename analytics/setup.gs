@@ -181,5 +181,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Build clean_events', 'buildCleanEvents')
     .addItem('Build identity + people', 'buildIdentityAndPeople')
+    .addSeparator()
+    .addItem('[DEV] Load test data', 'loadTestData')
     .addToUi();
 }
