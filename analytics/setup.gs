@@ -166,5 +166,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Analytics MVP')
     .addItem('Run setup', 'runSetup')
+    .addSeparator()
+    .addItem('Build clean_events', 'buildCleanEvents')
     .addToUi();
 }
