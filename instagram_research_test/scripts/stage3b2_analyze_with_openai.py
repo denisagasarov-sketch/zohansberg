@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 BASE = Path(__file__).parent.parent
-load_dotenv(BASE / ".env")
+load_dotenv(dotenv_path=BASE / ".env", override=True)
 
 MODEL = "gpt-4.1-mini"
 
@@ -51,6 +51,16 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 key_ok = bool(OPENAI_API_KEY)
 if not key_ok:
     preflight_errors.append("OPENAI_API_KEY missing or empty in .env")
+else:
+    if not OPENAI_API_KEY.startswith("sk-"):
+        preflight_errors.append("OPENAI_API_KEY does not start with 'sk-' — wrong key or shell variable override")
+        key_ok = False
+    elif not OPENAI_API_KEY.isascii():
+        preflight_errors.append("OPENAI_API_KEY contains non-ASCII characters — likely corrupted or wrong variable")
+        key_ok = False
+    elif any(c in OPENAI_API_KEY for c in (" ", "\t", "\n", "\r")):
+        preflight_errors.append("OPENAI_API_KEY contains whitespace — likely corrupted or wrong variable")
+        key_ok = False
 
 # preview file
 preview_path = BASE / "data/normalized/stage3b1_openai_input_preview.json"
