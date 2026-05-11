@@ -67,15 +67,21 @@
     "highlights_index": {
       "actor_id": "scrapio/instagram-highlights-scraper",
       "purpose": "Collect highlights list and highlight IDs from the first test account",
-      "schema_status": "manual_confirmation_needed",
-      "schema_source": "unknown",
-      "_schema_note": "Actor scrapio/instagram-highlights-scraper was NOT returned by any search or Apify API lookup. Only scrapio/instagram-profile-scraper surfaced for this author. Actor existence and exact input schema require manual verification before running.",
-      "accepts": "unknown",
-      "requires_proxy": "unknown",
-      "supports_limit": "unknown",
-      "test_input_status": "needs_manual_confirmation",
-      "test_input": {},
-      "can_run_stage_2": false,
+      "schema_status": "user_provided",
+      "schema_source": "user_provided",
+      "accepts": "profile_url",
+      "requires_proxy": true,
+      "supports_limit": false,
+      "test_input_status": "ready",
+      "test_input": {
+        "proxyConfiguration": {
+          "useApifyProxy": true
+        },
+        "startUrls": [
+          "https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"
+        ]
+      },
+      "can_run_stage_2": true,
       "required_business_fields_to_check": [
         "title",
         "highlight_id",
@@ -84,29 +90,40 @@
         "username",
         "user_id"
       ],
-      "possible_output_field_names": [],
-      "risks": [
-        "Actor ID scrapio/instagram-highlights-scraper could not be confirmed — it may not exist or may have been renamed/deprecated",
-        "clean_highlight_id extraction rule (strip 'highlight:' prefix) cannot be verified without confirmed output schema"
+      "possible_output_field_names": [
+        "input_url",
+        "username",
+        "user_id",
+        "type",
+        "id",
+        "title",
+        "cover_media",
+        "success",
+        "error",
+        "timestamp"
       ],
-      "stop_reason": "Actor scrapio/instagram-highlights-scraper was not found in Apify search results or API. Schema, input format, and output fields are unconfirmed. Manual verification required: open https://apify.com/scrapio/instagram-highlights-scraper and confirm the actor exists, then capture exact input field names from the Input tab."
+      "_clean_highlight_id_rule": "If 'id' arrives as 'highlight:18268617304253172' — strip prefix to get '18268617304253172'. If already numeric — use as-is.",
+      "risks": [
+        "id field may arrive with 'highlight:' prefix — extraction script must strip it before passing to Actor 3",
+        "Actor returns all highlights; limit to 1 must be applied manually in post-processing"
+      ],
+      "stop_reason": null
     },
     "highlight_stories": {
       "actor_id": "igview-owner/instagram-highlights-stories-viewer",
       "purpose": "Collect stories inside one highlight by clean highlight ID",
-      "schema_status": "manual_confirmation_needed",
-      "schema_source": "unknown",
-      "_schema_note": "Actor page confirmed to exist. Accepts highlightId parameter confirmed from search results. But exact input field name, required ID format (numeric-only vs 'highlight:XXXX' prefix), and complete output schema were not accessible — apify.com blocked all WebFetch calls.",
+      "schema_status": "user_provided",
+      "schema_source": "user_provided",
       "accepts": "highlight_id",
       "requires_proxy": "unknown",
       "supports_limit": "unknown",
       "test_input_status": "template_only",
       "test_input_template": {
-        "highlightId": "WILL_BE_FILLED_AFTER_HIGHLIGHTS_INDEX_TEST",
-        "_format_note": "Exact format unconfirmed: may require numeric-only (e.g. 18268617304253172) or prefixed (e.g. highlight:18268617304253172). Confirm from actor Input tab before running."
+        "highlightId": "WILL_BE_FILLED_AFTER_HIGHLIGHTS_INDEX_TEST"
       },
+      "_highlightId_format": "17-digit numeric only — no 'highlight:' prefix. Example: 18268617304253172",
       "can_run_stage_2": true,
-      "_stage2_condition": "Can run only after highlights_index actor provides a valid clean_highlight_id AND highlightId format is manually confirmed",
+      "_stage2_condition": "Can run only after highlights_index actor provides a valid clean_highlight_id (numeric, no prefix)",
       "required_business_fields_to_check": [
         "storyNumber",
         "storyId",
@@ -118,27 +135,26 @@
         "rawStoryData"
       ],
       "possible_output_field_names": [
+        "storyNumber",
         "storyId",
-        "publishDate",
-        "expiryDate",
+        "storyType",
         "imageUrl",
         "videoUrl",
-        "mentions",
-        "links"
+        "takenAt",
+        "duration",
+        "rawStoryData"
       ],
-      "_output_note": "Field names inferred from search results only. Exact names (camelCase vs snake_case) unconfirmed. Treat as probable.",
+      "_output_note": "Field names provided by user. Confirm exact names against raw Stage 2 output.",
       "risks": [
         "Cannot run before clean_highlight_id is obtained from highlights_index actor",
-        "highlightId format (prefix vs numeric-only) unconfirmed — wrong format will cause actor error",
-        "Actor may require login/session to access private or expired highlights"
+        "highlightId must be numeric-only (no 'highlight:' prefix) — passing prefixed ID will cause actor error",
+        "Expired or private highlights may return empty results"
       ],
       "stop_reason": null
     }
   },
-  "stage_2_allowed": false,
+  "stage_2_allowed": true,
   "stage_2_blockers": [
-    "NO_ACCOUNT_PROVIDED: No Instagram account URL was given — replace PASTE_TEST_ACCOUNT_HERE in accounts.json",
-    "HIGHLIGHTS_INDEX_SCHEMA_UNCONFIRMED: scrapio/instagram-highlights-scraper actor existence and input schema require manual verification",
-    "HIGHLIGHTS_STORIES_FORMAT_UNCONFIRMED: igview-owner/instagram-highlights-stories-viewer highlightId format (prefix vs numeric) requires manual confirmation"
+    "NO_ACCOUNT_PROVIDED: No Instagram account URL was given — replace PASTE_TEST_ACCOUNT_HERE in data/accounts.json and in all test_input.startUrls / test_input.directUrls before running"
   ]
 }
