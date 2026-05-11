@@ -107,6 +107,10 @@ else:
     max_payload     = summary.get("max_payload_size_mb", "?")
     plan_errors     = summary.get("errors", [])
 
+    total_prepared  = summary.get("total_prepared_inputs", "?")
+    total_selected  = summary.get("total_selected_inputs", "?")
+    inputs_dropped  = summary.get("inputs_dropped_by_sampling", "?")
+
     lines.append(f"**plan_status:** `{plan_status}`  ")
     lines.append(f"**can_run_stage4b:** `{can_run}`\n")
     lines.append(f"| Metric | Value | Limit |")
@@ -115,6 +119,9 @@ else:
     lines.append(f"| highlight batch requests | {summary.get('highlight_batch_requests','?')} | — |")
     lines.append(f"| synthesis requests | {summary.get('synthesis_requests','?')} | — |")
     lines.append(f"| estimated total requests | {total_requests} | 15 |")
+    lines.append(f"| total prepared inputs (manifest) | {total_prepared} | — |")
+    lines.append(f"| total selected inputs (plan) | {total_selected} | 120 |")
+    lines.append(f"| inputs dropped by sampling | {inputs_dropped} | — |")
     lines.append(f"| total images planned | {total_images} | 120 |")
     lines.append(f"| max images in one request | {max_img_req} | 10 |")
     lines.append(f"| max payload size (MB) | {max_payload} | 20 |")
