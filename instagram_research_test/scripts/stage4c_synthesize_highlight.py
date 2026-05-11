@@ -183,12 +183,11 @@ top_roles_str = ", ".join(
     f"{r} ({c})" for r, c in role_counter.most_common(5)
 ) or "unknown"
 summary_text = (
-    f"Highlight consists of {stories_total_label} stories analyzed in {batches_analyzed} batches. "
+    f"Highlight ({STORIES_TOTAL} stories, {batches_analyzed} batches). "
     f"Dominant role: {dominant_role}. "
     f"Top roles: {top_roles_str}. "
-    f"Average decision support score: {avg_dss}/10."
+    f"Avg decision support score: {avg_dss}/10."
 )
-stories_total_label = str(STORIES_TOTAL)
 
 # ── Status ────────────────────────────────────────────────────────────────────
 if batches_analyzed < 8:
@@ -207,12 +206,7 @@ result = {
     "dominant_role":        dominant_role,
     "main_roles":           all_roles_dedup,
     "role_frequency":       role_frequency,
-    "summary":              (
-        f"Highlight ({STORIES_TOTAL} stories, {batches_analyzed} batches). "
-        f"Dominant role: {dominant_role}. "
-        f"Top roles: {top_roles_str}. "
-        f"Avg decision support score: {avg_dss}/10."
-    ),
+    "summary":              summary_text,
     "cta_patterns":          cta_patterns,
     "offer_patterns":        offer_patterns,
     "social_proof_patterns": social_proof_patterns,
