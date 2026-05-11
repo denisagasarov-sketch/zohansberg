@@ -1,0 +1,21 @@
+{
+  "status": "FAIL",
+  "actor_id": "igview-owner/instagram-highlights-stories-viewer",
+  "highlight_id_tested": "17874797856565339",
+  "stories_count": 0,
+  "sample_item_fields": [],
+  "has_storyNumber": false,
+  "has_storyId": false,
+  "has_storyType": false,
+  "has_imageUrl": false,
+  "has_videoUrl": false,
+  "has_any_media_url": false,
+  "has_takenAt": false,
+  "has_duration": false,
+  "has_rawStoryData": false,
+  "raw_path": "data/raw/highlight_stories_manual_test_raw.json",
+  "sample_path": "data/raw/sample_story_manual_item.json",
+  "errors": [
+    "Unexpected error: Host not in allowlist"
+  ]
+}
