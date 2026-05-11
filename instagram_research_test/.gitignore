@@ -1,0 +1,6 @@
+.env
+output/
+data/raw/
+analysis/openai_responses/
+__pycache__/
+*.pyc
