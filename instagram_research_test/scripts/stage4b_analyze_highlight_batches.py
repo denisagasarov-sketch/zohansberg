@@ -17,6 +17,7 @@ PLAN_PATH       = BASE / "data/normalized/stage4a_openai_plan.json"
 BATCHES_OUT_DIR = BASE / "analysis/stage4b/highlight_batches"
 RAW_RESP_DIR    = BASE / "analysis/openai_responses/stage4b/highlight_batches"
 SUMMARY_PATH    = BASE / "data/normalized/stage4b_highlight_batches_summary.json"
+NORM_SUMMARY_PATH = BASE / "data/normalized/stage4b_highlight_role_normalization_summary.json"
 
 HIGHLIGHT_ID = "17874797856565339"
 
@@ -92,7 +93,18 @@ SYSTEM_PROMPT = (
     "If a conclusion is not supported by visible text or visual facts, "
     "write 'not enough evidence'. "
     "Always include in limitations: "
-    "'This is one batch from a 57-story highlight, not full highlight synthesis'."
+    "'This is one batch from a 57-story highlight, not full highlight synthesis'. "
+    "\n\nCRITICAL: main_roles MUST contain enum values ONLY. "
+    "Do not use free-text role names. "
+    "Allowed values: social_proof, student_results, course_trust, community, "
+    "education, reviews, cases, faq, product, pricing, about, process, "
+    "backstage, lead_magnet, unknown. "
+    "If unsure, use unknown. "
+    "Testimonials / praise / feedback → social_proof or reviews. "
+    "Student wins / sales / client results / money → student_results. "
+    "Active chat / group / participants → community. "
+    "Course/instructor credibility / support → course_trust. "
+    "Lessons / learning / AI marketing / GPT tools → education."
 )
 
 SCHEMA_EXAMPLE = json.dumps({
@@ -110,7 +122,7 @@ SCHEMA_EXAMPLE = json.dumps({
         "visual_facts": [],
     },
     "inferred_meanings": {
-        "main_roles": [],
+        "main_roles": ["social_proof", "education", "unknown"],  # USE ENUM ONLY
         "summary": "...",
         "cta_found": "...",
         "offer_found": "...",
@@ -125,6 +137,7 @@ SCHEMA_EXAMPLE = json.dumps({
 
 
 def validate_batch_json(data):
+    """Validates after normalization — main_roles are expected to be enum-clean."""
     errors = []
     missing = REQUIRED_KEYS - set(data.keys())
     if missing:
@@ -146,11 +159,12 @@ def validate_batch_json(data):
     if len(evidence) == 0 and confidence == "high":
         errors.append("evidence is empty but confidence is 'high'")
 
+    # main_roles validated after normalization — only flag truly unmapped values
     roles = data.get("inferred_meanings", {}).get("main_roles", [])
     if isinstance(roles, list):
         invalid = [r for r in roles if r not in VALID_ROLES]
         if invalid:
-            errors.append(f"invalid main_roles: {invalid}")
+            errors.append(f"invalid main_roles after normalization: {invalid}")
 
     if len(evidence) < 2:
         errors.append(f"evidence has {len(evidence)} items; minimum 2 required for OK status")
@@ -164,6 +178,67 @@ def validate_batch_json(data):
         errors.append("limitations must state this is a batch from 57-story highlight")
 
     return errors
+
+
+# Keyword → enum mapping (checked in order; first match wins per keyword group)
+_ROLE_KEYWORD_MAP = [
+    ({"testimonial", "praise", "feedback"},                        "social_proof"),
+    ({"review", "отзыв"},                                          "reviews"),
+    ({"student", "learner", "participant", "client",
+      "sale", "money", "result", "win", "success"},                "student_results"),
+    ({"chat", "group", "community", "participants", "member"},     "community"),
+    ({"instructor", "creator", "credibility", "support",
+      "course creator", "expert"},                                  "course_trust"),
+    ({"lesson", "education", "learning", "ai ", "gpt",
+      "marketing strategy", "strategy", "training"},               "education"),
+    ({"faq", "question", "answer"},                                "faq"),
+    ({"product", "tool", "feature"},                               "product"),
+    ({"price", "pricing", "cost", "tariff"},                       "pricing"),
+    ({"about", "story", "who", "team"},                            "about"),
+    ({"process", "workflow", "step", "how"},                       "process"),
+    ({"backstage", "behind", "bts"},                               "backstage"),
+    ({"lead", "magnet", "freebie", "free"},                        "lead_magnet"),
+    ({"case", "project"},                                          "cases"),
+]
+
+
+def normalize_roles(raw_roles):
+    """
+    Maps free-text role strings to VALID_ROLES enum values.
+    Returns (normalized_roles, normalization_notes).
+    normalized_roles is deduplicated; unmapped values become 'unknown'.
+    """
+    normalized = []
+    notes      = []
+
+    for raw in raw_roles:
+        raw_str = str(raw).strip()
+        if raw_str in VALID_ROLES:
+            normalized.append(raw_str)
+            continue
+
+        raw_lower  = raw_str.lower()
+        mapped_to  = None
+        for keywords, enum_value in _ROLE_KEYWORD_MAP:
+            if any(kw in raw_lower for kw in keywords):
+                mapped_to = enum_value
+                break
+
+        if mapped_to is None:
+            mapped_to = "unknown"
+
+        normalized.append(mapped_to)
+        notes.append({"original": raw_str, "mapped_to": mapped_to})
+
+    # deduplicate preserving order
+    seen: set = set()
+    deduped   = []
+    for r in normalized:
+        if r not in seen:
+            seen.add(r)
+            deduped.append(r)
+
+    return deduped, notes
 
 
 def analyze_batch(req):
@@ -254,7 +329,21 @@ def analyze_batch(req):
     if not has_batch_note:
         limitations.append(BATCH_LIMITATION)
 
-    # Validate
+    # Normalize main_roles before validation
+    im = result.setdefault("inferred_meanings", {})
+    raw_roles = im.get("main_roles", [])
+    if isinstance(raw_roles, list):
+        normalized_roles, norm_notes = normalize_roles(raw_roles)
+        im["main_roles"] = normalized_roles
+        if norm_notes:
+            result["role_normalization_notes"] = norm_notes
+    else:
+        im["main_roles"] = ["unknown"]
+        result["role_normalization_notes"] = [
+            {"original": str(raw_roles), "mapped_to": "unknown"}
+        ]
+
+    # Validate (main_roles are enum-clean after normalization)
     val_errors = validate_batch_json(result)
     if val_errors:
         if len(result.get("evidence", [])) == 0:
@@ -270,7 +359,8 @@ def analyze_batch(req):
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 ok = partial = fail = skipped = calls_made = 0
-loop_errors = []
+loop_errors    = []
+norm_summary   = []   # accumulates normalization notes across all batches
 
 for req in batches_plan:
     request_id = req["request_id"]
@@ -301,8 +391,12 @@ for req in batches_plan:
             partial += 1
         else:
             fail += 1
+        notes = result.get("role_normalization_notes", [])
+        if notes:
+            norm_summary.append({"request_id": request_id, "normalizations": notes})
         print(f"    → {status} | confidence={result.get('confidence')} "
-              f"| evidence={len(result.get('evidence', []))}")
+              f"| evidence={len(result.get('evidence', []))} "
+              f"| roles_normalized={len(notes)}")
     except Exception as e:
         calls_made += 1
         tb = traceback.format_exc()
@@ -349,6 +443,16 @@ summary = {
 SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
 SUMMARY_PATH.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
+total_norm = sum(len(e["normalizations"]) for e in norm_summary)
+norm_out = {
+    "batches_with_normalizations": len(norm_summary),
+    "total_roles_normalized":      total_norm,
+    "details":                     norm_summary,
+}
+NORM_SUMMARY_PATH.write_text(json.dumps(norm_out, ensure_ascii=False, indent=2), encoding="utf-8")
+
 print(f"\nbatches: OK={ok} PARTIAL={partial} FAIL={fail} skipped={skipped} calls={calls_made}")
+print(f"roles normalized across all batches: {total_norm}")
 print(f"status: {summary_status}")
 print(f"saved: {SUMMARY_PATH.relative_to(BASE)}")
+print(f"saved: {NORM_SUMMARY_PATH.relative_to(BASE)}")
