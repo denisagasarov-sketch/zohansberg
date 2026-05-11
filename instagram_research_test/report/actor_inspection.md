@@ -21,12 +21,10 @@
 
 ## Test account
 
-- first account: **not provided** — placeholder `PASTE_TEST_ACCOUNT_HERE` remains in `data/accounts.json`
-- clean username: **not available** — will be extracted from URL after account is provided
+- first account: `https://www.instagram.com/vlada_kliuiko/`
+- clean username: `vlada_kliuiko`
 - posts_limit: 5
 - highlights_limit: 1
-
-> **Action required before Stage 2:** Replace `PASTE_TEST_ACCOUNT_HERE` in `data/accounts.json` with a real public Instagram account URL.
 
 ---
 
@@ -50,10 +48,10 @@ For Actor 2 and Actor 3, input-schema pages were not accessible — see schema_s
 
 **accepts:** profile URL via `directUrls` array
 
-**Test input (ready — pending account URL):**
+**Test input:**
 ```json
 {
-  "directUrls": ["https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"],
+  "directUrls": ["https://www.instagram.com/vlada_kliuiko/"],
   "resultsType": "posts",
   "resultsLimit": 5,
   "proxy": {
@@ -94,7 +92,7 @@ For Actor 2 and Actor 3, input-schema pages were not accessible — see schema_s
 - Reel detection depends on `type` field — exact enum values unknown until Stage 2
 
 **can_run_stage_2:** `true`  
-**stop_reason:** none — ready after account URL is provided
+**stop_reason:** none
 
 ---
 
@@ -111,14 +109,14 @@ For Actor 2 and Actor 3, input-schema pages were not accessible — see schema_s
 **Proxy required:** yes  
 **supports_limit:** no — actor returns all highlights; limit to 1 applied in post-processing
 
-**Test input (ready — pending account URL):**
+**Test input:**
 ```json
 {
   "proxyConfiguration": {
     "useApifyProxy": true
   },
   "startUrls": [
-    "https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"
+    "https://www.instagram.com/vlada_kliuiko/"
   ]
 }
 ```
@@ -150,7 +148,7 @@ If `id` is already numeric → use as-is
 - Actor has no built-in limit — post-processing must select only 1 highlight for Stage 2 test
 
 **can_run_stage_2:** `true`  
-**stop_reason:** none — ready after account URL is provided
+**stop_reason:** none
 
 ---
 
@@ -207,17 +205,15 @@ Example with real ID: `{ "highlightId": "18268617304253172" }`
 
 **stage_2_allowed:** `true`
 
-**Remaining blocker (operational, not schema):**
+**Blockers:** none
 
-- **NO_ACCOUNT_PROVIDED** — Replace `PASTE_TEST_ACCOUNT_HERE` in `data/accounts.json` and in `actor_payloads.json` (`posts_reels.test_input.directUrls[0]` and `highlights_index.test_input.startUrls[0]`) with a real public Instagram account URL before running.
-
-All schema blockers resolved via manual user confirmation.
+All schema blockers resolved via manual user confirmation. Test account set to `vlada_kliuiko`.
 
 ---
 
 ## Minimal run plan for Stage 2
 
-> Ready to execute after account URL is provided.
+> Ready to execute. Awaiting Stage 2 approval.
 
 1. Replace `PASTE_TEST_ACCOUNT_HERE` in `data/accounts.json` with real account URL
 2. Update `actor_payloads.json` → `posts_reels.test_input.directUrls[0]` with real URL

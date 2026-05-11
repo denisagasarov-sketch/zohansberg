@@ -1,8 +1,7 @@
 {
   "stage": "actor_inspection",
-  "test_account": "PASTE_TEST_ACCOUNT_HERE",
-  "clean_username": "PASTE_TEST_ACCOUNT_HERE",
-  "_account_note": "No Instagram account URL was provided. Replace PASTE_TEST_ACCOUNT_HERE with a real URL before Stage 2.",
+  "test_account": "https://www.instagram.com/vlada_kliuiko/",
+  "clean_username": "vlada_kliuiko",
   "posts_limit": 5,
   "highlights_limit": 1,
   "actors": {
@@ -16,7 +15,7 @@
       "supports_limit": true,
       "test_input_status": "ready",
       "test_input": {
-        "directUrls": ["https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"],
+        "directUrls": ["https://www.instagram.com/vlada_kliuiko/"],
         "resultsType": "posts",
         "resultsLimit": 5,
         "proxy": {
@@ -78,7 +77,7 @@
           "useApifyProxy": true
         },
         "startUrls": [
-          "https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"
+          "https://www.instagram.com/vlada_kliuiko/"
         ]
       },
       "can_run_stage_2": true,
@@ -154,7 +153,5 @@
     }
   },
   "stage_2_allowed": true,
-  "stage_2_blockers": [
-    "NO_ACCOUNT_PROVIDED: No Instagram account URL was given — replace PASTE_TEST_ACCOUNT_HERE in data/accounts.json and in all test_input.startUrls / test_input.directUrls before running"
-  ]
+  "stage_2_blockers": []
 }

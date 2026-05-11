@@ -1,9 +1,8 @@
 {
   "accounts": [
-    "PASTE_TEST_ACCOUNT_HERE"
+    "https://www.instagram.com/vlada_kliuiko/"
   ],
   "posts_limit": 5,
   "highlights_limit": 1,
-  "mode": "actor_inspection",
-  "_note": "Replace PASTE_TEST_ACCOUNT_HERE with real Instagram URL before Stage 2"
+  "mode": "actor_inspection"
 }
