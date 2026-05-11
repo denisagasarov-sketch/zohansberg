@@ -1,6 +1,9 @@
 import base64
 import json
 import os
+import sys
+os.environ["PYTHONUTF8"] = "1"
+
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -57,7 +60,7 @@ if not preview_ok:
 
 preview = {}
 if preview_ok:
-    preview = json.loads(preview_path.read_text())
+    preview = json.loads(preview_path.read_text(encoding="utf-8"))
 
 # readiness
 can_run = preview.get("readiness", {}).get("can_run_stage3b2_openai_call", False)
@@ -118,7 +121,7 @@ total_mb = round(total_bytes / 1024 / 1024, 2)
 gitignore_path = BASE / ".gitignore"
 gitignore_safe = False
 if gitignore_path.exists():
-    content = gitignore_path.read_text()
+    content = gitignore_path.read_text(encoding="utf-8")
     required = [".env", "data/raw/", "output/", "analysis/openai_responses/"]
     gitignore_safe = all(r in content for r in required)
 if not gitignore_safe:
@@ -149,10 +152,19 @@ FAILED — OpenAI was not called.
 
 Errors:
 {chr(10).join(f'- {e}' for e in preflight_errors)}
-""")
+""", encoding="utf-8")
     raise SystemExit(1)
 
 print("Preflight OK — proceeding to OpenAI calls\n")
+
+# ── Debug: encoding info (no secrets) ────────────────────────────────────────
+_cap_preview = (preview.get("post_sample") or {}).get("caption") or ""
+print(f"  [debug] python default encoding:  {sys.getdefaultencoding()}")
+print(f"  [debug] filesystem encoding:      {sys.getfilesystemencoding()}")
+print(f"  [debug] caption length:           {len(_cap_preview)}")
+print(f"  [debug] caption contains non-ascii: {not _cap_preview.isascii()}")
+print(f"  [debug] caption preview (120 ch): {_cap_preview[:120]!r}")
+print()
 
 # ── C. File encoding helper ───────────────────────────────────────────────────
 def encode_image(rel_path):
@@ -162,7 +174,7 @@ def encode_image(rel_path):
     ext = p.suffix.lower().lstrip(".")
     mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg",
             "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
-    data = base64.standard_b64encode(p.read_bytes()).decode()
+    data = base64.b64encode(p.read_bytes()).decode("utf-8")
     return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{data}"}}
 
 def image_block(rel_path):
@@ -291,7 +303,7 @@ try:
     )
     post_raw_response = resp.model_dump()
     raw_text = resp.choices[0].message.content or ""
-    POST_RESPONSE_PATH.write_text(json.dumps(post_raw_response, ensure_ascii=False, indent=2))
+    POST_RESPONSE_PATH.write_text(json.dumps(post_raw_response, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
         post_analysis = json.loads(raw_text)
@@ -323,13 +335,16 @@ try:
                 post_analysis["confidence"] = "medium"
                 post_analysis.setdefault("limitations", []).append("confidence downgraded: evidence is empty")
 
-    POST_ANALYSIS_PATH.write_text(json.dumps(post_analysis or {}, ensure_ascii=False, indent=2))
+    POST_ANALYSIS_PATH.write_text(json.dumps(post_analysis or {}, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  post status: {post_status}")
 except Exception as e:
     post_err = str(e)
     print(f"  [ERROR] post analysis: {post_err}")
     if "model" in post_err.lower() and ("not found" in post_err.lower() or "does not exist" in post_err.lower()):
         raise SystemExit(f"Model '{MODEL}' is not available: {post_err}")
+    _fail_stub = {"status": "FAIL", "error": post_err, "account": "vlada_kliuiko",
+                  "analysis_scope": "single_post_sample", "confidence": "low"}
+    POST_ANALYSIS_PATH.write_text(json.dumps(_fail_stub, ensure_ascii=False, indent=2), encoding="utf-8")
 
 # ── D/E. Request 2: Highlight sample analysis ─────────────────────────────────
 print("Request 2: Highlight sample analysis...")
@@ -389,7 +404,7 @@ try:
     )
     hl_raw_response = resp.model_dump()
     raw_text = resp.choices[0].message.content or ""
-    HL_RESPONSE_PATH.write_text(json.dumps(hl_raw_response, ensure_ascii=False, indent=2))
+    HL_RESPONSE_PATH.write_text(json.dumps(hl_raw_response, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
         hl_analysis = json.loads(raw_text)
@@ -418,13 +433,16 @@ try:
                 hl_analysis["confidence"] = "medium"
                 hl_analysis.setdefault("limitations", []).append("confidence downgraded: evidence is empty")
 
-    HL_ANALYSIS_PATH.write_text(json.dumps(hl_analysis or {}, ensure_ascii=False, indent=2))
+    HL_ANALYSIS_PATH.write_text(json.dumps(hl_analysis or {}, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  highlight status: {hl_status}")
 except Exception as e:
     hl_err = str(e)
     print(f"  [ERROR] highlight analysis: {hl_err}")
     if "model" in hl_err.lower() and ("not found" in hl_err.lower() or "does not exist" in hl_err.lower()):
         raise SystemExit(f"Model '{MODEL}' is not available: {hl_err}")
+    _fail_stub = {"status": "FAIL", "error": hl_err, "account": "vlada_kliuiko",
+                  "analysis_scope": "highlight_sample_only", "confidence": "low"}
+    HL_ANALYSIS_PATH.write_text(json.dumps(_fail_stub, ensure_ascii=False, indent=2), encoding="utf-8")
 
 # ── I. Report ─────────────────────────────────────────────────────────────────
 def safe(d, *keys, default="n/a"):
@@ -527,10 +545,10 @@ Stage 3B-2 НЕ проверяет:
 
 ## Output files
 
-- analysis/content_analysis_test.json
-- analysis/highlights_analysis_test.json
-- analysis/openai_responses/post_analysis_response.json
-- analysis/openai_responses/highlight_analysis_response.json
+- analysis/content_analysis_test.json — exists: {yesno(POST_ANALYSIS_PATH.exists())} | status: {post_status}
+- analysis/highlights_analysis_test.json — exists: {yesno(HL_ANALYSIS_PATH.exists())} | status: {hl_status}
+- analysis/openai_responses/post_analysis_response.json — exists: {yesno(POST_RESPONSE_PATH.exists())}
+- analysis/openai_responses/highlight_analysis_response.json — exists: {yesno(HL_RESPONSE_PATH.exists())}
 
 ## Final verdict
 
@@ -541,6 +559,6 @@ Stage 3B-2 НЕ проверяет:
 {chr(10).join(recs)}
 """
 
-REPORT_PATH.write_text(report_md)
+REPORT_PATH.write_text(report_md, encoding="utf-8")
 print(f"\nReport: {REPORT_PATH.relative_to(BASE)}")
 print(f"Final verdict: {verdict}")
