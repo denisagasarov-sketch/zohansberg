@@ -3,6 +3,7 @@
     "PASTE_TEST_ACCOUNT_HERE"
   ],
   "posts_limit": 5,
-  "highlights_limit": 2,
-  "mode": "test"
+  "highlights_limit": 1,
+  "mode": "actor_inspection",
+  "_note": "Replace PASTE_TEST_ACCOUNT_HERE with real Instagram URL before Stage 2"
 }

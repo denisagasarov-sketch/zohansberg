@@ -1,0 +1,144 @@
+{
+  "stage": "actor_inspection",
+  "test_account": "PASTE_TEST_ACCOUNT_HERE",
+  "clean_username": "PASTE_TEST_ACCOUNT_HERE",
+  "_account_note": "No Instagram account URL was provided. Replace PASTE_TEST_ACCOUNT_HERE with a real URL before Stage 2.",
+  "posts_limit": 5,
+  "highlights_limit": 1,
+  "actors": {
+    "posts_reels": {
+      "actor_id": "apify/instagram-scraper",
+      "purpose": "Collect last 5 posts/reels from the first test account",
+      "schema_status": "confirmed",
+      "schema_source": "readme",
+      "accepts": "profile_url",
+      "requires_proxy": true,
+      "supports_limit": true,
+      "test_input_status": "ready",
+      "test_input": {
+        "directUrls": ["https://www.instagram.com/PASTE_TEST_ACCOUNT_HERE/"],
+        "resultsType": "posts",
+        "resultsLimit": 5,
+        "proxy": {
+          "useApifyProxy": true,
+          "apifyProxyGroups": []
+        }
+      },
+      "can_run_stage_2": true,
+      "required_business_fields_to_check": [
+        "caption",
+        "timestamp_or_date",
+        "url_or_shortcode",
+        "content_type",
+        "likes",
+        "comments",
+        "views_if_available",
+        "media_urls",
+        "video_url_if_available",
+        "carousel_data_if_available",
+        "reel_detection"
+      ],
+      "possible_output_field_names": [
+        "caption",
+        "timestamp",
+        "url",
+        "shortCode",
+        "likesCount",
+        "commentsCount",
+        "videoViewCount",
+        "displayUrl",
+        "videoUrl",
+        "type",
+        "images",
+        "ownerUsername",
+        "id",
+        "locationName",
+        "hashtags",
+        "mentions"
+      ],
+      "_output_note": "Field names not verified from a real run. Treat as probable — confirm against raw output in Stage 2.",
+      "risks": [
+        "resultsType='posts' should return both posts and reels; 'type' field distinguishes them but exact values (Image/Video/Sidecar/Reel) need Stage 2 confirmation",
+        "proxy required — free Apify proxy tier may be rate-limited on Instagram",
+        "Instagram anti-scraping may block even with proxy; result count may be less than resultsLimit"
+      ],
+      "stop_reason": null
+    },
+    "highlights_index": {
+      "actor_id": "scrapio/instagram-highlights-scraper",
+      "purpose": "Collect highlights list and highlight IDs from the first test account",
+      "schema_status": "manual_confirmation_needed",
+      "schema_source": "unknown",
+      "_schema_note": "Actor scrapio/instagram-highlights-scraper was NOT returned by any search or Apify API lookup. Only scrapio/instagram-profile-scraper surfaced for this author. Actor existence and exact input schema require manual verification before running.",
+      "accepts": "unknown",
+      "requires_proxy": "unknown",
+      "supports_limit": "unknown",
+      "test_input_status": "needs_manual_confirmation",
+      "test_input": {},
+      "can_run_stage_2": false,
+      "required_business_fields_to_check": [
+        "title",
+        "highlight_id",
+        "clean_highlight_id",
+        "cover_media",
+        "username",
+        "user_id"
+      ],
+      "possible_output_field_names": [],
+      "risks": [
+        "Actor ID scrapio/instagram-highlights-scraper could not be confirmed — it may not exist or may have been renamed/deprecated",
+        "clean_highlight_id extraction rule (strip 'highlight:' prefix) cannot be verified without confirmed output schema"
+      ],
+      "stop_reason": "Actor scrapio/instagram-highlights-scraper was not found in Apify search results or API. Schema, input format, and output fields are unconfirmed. Manual verification required: open https://apify.com/scrapio/instagram-highlights-scraper and confirm the actor exists, then capture exact input field names from the Input tab."
+    },
+    "highlight_stories": {
+      "actor_id": "igview-owner/instagram-highlights-stories-viewer",
+      "purpose": "Collect stories inside one highlight by clean highlight ID",
+      "schema_status": "manual_confirmation_needed",
+      "schema_source": "unknown",
+      "_schema_note": "Actor page confirmed to exist. Accepts highlightId parameter confirmed from search results. But exact input field name, required ID format (numeric-only vs 'highlight:XXXX' prefix), and complete output schema were not accessible — apify.com blocked all WebFetch calls.",
+      "accepts": "highlight_id",
+      "requires_proxy": "unknown",
+      "supports_limit": "unknown",
+      "test_input_status": "template_only",
+      "test_input_template": {
+        "highlightId": "WILL_BE_FILLED_AFTER_HIGHLIGHTS_INDEX_TEST",
+        "_format_note": "Exact format unconfirmed: may require numeric-only (e.g. 18268617304253172) or prefixed (e.g. highlight:18268617304253172). Confirm from actor Input tab before running."
+      },
+      "can_run_stage_2": true,
+      "_stage2_condition": "Can run only after highlights_index actor provides a valid clean_highlight_id AND highlightId format is manually confirmed",
+      "required_business_fields_to_check": [
+        "storyNumber",
+        "storyId",
+        "storyType",
+        "imageUrl",
+        "videoUrl",
+        "takenAt",
+        "duration",
+        "rawStoryData"
+      ],
+      "possible_output_field_names": [
+        "storyId",
+        "publishDate",
+        "expiryDate",
+        "imageUrl",
+        "videoUrl",
+        "mentions",
+        "links"
+      ],
+      "_output_note": "Field names inferred from search results only. Exact names (camelCase vs snake_case) unconfirmed. Treat as probable.",
+      "risks": [
+        "Cannot run before clean_highlight_id is obtained from highlights_index actor",
+        "highlightId format (prefix vs numeric-only) unconfirmed — wrong format will cause actor error",
+        "Actor may require login/session to access private or expired highlights"
+      ],
+      "stop_reason": null
+    }
+  },
+  "stage_2_allowed": false,
+  "stage_2_blockers": [
+    "NO_ACCOUNT_PROVIDED: No Instagram account URL was given — replace PASTE_TEST_ACCOUNT_HERE in accounts.json",
+    "HIGHLIGHTS_INDEX_SCHEMA_UNCONFIRMED: scrapio/instagram-highlights-scraper actor existence and input schema require manual verification",
+    "HIGHLIGHTS_STORIES_FORMAT_UNCONFIRMED: igview-owner/instagram-highlights-stories-viewer highlightId format (prefix vs numeric) requires manual confirmation"
+  ]
+}
