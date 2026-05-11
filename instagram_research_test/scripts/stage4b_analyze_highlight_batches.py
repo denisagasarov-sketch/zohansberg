@@ -37,6 +37,15 @@ BATCH_LIMITATION = "This is one batch from a 57-story highlight, not full highli
 DRY_RUN = "--dry-run" in sys.argv
 FORCE   = "--force"   in sys.argv
 
+# --only highlight_batch_1,highlight_batch_5,highlight_batch_8
+_only_arg = next((a for a in sys.argv if a.startswith("--only=")), None)
+if _only_arg is None and "--only" in sys.argv:
+    _idx = sys.argv.index("--only")
+    _only_arg = f"--only={sys.argv[_idx + 1]}" if _idx + 1 < len(sys.argv) else None
+ONLY_IDS: set = (
+    set(_only_arg.split("=", 1)[1].split(",")) if _only_arg else set()
+)
+
 load_dotenv(dotenv_path=BASE / ".env", override=True)
 
 # ── Guards ────────────────────────────────────────────────────────────────────
@@ -57,7 +66,11 @@ RAW_RESP_DIR.mkdir(parents=True, exist_ok=True)
 if DRY_RUN:
     calls_needed = 0
     for req in batches_plan:
-        out  = BATCHES_OUT_DIR / f"{req['request_id']}.json"
+        rid  = req["request_id"]
+        out  = BATCHES_OUT_DIR / f"{rid}.json"
+        if ONLY_IDS and rid not in ONLY_IDS:
+            print(f"  {rid}: [SKIP --only filter]")
+            continue
         skip = False
         if out.exists() and not FORCE:
             try:
@@ -68,10 +81,12 @@ if DRY_RUN:
                 pass
         if not skip:
             calls_needed += 1
-        print(f"  {req['request_id']}: stories={len(req.get('story_ids',[]))} "
+        print(f"  {rid}: stories={len(req.get('story_ids',[]))} "
               f"images={req['images_count']} "
               f"{'[SKIP existing OK]' if skip else '[CALL]'}")
     print(f"dry-run: {calls_needed} OpenAI calls would be made")
+    if ONLY_IDS:
+        print(f"--only filter: {sorted(ONLY_IDS)}")
     sys.exit(0)
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
@@ -241,6 +256,65 @@ def normalize_roles(raw_roles):
     return deduped, notes
 
 
+def parse_json_robust(raw_text):
+    """
+    Parse JSON from an OpenAI response that may contain trailing text.
+    Strategy:
+    1. Try json.loads() directly.
+    2. Strip markdown fences (```json ... ```) and retry.
+    3. Find the first '{', use raw_decode() to extract the first object,
+       ignoring any trailing text.
+    Returns (parsed_obj, parsing_notes).
+    Raises ValueError if no valid JSON object can be found.
+    """
+    parsing_notes = []
+
+    # Pass 1: clean parse
+    try:
+        return json.loads(raw_text), parsing_notes
+    except json.JSONDecodeError:
+        pass
+
+    # Pass 2: strip markdown fences
+    text = raw_text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        # drop first line (```json or ```) and last closing ```
+        inner_lines = []
+        in_block = False
+        for line in lines:
+            if line.startswith("```") and not in_block:
+                in_block = True
+                continue
+            if line.startswith("```") and in_block:
+                break
+            if in_block:
+                inner_lines.append(line)
+        text = "\n".join(inner_lines).strip()
+        try:
+            return json.loads(text), ["json_salvaged_from_response"]
+        except json.JSONDecodeError:
+            pass
+
+    # Pass 3: raw_decode from first '{'
+    brace_idx = text.find("{")
+    if brace_idx == -1:
+        raise ValueError(f"No JSON object found in response. Preview: {raw_text[:300]}")
+
+    text_from_brace = text[brace_idx:]
+    try:
+        obj, end_idx = json.JSONDecoder().raw_decode(text_from_brace)
+        trailing = text_from_brace[end_idx:].strip()
+        notes = ["json_salvaged_from_response"]
+        if trailing:
+            notes.append("trailing_text_ignored")
+        return obj, notes
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Could not salvage JSON from response: {e}. Preview: {raw_text[:300]}"
+        )
+
+
 def analyze_batch(req):
     request_id   = req["request_id"]
     batch_index  = req.get("batch_index", 0)
@@ -304,11 +378,10 @@ def analyze_batch(req):
         json.dumps(raw_resp, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    # Parse JSON
-    try:
-        result = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"OpenAI returned invalid JSON: {e}\n---\n{raw_text[:500]}")
+    # Parse JSON — robust: tolerates trailing text after valid JSON object
+    result, parsing_notes = parse_json_robust(raw_text)
+    if parsing_notes:
+        result.setdefault("parsing_notes", []).extend(parsing_notes)
 
     # Inject required fields
     result["account"]             = "vlada_kliuiko"
@@ -366,6 +439,10 @@ for req in batches_plan:
     request_id = req["request_id"]
     out_path   = BATCHES_OUT_DIR / f"{request_id}.json"
 
+    # --only: skip requests not in the filter set; count their existing results below
+    if ONLY_IDS and request_id not in ONLY_IDS:
+        continue
+
     # Resume: skip existing OK unless --force
     if out_path.exists() and not FORCE:
         try:
@@ -422,6 +499,26 @@ for req in batches_plan:
 
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
+# When --only was used, recount status across all 8 output files so summary
+# reflects the full picture, not just the re-run subset.
+if ONLY_IDS:
+    ok = partial = fail = 0
+    for req in batches_plan:
+        fp = BATCHES_OUT_DIR / f"{req['request_id']}.json"
+        if fp.exists():
+            try:
+                s = json.loads(fp.read_text(encoding="utf-8")).get("status", "FAIL")
+            except Exception:
+                s = "FAIL"
+        else:
+            s = "FAIL"
+        if s == "OK":
+            ok += 1
+        elif s == "PARTIAL":
+            partial += 1
+        else:
+            fail += 1
+
 if fail == 0 and partial == 0:
     summary_status = "OK"
 elif ok > 0 or partial > 0:
@@ -436,6 +533,7 @@ summary = {
     "batches_fail":                fail,
     "batches_skipped_existing_ok": skipped,
     "openai_calls_made":           calls_made,
+    "only_filter":                 sorted(ONLY_IDS) if ONLY_IDS else None,
     "status":                      summary_status,
     "errors":                      loop_errors,
 }
