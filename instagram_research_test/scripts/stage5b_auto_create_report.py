@@ -61,10 +61,11 @@ def build_report(sm: dict, si: dict) -> str:
     a("")
     a(f"- account: `{sm.get('account', '—')}`")
     a(f"- actor: `{sm.get('actor', '—')}`")
+    a(f"- mode: `{sm.get('mode', 'collect')}`")
     a(f"- run_timestamp: `{sm.get('run_timestamp', '—')}`")
     a(f"- apify_run_id: `{sm.get('apify_run_id', '—')}`")
     a(f"- max_highlights_requested: {sm.get('max_highlights_requested', '—')}")
-    a(f"- apify_calls: 1  (single call)")
+    a(f"- apify_calls: {'1  (single call)' if sm.get('mode') != 'normalize_only' else '0  (normalize-only, raw reused)'}")
     a("")
 
     a("## Collection stats")
@@ -77,17 +78,27 @@ def build_report(sm: dict, si: dict) -> str:
     a(f"- can_analyze_highlights: **{sm.get('can_analyze_highlights', False)}**")
     a("")
 
+    ns = sm.get("normalization_stats", {})
+    if ns:
+        a("## Normalization stats")
+        a("")
+        a(f"- image_stories:    {ns.get('image_stories', '—')}")
+        a(f"- video_stories:    {ns.get('video_stories', '—')}")
+        a(f"- null_id_count:    {ns.get('null_id_count', '—')}")
+        a(f"- null_media_count: {ns.get('null_media_count', '—')}")
+        a("")
+
     a("## Active stories (profile, last 24h)")
     a("")
     active = si.get("active_stories", [])
     a(f"Count: {len(active)}")
     if active:
         a("")
-        a("| # | id | type | timestamp | imageUrl | videoUrl |")
+        a("| # | id | mediaType | timestamp | imageUrl | videoUrl |")
         a("|---|---|---|---|---|---|")
         for i, s in enumerate(active, start=1):
             sid   = s.get("id") or "—"
-            stype = s.get("type") or "—"
+            stype = s.get("mediaType") or "—"
             ts    = s.get("timestamp") or "—"
             img   = "yes" if s.get("imageUrl") else "no"
             vid   = "yes" if s.get("videoUrl") else "no"

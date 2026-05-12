@@ -33,7 +33,7 @@ STORIES_INDEX_PATH    = NORM_DIR / "stage5b_auto_stories_index.json"
 
 
 # ---------------------------------------------------------------------------
-# Validation
+# Validation helpers (credentials)
 # ---------------------------------------------------------------------------
 
 def validate_token(token: str) -> list[str]:
@@ -101,19 +101,50 @@ def build_canonical_index(highlights: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Item normalization
+# Item normalization (automation-lab field names)
 # ---------------------------------------------------------------------------
 
 def normalize_item(item: dict) -> dict:
-    """Normalized story item. Media URLs preserved (not downloaded)."""
+    """
+    Map automation-lab field names to normalized schema.
+
+    automation-lab fields:
+      storyId, mediaUrl, mediaType, thumbnailUrl, timestamp,
+      expiresAt, durationSecs, caption, isHighlight,
+      highlightId, highlightTitle, hasLink, linkUrl,
+      stickerTypes, scrapedAt
+    """
+    media_type = item.get("mediaType") or ""
+    media_url  = item.get("mediaUrl")
+
+    if media_type == "Image":
+        image_url = media_url
+        video_url = None
+    elif media_type == "Video":
+        image_url = None
+        video_url = media_url
+    else:
+        image_url = media_url
+        video_url = None
+
     return {
-        "id":               item.get("id"),
-        "type":             item.get("type") or item.get("mediaType"),
-        "timestamp":        item.get("timestamp") or item.get("takenAtTimestamp"),
-        "imageUrl":         item.get("imageUrl") or item.get("displayUrl"),
-        "videoUrl":         item.get("videoUrl"),
-        "highlightId":      item.get("highlightId"),
-        "highlightTitle":   item.get("highlightTitle"),  # raw from actor, secondary only
+        "id":           item.get("storyId"),
+        "mediaUrl":     media_url,
+        "mediaType":    media_type or None,
+        "thumbnailUrl": item.get("thumbnailUrl"),
+        "imageUrl":     image_url,
+        "videoUrl":     video_url,
+        "timestamp":    item.get("timestamp"),
+        "expiresAt":    item.get("expiresAt"),
+        "durationSecs": item.get("durationSecs"),
+        "caption":      item.get("caption"),
+        "isHighlight":  item.get("isHighlight"),
+        "highlightId":  item.get("highlightId"),
+        "highlightTitle": item.get("highlightTitle"),   # raw from actor, secondary only
+        "hasLink":      item.get("hasLink"),
+        "linkUrl":      item.get("linkUrl"),
+        "stickerTypes": item.get("stickerTypes"),
+        "scrapedAt":    item.get("scrapedAt"),
     }
 
 
@@ -138,6 +169,175 @@ def split_items(
             highlight_map.setdefault(bare, []).append(normalize_item(item))
 
     return active, highlight_map
+
+
+# ---------------------------------------------------------------------------
+# Validation (normalized data quality)
+# ---------------------------------------------------------------------------
+
+def validate_normalized(
+    active_stories: list[dict],
+    highlight_map: dict[str, list[dict]],
+) -> dict:
+    """
+    Returns stats dict. Calls sys.exit(1) on hard failures:
+      - highlight_stories_count > 0 but all highlight mediaUrl are null
+      - > 10% of normalized stories have null id
+      - > 10% of normalized stories have null mediaUrl
+    """
+    all_stories = list(active_stories)
+    for stories in highlight_map.values():
+        all_stories.extend(stories)
+
+    total = len(all_stories)
+    image_count   = sum(1 for s in all_stories if s.get("mediaType") == "Image")
+    video_count   = sum(1 for s in all_stories if s.get("mediaType") == "Video")
+    null_id       = sum(1 for s in all_stories if s.get("id") is None)
+    null_media    = sum(1 for s in all_stories if s.get("mediaUrl") is None)
+
+    highlight_stories = [s for stories in highlight_map.values() for s in stories]
+    hl_count = len(highlight_stories)
+
+    stats = {
+        "total_normalized":   total,
+        "image_stories":      image_count,
+        "video_stories":      video_count,
+        "null_id_count":      null_id,
+        "null_media_count":   null_media,
+        "highlight_stories":  hl_count,
+    }
+
+    # Hard failure: highlights returned but all mediaUrl null
+    if hl_count > 0 and all(s.get("mediaUrl") is None for s in highlight_stories):
+        print(
+            f"[ERROR] {hl_count} highlight stories returned but ALL have null mediaUrl.",
+            file=sys.stderr,
+        )
+        print("  Field mapping may be wrong. Check raw item keys vs normalize_item().", file=sys.stderr)
+        sys.exit(1)
+
+    # Hard failure: > 10% null id
+    if total > 0 and null_id / total > 0.10:
+        pct = null_id / total * 100
+        print(f"[ERROR] {null_id}/{total} ({pct:.1f}%) normalized stories have null id.", file=sys.stderr)
+        print("  Expected field: storyId. Check raw item keys.", file=sys.stderr)
+        sys.exit(1)
+
+    # Hard failure: > 10% null mediaUrl
+    if total > 0 and null_media / total > 0.10:
+        pct = null_media / total * 100
+        print(f"[ERROR] {null_media}/{total} ({pct:.1f}%) normalized stories have null mediaUrl.", file=sys.stderr)
+        print("  Expected field: mediaUrl. Check raw item keys.", file=sys.stderr)
+        sys.exit(1)
+
+    return stats
+
+
+# ---------------------------------------------------------------------------
+# Build and save outputs (shared by collect and normalize_from_raw)
+# ---------------------------------------------------------------------------
+
+def _build_and_save(
+    raw_items: list[dict],
+    canonical_index: dict,
+    total_in_index: int,
+    run_meta: dict,
+) -> dict:
+    """
+    Normalize raw_items, validate, build highlight entries, save outputs.
+    run_meta keys: apify_run_id, apify_dataset_id, max_highlights_requested, mode
+    """
+    active_stories, highlight_map = split_items(raw_items)
+    total_items = len(raw_items)
+
+    val_stats = validate_normalized(active_stories, highlight_map)
+
+    print(f"[INFO] Normalization stats:")
+    print(f"  image_stories:   {val_stats['image_stories']}")
+    print(f"  video_stories:   {val_stats['video_stories']}")
+    print(f"  null_id_count:   {val_stats['null_id_count']}")
+    print(f"  null_media_count:{val_stats['null_media_count']}")
+
+    # Build highlight entries with canonical metadata from singhera07 index
+    highlight_entries: list[dict] = []
+    for bare_id, stories in highlight_map.items():
+        canonical  = canonical_index.get(bare_id, {})
+        auto_title = next(
+            (s["highlightTitle"] for s in stories if s.get("highlightTitle")), None
+        )
+        highlight_entries.append({
+            "highlight_id":         bare_id,
+            "position":             canonical.get("position"),        # from singhera07
+            "canonical_title":      canonical.get("canonical_title"), # from singhera07
+            "canonical_cover":      canonical.get("canonical_cover"), # from singhera07
+            "automation_lab_title": auto_title,                       # secondary / raw
+            "stories_count":        len(stories),
+            "stories":              stories,
+        })
+
+    highlight_entries.sort(key=lambda h: (h["position"] is None, h["position"] or 9999))
+
+    max_highlights = run_meta.get("max_highlights_requested")
+
+    # Warnings
+    warnings: list[str] = []
+    if max_highlights and len(highlight_map) < min(max_highlights, total_in_index):
+        warnings.append(
+            f"Returned {len(highlight_map)} highlights; expected up to "
+            f"{min(max_highlights, total_in_index)}."
+        )
+    unmatched = [bid for bid in highlight_map if bid not in canonical_index]
+    if unmatched:
+        warnings.append(
+            f"highlightIds not found in canonical index (title/position unavailable): {unmatched}"
+        )
+
+    can_analyze = len(highlight_entries) > 0 and any(
+        e["stories_count"] > 0 for e in highlight_entries
+    )
+
+    summary = {
+        "account":                  ACCOUNT,
+        "actor":                    ACTOR_ID,
+        "mode":                     run_meta.get("mode", "collect"),
+        "run_timestamp":            datetime.now(timezone.utc).isoformat(),
+        "apify_run_id":             run_meta.get("apify_run_id"),
+        "apify_dataset_id":         run_meta.get("apify_dataset_id"),
+        "max_highlights_requested": max_highlights,
+        "total_items_returned":     total_items,
+        "active_stories_count":     len(active_stories),
+        "highlight_stories_count":  total_items - len(active_stories),
+        "highlights_returned":      len(highlight_map),
+        "highlights_in_index":      total_in_index,
+        "can_analyze_highlights":   can_analyze,
+        "normalization_stats":      val_stats,
+        "warnings":                 warnings,
+        "blockers":                 [] if can_analyze else ["No highlight stories returned."],
+    }
+
+    stories_index = {
+        "account":              ACCOUNT,
+        "actor":                ACTOR_ID,
+        "mode":                 run_meta.get("mode", "collect"),
+        "run_timestamp":        summary["run_timestamp"],
+        "apify_run_id":         run_meta.get("apify_run_id"),
+        "max_highlights":       max_highlights,
+        "active_stories_count": len(active_stories),
+        "active_stories":       active_stories,
+        "highlights":           highlight_entries,
+    }
+
+    NORM_DIR.mkdir(parents=True, exist_ok=True)
+    SUMMARY_PATH.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    STORIES_INDEX_PATH.write_text(
+        json.dumps(stories_index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"[INFO] Summary:       {SUMMARY_PATH.relative_to(BASE)}")
+    print(f"[INFO] Stories index: {STORIES_INDEX_PATH.relative_to(BASE)}")
+
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +379,48 @@ def run_dry_run(max_highlights: int) -> None:
     print()
     print("[DRY RUN] No Apify call made. No files written.")
     sys.exit(0)
+
+
+# ---------------------------------------------------------------------------
+# Normalize-only mode (rebuild from existing raw, no Apify call)
+# ---------------------------------------------------------------------------
+
+def normalize_from_raw() -> dict:
+    """
+    Rebuild normalized outputs from data/raw/stage5b_auto_stories_raw.json
+    without making any Apify call. Reads existing summary for run metadata.
+    """
+    if not RAW_OUTPUT_PATH.exists():
+        print(f"[ERROR] Raw file not found: {RAW_OUTPUT_PATH.relative_to(BASE)}", file=sys.stderr)
+        print("  Run without --normalize-only first to collect data from Apify.", file=sys.stderr)
+        sys.exit(1)
+
+    raw_items = json.loads(RAW_OUTPUT_PATH.read_text(encoding="utf-8"))
+    total_items = len(raw_items)
+    print(f"[INFO] Loaded {total_items} items from {RAW_OUTPUT_PATH.relative_to(BASE)}")
+
+    # Recover run metadata from existing summary if available (best-effort)
+    run_id     = None
+    dataset_id = None
+    max_hl     = None
+    if SUMMARY_PATH.exists():
+        prev = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+        run_id     = prev.get("apify_run_id")
+        dataset_id = prev.get("apify_dataset_id")
+        max_hl     = prev.get("max_highlights_requested")
+
+    highlights      = load_highlights_index()
+    canonical_index = build_canonical_index(highlights)
+    total_in_index  = len(highlights)
+
+    run_meta = {
+        "apify_run_id":             run_id,
+        "apify_dataset_id":         dataset_id,
+        "max_highlights_requested": max_hl,
+        "mode":                     "normalize_only",
+    }
+
+    return _build_and_save(raw_items, canonical_index, total_in_index, run_meta)
 
 
 # ---------------------------------------------------------------------------
@@ -245,80 +487,11 @@ def collect(client, max_highlights: int) -> dict:
     )
     print(f"[INFO] Raw output: {RAW_OUTPUT_PATH.relative_to(BASE)} ({total_items} items)")
 
-    active_stories, highlight_map = split_items(raw_items)
-
-    # Build highlight entries with canonical metadata joined from singhera07 index
-    highlight_entries: list[dict] = []
-    for bare_id, stories in highlight_map.items():
-        canonical  = canonical_index.get(bare_id, {})
-        auto_title = next(
-            (s["highlightTitle"] for s in stories if s.get("highlightTitle")), None
-        )
-        highlight_entries.append({
-            "highlight_id":         bare_id,
-            "position":             canonical.get("position"),        # from singhera07
-            "canonical_title":      canonical.get("canonical_title"), # from singhera07
-            "canonical_cover":      canonical.get("canonical_cover"), # from singhera07
-            "automation_lab_title": auto_title,                       # secondary / raw
-            "stories_count":        len(stories),
-            "stories":              stories,
-        })
-
-    highlight_entries.sort(key=lambda h: (h["position"] is None, h["position"] or 9999))
-
-    # Warnings
-    warnings: list[str] = []
-    if len(highlight_map) < min(max_highlights, total_in_index):
-        warnings.append(
-            f"Returned {len(highlight_map)} highlights; expected up to "
-            f"{min(max_highlights, total_in_index)}."
-        )
-    unmatched = [bid for bid in highlight_map if bid not in canonical_index]
-    if unmatched:
-        warnings.append(
-            f"highlightIds not found in canonical index (title/position unavailable): {unmatched}"
-        )
-
-    can_analyze = len(highlight_entries) > 0 and any(
-        e["stories_count"] > 0 for e in highlight_entries
-    )
-
-    summary = {
-        "account":                  ACCOUNT,
-        "actor":                    ACTOR_ID,
-        "run_timestamp":            datetime.now(timezone.utc).isoformat(),
+    run_meta = {
         "apify_run_id":             run_id,
         "apify_dataset_id":         dataset_id,
         "max_highlights_requested": max_highlights,
-        "total_items_returned":     total_items,
-        "active_stories_count":     len(active_stories),
-        "highlight_stories_count":  total_items - len(active_stories),
-        "highlights_returned":      len(highlight_map),
-        "highlights_in_index":      total_in_index,
-        "can_analyze_highlights":   can_analyze,
-        "warnings":                 warnings,
-        "blockers":                 [] if can_analyze else ["No highlight stories returned."],
+        "mode":                     "collect",
     }
 
-    stories_index = {
-        "account":              ACCOUNT,
-        "actor":                ACTOR_ID,
-        "run_timestamp":        summary["run_timestamp"],
-        "apify_run_id":         run_id,
-        "max_highlights":       max_highlights,
-        "active_stories_count": len(active_stories),
-        "active_stories":       active_stories,
-        "highlights":           highlight_entries,
-    }
-
-    NORM_DIR.mkdir(parents=True, exist_ok=True)
-    SUMMARY_PATH.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    STORIES_INDEX_PATH.write_text(
-        json.dumps(stories_index, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    print(f"[INFO] Summary:       {SUMMARY_PATH.relative_to(BASE)}")
-    print(f"[INFO] Stories index: {STORIES_INDEX_PATH.relative_to(BASE)}")
-
-    return summary
+    return _build_and_save(raw_items, canonical_index, total_in_index, run_meta)

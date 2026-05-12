@@ -17,6 +17,9 @@ Usage:
 
   # real run — all highlights in index
   python scripts/stage5b_auto_run_local.py --max-highlights 32
+
+  # normalize-only — rebuild outputs from existing raw, no Apify call
+  python scripts/stage5b_auto_run_local.py --normalize-only
 """
 
 import sys
@@ -28,9 +31,10 @@ os.environ["PYTHONUTF8"] = "1"
 BASE = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
 
-DRY_RUN = "--dry-run" in sys.argv
+DRY_RUN       = "--dry-run" in sys.argv
+NORMALIZE_ONLY = "--normalize-only" in sys.argv
 
-# --max-highlights N is REQUIRED
+# --max-highlights N is REQUIRED unless --normalize-only
 MAX_HIGHLIGHTS: int | None = None
 for i, arg in enumerate(sys.argv):
     if arg == "--max-highlights" and i + 1 < len(sys.argv):
@@ -46,10 +50,11 @@ for i, arg in enumerate(sys.argv):
             )
             sys.exit(1)
 
-if MAX_HIGHLIGHTS is None:
+if not NORMALIZE_ONLY and MAX_HIGHLIGHTS is None:
     print("[ERROR] --max-highlights N is required. Unbounded runs are not allowed.", file=sys.stderr)
     print("  Example: python scripts/stage5b_auto_run_local.py --max-highlights 3", file=sys.stderr)
     print("  Use --dry-run to preview without calling Apify.", file=sys.stderr)
+    print("  Use --normalize-only to rebuild outputs from existing raw (no Apify).", file=sys.stderr)
     sys.exit(1)
 
 
@@ -59,6 +64,20 @@ def main() -> None:
     if DRY_RUN:
         collector.run_dry_run(MAX_HIGHLIGHTS)
         return  # run_dry_run calls sys.exit(0)
+
+    if NORMALIZE_ONLY:
+        print("=== Stage 5B-auto: NORMALIZE ONLY (no Apify call) ===")
+        print(f"Source: {collector.RAW_OUTPUT_PATH.relative_to(BASE)}")
+        print()
+        summary = collector.normalize_from_raw()
+
+        print("\n=== Creating report ===")
+        import stage5b_auto_create_report as reporter
+        reporter.main()
+
+        print("\n=== Normalize-only complete ===")
+        _print_outputs()
+        return
 
     # Real run — load env and validate credentials
     from dotenv import load_dotenv
@@ -104,6 +123,10 @@ def main() -> None:
     reporter.main()
 
     print("\n=== Stage 5B-auto complete ===")
+    _print_outputs()
+
+
+def _print_outputs() -> None:
     print("Runtime outputs (not committed):")
     print("  data/raw/stage5b_auto_stories_raw.json")
     print("  data/normalized/stage5b_auto_stories_summary.json")

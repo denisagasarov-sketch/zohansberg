@@ -54,6 +54,10 @@ python scripts/stage5b_auto_run_local.py --max-highlights 3
 # реальный запуск — все 32 highlights
 python scripts/stage5b_auto_run_local.py --max-highlights 32
 
+# normalize-only — перестроить outputs из существующего raw, Apify НЕ вызывается
+# требует: data/raw/stage5b_auto_stories_raw.json (предыдущий реальный запуск)
+python scripts/stage5b_auto_run_local.py --normalize-only
+
 # просмотр результатов
 cat report/stage_5b_auto_stories_report.md
 cat data/normalized/stage5b_auto_stories_index.json
@@ -110,6 +114,39 @@ Payload shape (sanitized — no secrets printed):
 Скрипт упадёт с non-zero exit если:
 - Apify статус SUCCEEDED, но dataset содержит 0 items
 - `includeHighlights=true`, но 0 highlight story items в результате
+
+## Normalization validation (реальный запуск и --normalize-only)
+
+Скрипт упадёт с non-zero exit если:
+- highlight stories count > 0 и **все** highlight mediaUrl = null
+- более 10% normalized stories имеют null `id` (expected: `storyId`)
+- более 10% normalized stories имеют null `mediaUrl`
+
+## Mapping: automation-lab поля → normalized schema
+
+| Raw поле (automation-lab) | Normalized поле | Примечание |
+|---|---|---|
+| `storyId` | `id` | |
+| `mediaUrl` | `mediaUrl` | всегда сохраняется |
+| `mediaType` | `mediaType` | `"Image"` или `"Video"` |
+| `thumbnailUrl` | `thumbnailUrl` | |
+| `mediaUrl` (если Image) | `imageUrl` | |
+| `mediaUrl` (если Video) | `videoUrl` | |
+| `null` (если Image) | `videoUrl` | |
+| `null` (если Video) | `imageUrl` | |
+| `timestamp` | `timestamp` | |
+| `expiresAt` | `expiresAt` | |
+| `durationSecs` | `durationSecs` | |
+| `caption` | `caption` | |
+| `isHighlight` | `isHighlight` | |
+| `highlightId` | `highlightId` | сохраняется raw |
+| `highlightTitle` | `highlightTitle` | secondary/raw |
+| `hasLink` | `hasLink` | |
+| `linkUrl` | `linkUrl` | |
+| `stickerTypes` | `stickerTypes` | |
+| `scrapedAt` | `scrapedAt` | |
+
+**НЕ используй**: `id`, `imageUrl`, `videoUrl`, `displayUrl`, `type` — это старые/неправильные поля.
 
 ## ВАЖНО: cost warning
 
