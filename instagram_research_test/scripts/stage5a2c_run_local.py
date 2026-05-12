@@ -255,6 +255,21 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
     print(f"Posts:         {semantic_output.get('total_posts', 0)}")
     print()
 
+    # Try to load stage5a2b captions for trust+leadgen detection
+    stage5a2b_captions: dict[int, str] = {}
+    if STAGE5A2B_PATH.exists():
+        try:
+            a2b_data = json.loads(STAGE5A2B_PATH.read_text(encoding="utf-8"))
+            for p in a2b_data.get("posts") or []:
+                cap = p.get("full_caption") or p.get("caption_for_analysis") or ""
+                stage5a2b_captions[p.get("position")] = cap
+            print(f"Stage5A2B captions loaded: {len(stage5a2b_captions)} posts")
+        except Exception:
+            pass
+    if not stage5a2b_captions:
+        print("[INFO] Stage 5A-2B output not available — trust+leadgen rule will not be applied")
+    print()
+
     # Run structural validation
     val_errors = validate_output(semantic_output)
 
@@ -267,22 +282,27 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
         gf  = sem.get("google_sheet_fields") or {}
         pos = sem.get("position")
 
-        # Re-run _validate_and_fix on the fields as if they came from OpenAI
+        # Re-run _validate_and_fix with caption if available
+        caption = stage5a2b_captions.get(pos, "")
         analysis_fields = dict(gf)
-        analysis_fields["confidence"] = sem.get("confidence") or {}
-        analysis_fields["evidence"]   = sem.get("evidence") or {}
-        analysis_fields["limitations"] = []
+        analysis_fields["confidence"]   = sem.get("confidence") or {}
+        analysis_fields["evidence"]     = sem.get("evidence") or {}
+        analysis_fields["limitations"]  = []
+        post_with_caption = {"full_caption": caption} if caption else {}
 
-        fixed_fields, new_warns, new_notes = _validate_and_fix(analysis_fields, {})
+        fixed_fields, new_warns, new_notes = _validate_and_fix(analysis_fields, post_with_caption)
 
         if new_notes:
             any_pp_changes = True
-            pp_issues.append(f"Post {pos}: {len(new_notes)} postprocessing fix(es) needed")
+            permalink = sem.get("permalink") or f"position={pos}"
+            pp_issues.append(f"\nPost {pos} — {permalink}")
             for note in new_notes:
-                pp_issues.append(
-                    f"  [{note['field']}] {note['reason']}"
-                    f"  orig={note['original_value'][:60]!r} → final={note['final_value'][:60]!r}"
-                )
+                orig  = str(note.get("original_value") or "")
+                final = str(note.get("final_value") or "")
+                pp_issues.append(f"  {note['field']}:")
+                pp_issues.append(f"    original:  {orig[:100]}")
+                pp_issues.append(f"    proposed:  {final[:100]}")
+                pp_issues.append(f"    reason:    {note['reason']}")
 
         # Build fixed semantic post
         new_gf = {k: v for k, v in fixed_fields.items()
@@ -335,9 +355,9 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
 
     if pp_issues:
         all_clean = False
-        print(f"Postprocessing issues ({len(pp_issues)} lines):")
+        print("Proposed postprocessing fixes:")
         for line in pp_issues:
-            print(f"  {line}")
+            print(line)
         print()
 
     if rows_issues:

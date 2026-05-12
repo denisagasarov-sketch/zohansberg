@@ -371,7 +371,167 @@ def _normalize_funnel_role(value: str) -> tuple[str, list[str]]:
     return result, warns
 
 
-# ── Response parser & validator ────────────────────────────────────────────
+# ── Trust + leadgen detection & rule ─────────────────────────────────────
+
+# Ordered list for role output — preserves canonical funnel order
+_FUNNEL_ORDER = ["знакомство", "доверие", "прогрев", "продажа", "лидогенерация"]
+
+# Trust proof signals: distinct evidence categories
+_TRUST_CAT_PATTERNS = [
+    # 1. Experience (years of work)
+    re.compile(r"\b\d+\+?\s*лет\b|\bлет\s+опыта\b", re.IGNORECASE),
+    # 2. Scale numbers (N+ projects/clients/cases)
+    re.compile(r"\b\d+\+\s*(?:проект|кейс|клиент)\w*", re.IGNORECASE),
+    # 3. Entity (agency/team/company)
+    re.compile(r"\bагентств\w+\b|\bкоманд[аы]\b|\bкомпани[яи]\b", re.IGNORECASE),
+    # 4. Clients mentioned as evidence
+    re.compile(r"\b(?:наших?|наши)\s+клиент\w*|\bсреди\s+клиент\w*|\bклиент(?:ов|ы|ам|ах)\b", re.IGNORECASE),
+    # 5. Cases / portfolio
+    re.compile(r"\bкейс(?:ов|ы)?\b|\bпортфолио\b", re.IGNORECASE),
+    # 6. Services list
+    re.compile(r"\bуслуг[иа]\b", re.IGNORECASE),
+    # 7. Geographic reach / markets
+    re.compile(r"\b(?:ЕС|СНГ|Европ\w+)\b|\bрынк(?:и|ов|ах)?\b", re.IGNORECASE),
+]
+
+# Leadgen / action signals: explicit conversion path
+_LEADGEN_ACTION_RE = re.compile(
+    r"\b(?:"
+    r"консультаци[яи]|заявк[аи]|анкет[аы]|предзапись|предзаписи|"
+    r"пишите|напишите|оставьте|заполните|запишитесь|нажмите|"
+    r"директ|комментари\w*|кодовое\s+слово|"
+    r"расчет\s+стоимости|получить\s+расчет|"
+    r"закрытый\s+канал|закрытый\s+чат"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Patterns for "Почему закреплен" — prefix-based (no trailing \b; Cyrillic inflected forms)
+_PZ_TRUST_RE = re.compile(
+    r"\b(?:доверие|доверия|опыт\w*|клиент\w*|проект\w*|кейс\w*|компетент\w*|"
+    r"доказательств\w*|эксперт\w*|агентств\w*)",
+    re.IGNORECASE,
+)
+_PZ_LEADGEN_RE = re.compile(
+    r"\b(?:лидогенераци\w*|консультаци\w*|заявк\w*|анкет\w*|запис\w+|воронк\w*|лидген\w*)",
+    re.IGNORECASE,
+)
+
+
+def _count_trust_categories(caption: str) -> int:
+    """Return number of distinct trust proof signal categories present in caption."""
+    return sum(1 for pat in _TRUST_CAT_PATTERNS if pat.search(caption))
+
+
+def _has_trust_proof(caption: str) -> bool:
+    """True if caption has 2+ distinct trust proof signal categories."""
+    return _count_trust_categories(caption) >= 2
+
+
+def _has_leadgen_action(caption: str) -> bool:
+    """True if caption has at least one explicit leadgen/action signal."""
+    return bool(_LEADGEN_ACTION_RE.search(caption))
+
+
+def _build_trust_leadgen_pz(caption: str, cta_dest: str) -> str:
+    """Build a specific 'Почему закреплен' that references trust proof + leadgen task."""
+    ev_parts: list[str] = []
+
+    # Experience
+    exp_m = re.search(r"\b(\d+\+?\s*лет(?:\s+опыта)?)\b", caption, re.IGNORECASE)
+    if exp_m:
+        ev_parts.append(exp_m.group(1).strip().lower())
+
+    # Scale (N+ items)
+    scale_m = re.search(r"\b(\d+\+\s*(?:проект|кейс|клиент)\w*)\b", caption, re.IGNORECASE)
+    if scale_m:
+        ev_parts.append(scale_m.group(1).strip().lower())
+
+    # Entity
+    if re.search(r"\bагентств\w+\b|\bкоманд[аы]\b", caption, re.IGNORECASE):
+        ev_parts.append("агентство/команда")
+
+    # Services
+    if re.search(r"\bуслуг[иа]\b", caption, re.IGNORECASE):
+        ev_parts.append("список услуг")
+
+    # Clients (if no scale already captured)
+    if not scale_m and re.search(r"\bклиент(?:ов|ы|ам)?\b", caption, re.IGNORECASE):
+        ev_parts.append("клиентов")
+
+    # CTA destination type
+    cta_label = "консультацию"
+    if "консультация" in cta_dest or re.search(r"\bконсультаци\w+\b", caption, re.IGNORECASE):
+        cta_label = "консультацию"
+    elif "анкета" in cta_dest or re.search(r"\bанкет\w+\b", caption, re.IGNORECASE):
+        cta_label = "анкету"
+    elif re.search(r"\bзаявк\w+\b", caption, re.IGNORECASE):
+        cta_label = "заявку"
+
+    ev_str = ", ".join(ev_parts[:3]) if ev_parts else "опыт, клиентов и услуги"
+    result = (
+        f"Вероятно, закреплен для доверия и лидогенерации: "
+        f"показывает {ev_str} и ведет к {cta_label}."
+    )
+    return result[:250] if len(result) > 250 else result
+
+
+def _apply_trust_leadgen_rule(
+    fixed: dict,
+    caption: str,
+    pp_notes: list[dict],
+    warns: list[str],
+) -> None:
+    """
+    If caption has trust proof signals (2+ categories) AND leadgen/action signals,
+    ensure Роль в воронке includes both 'доверие' and 'лидогенерация'.
+    Also updates 'Почему закреплен' if it doesn't already mention both.
+    Mutates fixed, pp_notes, warns in place.
+    """
+    if not caption:
+        return
+    if not (_has_trust_proof(caption) and _has_leadgen_action(caption)):
+        return
+
+    # ── 1. Role ──────────────────────────────────────────────────────────
+    rv = fixed.get("Роль в воронке", "")
+    existing_tokens = {t.strip().lower() for t in re.split(r"[/,]", rv) if t.strip()} if rv else set()
+    required = {"доверие", "лидогенерация"}
+    missing  = required - existing_tokens
+
+    if missing:
+        orig_rv = rv
+        merged  = existing_tokens | required
+        # Keep only valid atoms; preserve canonical funnel order
+        new_rv  = " / ".join(t for t in _FUNNEL_ORDER if t in merged)
+        fixed["Роль в воронке"] = new_rv
+        warns.append(
+            f"Роль в воронке: added {sorted(missing)} — caption has trust proof signals + leadgen CTA"
+        )
+        pp_notes.append({
+            "field": "Роль в воронке",
+            "original_value": orig_rv,
+            "final_value": new_rv,
+            "reason": "Caption contains both trust proof signals and explicit leadgen CTA",
+        })
+
+    # ── 2. Почему закреплен ───────────────────────────────────────────────
+    pz = fixed.get("Почему закреплен", "")
+    pz_has_trust   = bool(_PZ_TRUST_RE.search(pz))
+    pz_has_leadgen = bool(_PZ_LEADGEN_RE.search(pz))
+
+    if not (pz_has_trust and pz_has_leadgen):
+        orig_pz = pz
+        cta_dest = fixed.get("Куда ведет CTA", "") or ""
+        new_pz   = _build_trust_leadgen_pz(caption, cta_dest)
+        fixed["Почему закреплен"] = new_pz
+        warns.append("Почему закреплен: updated to reflect both trust proof and leadgen task")
+        pp_notes.append({
+            "field": "Почему закреплен",
+            "original_value": orig_pz,
+            "final_value": new_pz,
+            "reason": "Pinned role includes both trust proof and leadgen path",
+        })
 
 def _validate_and_fix(
     raw: dict, post: dict
@@ -479,6 +639,10 @@ def _validate_and_fix(
                     "final_value": normalized_rv,
                     "reason": "Normalized composite role",
                 })
+
+    # 4.5. Trust + leadgen rule
+    _caption = post.get("full_caption") or post.get("caption_for_analysis") or ""
+    _apply_trust_leadgen_rule(fixed, _caption, pp_notes, warns)
 
     # 5. Хук / первый экран always empty (visual/OCR not done)
     hook = fixed.get("Хук / первый экран", "")
@@ -1121,5 +1285,89 @@ def run_regression_checks() -> tuple[int, int, list[str]]:
     ff, wf, _ = _validate_and_fix(raw_f, {})
     eq("PP: Вероятно prefix not doubled",
        ff.get("Почему закреплен"), "Вероятно, закреплен как вход в воронку")
+
+    # ── Trust + leadgen rule ──────────────────────────────────────────────
+
+    # A. Trust proof signals helper
+    ok("Trust: agency+experience detected",
+       _has_trust_proof("Агентство работает 6+ лет. Среди клиентов — крупные компании."))
+    ok("Trust: N+ projects detected",
+       _has_trust_proof("1000+ проектов. Команда из 20 специалистов."))
+    ok("Trust: NOT triggered by single weak mention",
+       not _has_trust_proof("Хороший контент — это опыт."))  # only 1 category
+    ok("Leadgen: consultation CTA detected",
+       _has_leadgen_action("Пишите слово «консультация» в комментариях."))
+    ok("Leadgen: application form detected",
+       _has_leadgen_action("Оставьте заявку через анкету."))
+    ok("Leadgen: NOT triggered by pure educational text",
+       not _has_leadgen_action("Как создать контент-план за 30 минут."))
+
+    # B. Trust + leadgen: role must include both доверие and лидогенерация
+    trust_leadgen_caption = (
+        "Агентство работает более 6 лет. Среди клиентов — топовые бренды СНГ. "
+        "1000+ проектов в портфолио. Список услуг: SEO, контекст, SMM. "
+        "Пишите слово «консультация» в комментариях."
+    )
+    raw_tl = {
+        "Роль в воронке": "лидогенерация",
+        "Какой CTA": "Пишите слово «консультация» в комментариях",
+        "Куда ведет CTA": "комментарии → консультация",
+        "Почему закреплен": "Вероятно, закреплен для лидогенерации",
+    }
+    post_tl = {"full_caption": trust_leadgen_caption}
+    ftl, _, ntl = _validate_and_fix(raw_tl, post_tl)
+    ok("TL: доверие added to role",
+       "доверие" in ftl.get("Роль в воронке", ""))
+    ok("TL: лидогенерация preserved in role",
+       "лидогенерация" in ftl.get("Роль в воронке", ""))
+    ok("TL: pp_note for role change",
+       any(n["field"] == "Роль в воронке" for n in ntl))
+    ok("TL: Почему закреплен updated to mention trust",
+       bool(_PZ_TRUST_RE.search(ftl.get("Почему закреплен", ""))))
+    ok("TL: Почему закреплен updated to mention leadgen",
+       bool(_PZ_LEADGEN_RE.search(ftl.get("Почему закреплен", ""))))
+    ok("TL: Почему закреплен starts with Вероятно",
+       ftl.get("Почему закреплен", "").startswith("Вероятно"))
+
+    # C. Leadgen only (no trust proof) — do NOT add доверие
+    leadgen_only_caption = "Пишите «АНКЕТА» в директ и комментарии для предзаписи."
+    raw_lo = {"Роль в воронке": "лидогенерация", "Какой CTA": "Пишите «АНКЕТА» в директ"}
+    post_lo = {"full_caption": leadgen_only_caption}
+    flo, _, _ = _validate_and_fix(raw_lo, post_lo)
+    eq("TL: leadgen-only keeps role unchanged",
+       flo.get("Роль в воронке"), "лидогенерация")
+
+    # D. Trust only (no leadgen action) — do NOT add лидогенерация
+    trust_only_caption = "6 лет опыта, клиенты, кейсы, услуги по SEO и контексту. Агентство."
+    raw_to = {"Роль в воронке": "доверие", "Какой CTA": ""}
+    post_to = {"full_caption": trust_only_caption}
+    fto, _, _ = _validate_and_fix(raw_to, post_to)
+    ok("TL: trust-only does NOT add лидогенерация",
+       "лидогенерация" not in fto.get("Роль в воронке", ""))
+
+    # E. Trust + leadgen with existing composite role — extends cleanly
+    raw_te = {
+        "Роль в воронке": "доверие / прогрев",
+        "Какой CTA": "Напишите нам в директ",
+        "Куда ведет CTA": "директ → консультация",
+        "Почему закреплен": "Вероятно, закреплен для прогрева аудитории",
+    }
+    post_te = {"full_caption": trust_leadgen_caption}
+    fte, _, nte = _validate_and_fix(raw_te, post_te)
+    rv_te = fte.get("Роль в воронке", "")
+    ok("TL: existing composite role extended with лидогенерация",
+       "доверие" in rv_te and "лидогенерация" in rv_te and "прогрев" in rv_te)
+    ok("TL: extended role atoms are valid",
+       all(t.strip() in ALLOWED_FUNNEL_ROLES for t in re.split(r"[/,]", rv_te) if t.strip()))
+
+    # F. Invalid role atom still rejected even with trust+leadgen
+    raw_inv = {"Роль в воронке": "экспертность / лидогенерация"}
+    post_inv = {"full_caption": trust_leadgen_caption}
+    finv, _, _ = _validate_and_fix(raw_inv, post_inv)
+    ok("TL: invalid role atom 'экспертность' still cleared",
+       "экспертность" not in finv.get("Роль в воронке", ""))
+    ok("TL: лидогенерация kept + доверие added after invalid atom fix",
+       "лидогенерация" in finv.get("Роль в воронке", "") and
+       "доверие" in finv.get("Роль в воронке", ""))
 
     return passed, failed, errors

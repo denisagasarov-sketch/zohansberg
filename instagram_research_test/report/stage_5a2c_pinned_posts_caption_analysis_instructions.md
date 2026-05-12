@@ -184,6 +184,33 @@ Allowed: `знакомство` | `доверие` | `прогрев` | `про�
 
 Composite: `"доверие / прогрев"`, `"доверие / лидогенерация"`, `"прогрев / лидогенерация"`
 
+### Trust + leadgen rule (deterministic postprocessing)
+
+If caption contains **trust proof signals (2+ categories)** AND **leadgen/action signals**,
+postprocessing automatically ensures role includes both `доверие` and `лидогенерация`.
+
+**Trust proof signal categories (need 2+ to fire):**
+- Experience years: `"6+ лет"`, `"лет опыта"`
+- Scale numbers: `"1000+ проектов"`, `"500+ клиентов"`
+- Entity: `"агентство"`, `"команда"`, `"компания"`
+- Clients mentioned: `"клиентов"`, `"среди наших клиентов"`
+- Cases / portfolio: `"кейсы"`, `"портфолио"`
+- Services list: `"услуги"`
+- Geography / market reach: `"ЕС"`, `"СНГ"`, `"рынки"`
+
+**Leadgen / action signals (need 1+ to fire):**
+`консультация`, `заявка`, `анкета`, `предзапись`, `пишите`, `напишите`,
+`оставьте`, `заполните`, `директ`, `комментарии`, `кодовое слово`, `закрытый канал`
+
+**Effect:**
+- `Роль в воронке` is extended to include both `доверие` and `лидогенерация`
+- `Почему закреплен` is rewritten to mention both trust proof and leadgen task
+- Both changes are recorded in `postprocessing_notes`
+
+**Does NOT fire if:**
+- Caption has leadgen signals but no trust proof (< 2 categories)
+- Caption has trust proof but no leadgen signals
+
 ---
 
 ## Cache system
