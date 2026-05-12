@@ -6,5 +6,6 @@ handoff/
 data/normalized/stage5d_coverage_map.json
 data/normalized/stage5d_coverage_summary.json
 report/stage_5d_coverage_report.md
+report/stage_5d1_sheet_rows_preview_report.md
 __pycache__/
 *.pyc
