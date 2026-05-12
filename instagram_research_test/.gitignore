@@ -2,5 +2,6 @@
 output/
 data/raw/
 analysis/openai_responses/
+handoff/
 __pycache__/
 *.pyc
