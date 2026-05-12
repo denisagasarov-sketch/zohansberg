@@ -49,6 +49,7 @@ PROBE_FIELDS = [
     "externalUrl",
     "external_url",
     "followersCount",
+    "followsCount",
     "followingCount",
     "postsCount",
     "ownerUsername",
@@ -346,7 +347,7 @@ _PROFILE_FIELD_MAP = {
     "username":        ["username", "ownerUsername"],
     "external_url":    ["externalUrl", "external_url"],
     "followers_count": ["followersCount", "ownerFollowersCount"],
-    "following_count": ["followingCount"],
+    "following_count": ["followingCount", "followsCount"],
     "posts_count":     ["postsCount"],
 }
 
@@ -387,6 +388,7 @@ def build_recommendation(
     profile_fields: dict,
     pinned_detection: dict,
     manual_needed: list,
+    modes_results: dict,
 ) -> str:
     parts = []
     missing = [k for k, v in profile_fields.items() if v == "none"]
@@ -404,6 +406,11 @@ def build_recommendation(
     else:
         parts.append(
             "Pinned posts NOT detectable by actor — use data/input/pinned_posts_manual.json."
+        )
+    profiles_status = modes_results.get("profiles", {}).get("status", "")
+    if profiles_status == "FAIL":
+        parts.append(
+            "'profiles' resultsType is not supported by this actor and should not be used."
         )
     return " ".join(parts)
 
@@ -476,11 +483,16 @@ def main():
     if not pinned_detect["available"]:
         missing_logical.append("pinned_posts")
 
-    can_use_actor = len(missing_logical) == 0 or (
-        len(missing_logical) == 1 and missing_logical == ["pinned_posts"]
+    _REQUIRED_FOR_ACTOR = {
+        "bio_text", "full_name", "username",
+        "external_url", "followers_count", "posts_count",
+    }
+    can_use_actor = all(
+        profile_fields.get(f, "none") != "none"
+        for f in _REQUIRED_FOR_ACTOR
     )
 
-    recommendation = build_recommendation(profile_fields, pinned_detect, missing_logical)
+    recommendation = build_recommendation(profile_fields, pinned_detect, missing_logical, modes_results)
 
     summary = {
         "stage":       "stage5a0_actor_profile_schema_check",
