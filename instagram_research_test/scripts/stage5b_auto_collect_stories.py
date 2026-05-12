@@ -163,13 +163,20 @@ def run_dry_run(max_highlights: int) -> None:
     print(f"  Rough estimate: up to ~{planned * 60} story items billed.")
     print("  Reduce --max-highlights to limit cost.")
     print()
+    print("Payload shape (sanitized — no secrets printed):")
+    print(f"  usernames:          list[str], length=1  [\"{ACCOUNT}\"]")
+    print( "  sessionCookie:      present / redacted")
+    print( "  includeHighlights:  true")
+    print(f"  maxHighlights:      {max_highlights}")
+    print( "  includeProfile:     false")
+    print( "  proxyConfiguration: {useApifyProxy: true}")
+    print()
     print("Highlights that would be fetched (canonical order from singhera07 index):")
     ordered = sorted(canonical_index.items(), key=lambda kv: kv[1]["position"])
     for bare_id, meta in ordered[:planned]:
         title = meta["canonical_title"] or "—"
         print(f"  [{meta['position']:>2}] {bare_id}  \"{title}\"")
     print()
-    print("Session cookie: read from .env at runtime (not shown in dry-run).")
     print("[DRY RUN] No Apify call made. No files written.")
     sys.exit(0)
 
@@ -192,21 +199,45 @@ def collect(client, max_highlights: int) -> dict:
         sys.exit(1)
 
     payload = {
-        "username":      ACCOUNT,
-        "maxHighlights": max_highlights,
-        "sessionCookie": cookie,  # never printed
+        "usernames":          [ACCOUNT],
+        "sessionCookie":      cookie,           # never printed
+        "includeHighlights":  True,
+        "maxHighlights":      max_highlights,
+        "includeProfile":     False,
+        "proxyConfiguration": {"useApifyProxy": True},
     }
 
     print(f"[INFO] Calling {ACTOR_ID} (single call) ...")
-    print(f"[INFO] username={ACCOUNT}  maxHighlights={max_highlights}")
+    print(f"[INFO] usernames=['{ACCOUNT}']  maxHighlights={max_highlights}  includeHighlights=true")
     print(f"[COST] pay-per-story. Rough estimate: up to ~{max_highlights * 60} items billed.")
 
     run        = client.actor(ACTOR_ID).call(run_input=payload)
     run_id     = run.get("id", "unknown")
+    run_status = run.get("status", "UNKNOWN")
     dataset_id = run.get("defaultDatasetId", "")
 
     raw_items   = list(client.dataset(dataset_id).iterate_items())
     total_items = len(raw_items)
+
+    # Dataset validation: SUCCEEDED with 0 items means actor-level error (wrong payload etc.)
+    if total_items == 0:
+        print(f"[ERROR] Actor status={run_status} but dataset has 0 items.", file=sys.stderr)
+        print(f"  run_id={run_id}  dataset_id={dataset_id}", file=sys.stderr)
+        print("  Check Apify run log for actor-level errors.", file=sys.stderr)
+        sys.exit(1)
+
+    highlight_item_count = sum(
+        1 for item in raw_items if (item.get("highlightId") or "").strip()
+    )
+    if highlight_item_count == 0:
+        print(
+            f"[ERROR] includeHighlights=true but 0 highlight story items returned "
+            f"(total_items={total_items}).",
+            file=sys.stderr,
+        )
+        print(f"  run_id={run_id}", file=sys.stderr)
+        print("  Possible causes: sessionCookie expired, highlights not accessible.", file=sys.stderr)
+        sys.exit(1)
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     RAW_OUTPUT_PATH.write_text(

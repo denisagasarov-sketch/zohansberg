@@ -65,8 +65,51 @@ cat data/normalized/stage5b_auto_stories_summary.json
 | Поле | Значение |
 |---|---|
 | Actor | automation-lab/instagram-stories-scraper |
-| Payload | `{"username": "vlada_kliuiko", "maxHighlights": N, "sessionCookie": "<from .env>"}` |
 | Calls per run | **1** (один вызов на весь запуск) |
+
+Payload (точные ключи — не менять регистр):
+```json
+{
+  "usernames":          ["vlada_kliuiko"],
+  "sessionCookie":      "<from INSTAGRAM_SESSION_COOKIE env var>",
+  "includeHighlights":  true,
+  "maxHighlights":      3,
+  "includeProfile":     false,
+  "proxyConfiguration": {"useApifyProxy": true}
+}
+```
+
+**Неправильные ключи, которые молча ломают запуск:**
+
+| Неправильно | Правильно |
+|---|---|
+| `username` | `usernames` (массив) |
+| `max_highlights` | `maxHighlights` |
+| `include_highlights` | `includeHighlights` |
+| `session_cookie` | `sessionCookie` |
+
+## Dry-run ожидаемый вывод
+
+```
+=== Stage 5B-auto: DRY RUN ===
+Actor:               automation-lab/instagram-stories-scraper
+...
+Payload shape (sanitized — no secrets printed):
+  usernames:          list[str], length=1  ["vlada_kliuiko"]
+  sessionCookie:      present / redacted
+  includeHighlights:  true
+  maxHighlights:      3
+  includeProfile:     false
+  proxyConfiguration: {useApifyProxy: true}
+...
+[DRY RUN] No Apify call made. No files written.
+```
+
+## Dataset validation (реальный запуск)
+
+Скрипт упадёт с non-zero exit если:
+- Apify статус SUCCEEDED, но dataset содержит 0 items
+- `includeHighlights=true`, но 0 highlight story items в результате
 
 ## ВАЖНО: cost warning
 
