@@ -1,5 +1,59 @@
 {
   "actors": {
+    "automation-lab/instagram-stories-scraper": {
+      "purpose": "primary highlight stories collector",
+      "status": "confirmed_for_highlight_stories",
+      "confidence": "high",
+      "last_verified": "2026-05-12",
+      "notes": [
+        "Replaces igview-owner as primary actor for highlight stories.",
+        "Single Apify call per run (not per-highlight — more cost-efficient).",
+        "Requires INSTAGRAM_SESSION_COOKIE in addition to APIFY_TOKEN.",
+        "Pay-per-story: estimate ~60 items per highlight.",
+        "highlightTitle is unreliable — use singhera07 index as canonical source."
+      ],
+      "confirmed_actions": {
+        "stories_and_highlights": {
+          "tested": true,
+          "input_schema_source": "manual_input_from_successful_apify_run",
+          "safe_input_payload_example": {
+            "username": "vlada_kliuiko",
+            "maxHighlights": 3,
+            "sessionCookie": "<from INSTAGRAM_SESSION_COOKIE env var>"
+          },
+          "confirmed_test": {
+            "apify_run_id": "AkB2EgsysgjG0bG5l",
+            "dataset_id": "ltyH9V6TKBst54G1e",
+            "max_highlights_used": 3,
+            "total_items": 179,
+            "active_story_items": 6,
+            "highlight_story_items": 173,
+            "highlight_ids_observed": [
+              {"bare_id": "17874797856565339", "stories_count": 57},
+              {"bare_id": "18110898391654002", "stories_count": 17},
+              {"bare_id": "18124257904515721", "stories_count": 99}
+            ]
+          },
+          "confirmed_output_fields": [
+            "id",
+            "type",
+            "timestamp",
+            "imageUrl",
+            "videoUrl",
+            "highlightId",
+            "highlightTitle"
+          ],
+          "highlightId_format": "highlight:<numeric_id>  — strip prefix to get bare ID",
+          "highlightTitle_reliability": "unreliable — use singhera07 highlights_index as canonical source",
+          "limitations": [
+            "maxHighlights is required — unbounded runs are forbidden.",
+            "sessionCookie is required — actor cannot scrape without it.",
+            "highlightTitle mapping is incomplete — do not use as canonical title.",
+            "Active stories = last 24h profile stories (not archived highlights)."
+          ]
+        }
+      }
+    },
     "singhera07/instagram-scraper": {
       "purpose": "primary highlights index actor candidate",
       "status": "confirmed_for_highlights_index",
@@ -76,6 +130,23 @@
           ]
         }
       }
+    },
+    "igview-owner/instagram-highlights-stories-viewer": {
+      "purpose": "deprecated fallback — replaced by automation-lab",
+      "status": "deprecated",
+      "confidence": "high",
+      "last_verified": "2026-05-12",
+      "notes": [
+        "Was primary highlight stories actor before automation-lab confirmation.",
+        "Required 1 Apify call per highlight_id (32 calls for full run).",
+        "Replaced by automation-lab/instagram-stories-scraper (1 call total).",
+        "Do not use as primary actor. Keep as fallback reference only.",
+        "Confirmed compatible with singhera07 highlight IDs."
+      ],
+      "compatible_ids_tested": [
+        {"highlight_id": "17874797856565339", "stories_count": 57},
+        {"highlight_id": "18110898391654002", "stories_count": 17}
+      ]
     }
   }
 }
