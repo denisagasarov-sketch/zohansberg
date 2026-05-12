@@ -2,7 +2,7 @@
 
 ## Что делает Stage 4D
 
-Создаёт один HTML-файл для просмотра в браузере:
+Создает один HTML-файл для просмотра в браузере:
 
 ```
 report/final_one_account_analysis_vlada_kliuiko.html
@@ -53,7 +53,7 @@ Stage 4D: создание HTML evidence report...
   open report/final_one_account_analysis_vlada_kliuiko.html
 ```
 
-## Открыть отчёт
+## Открыть отчет
 
 ```bash
 open report/final_one_account_analysis_vlada_kliuiko.html
@@ -61,15 +61,15 @@ open report/final_one_account_analysis_vlada_kliuiko.html
 
 Или двойной клик на файл в Finder / проводнике.
 
-## Структура HTML-отчёта
+## Как устроен отчет
 
 | Раздел | Содержимое |
 |---|---|
 | 1. Резюме | Оффер, роли постов, роль хайлайта, механики доверия, слабые места |
 | 2. Посты | Карточка на каждый пост: картинки + разбор (тема, формат, хук, CTA, оффер, evidence) |
 | 3. Хайлайт | Каждый batch: роли, CTA, оффер, механики доверия, visible text, story grid с кадрами |
-| 4. Цитаты | Все visible_text из stories, дедуплицировано, с привязкой к batch |
-| 5. Доверие | Все trust_mechanics из account_summary + highlight_summary |
+| 4. Цитаты | Все видимые тексты из stories, дедуплицированные, с привязкой к batch |
+| 5. Доверие | Все механики доверия из account_summary + highlight_summary |
 | 6. Идеи | ideas_to_adapt из account_summary |
 | 7. Ограничения | Что не анализировали и почему |
 
@@ -78,7 +78,8 @@ open report/final_one_account_analysis_vlada_kliuiko.html
 HTML использует относительные пути к `../output/openai_inputs/...`.
 Файлы не встраиваются base64 — нужно, чтобы папка `output/` лежала рядом с `report/`.
 
-Если открывать HTML из другой директории или через HTTP-сервер:
+Если открывать HTML из другой директории или через HTTP-сервер —
+обновите пути вручную или запустите:
 
 ```bash
 python -m http.server 8000
@@ -90,9 +91,9 @@ python -m http.server 8000
 Скрипт перезаписывает HTML каждый раз. Идемпотентен.
 Данные не изменяет.
 
-## Ограничения HTML-отчёта
+## Ограничения HTML-отчета
 
-- Картинки не открываются, если папка `output/` недоступна.
+- Картинки не откроются, если папка `output/` недоступна.
 - Story-to-image mapping использует данные из `stage4a_media_manifest.json`;
-  если manifest недоступен — кадры распределяются по stories приближённо.
+  если manifest недоступен — кадры распределяются по stories приблизительно.
 - Цитаты привязаны к batch, не к конкретной story (ограничение Stage 4B).

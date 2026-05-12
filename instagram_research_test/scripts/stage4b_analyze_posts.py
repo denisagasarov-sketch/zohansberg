@@ -18,6 +18,7 @@ POSTS_RAW_PATH   = BASE / "data/raw/posts_test_raw.json"
 POSTS_OUT_DIR    = BASE / "analysis/stage4b/posts"
 RAW_RESP_DIR     = BASE / "analysis/openai_responses/stage4b/posts"
 SUMMARY_PATH     = BASE / "data/normalized/stage4b_posts_summary.json"
+POLICY_PATH      = BASE / "prompts/analysis_language_policy_ru.md"
 
 REQUIRED_KEYS = {
     "status", "account", "analysis_scope", "content_id", "url", "type",
@@ -91,7 +92,13 @@ except ImportError:
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
+_policy = POLICY_PATH.read_text(encoding="utf-8").strip() if POLICY_PATH.exists() else ""
+if not _policy:
+    print(f"  WARNING: policy file not found at {POLICY_PATH}", file=sys.stderr)
+
 SYSTEM_PROMPT = (
+    (_policy + "\n\n---\n\n") if _policy else ""
+) + (
     "You are an Instagram content analyst. "
     "Return ONLY valid JSON matching the provided schema. "
     "No markdown. No text outside JSON. "
