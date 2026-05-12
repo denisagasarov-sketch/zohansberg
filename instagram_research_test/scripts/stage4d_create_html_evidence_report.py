@@ -55,6 +55,36 @@ def h(value):
 
 _EMPTY_VALS = {"not found", "not enough evidence", "n/a", "", "none", "—"}
 
+TRANSLATE = {
+    "not found": "Не найдено",
+    "not enough evidence": "Недостаточно данных",
+    "leadgen": "Лидогенерация",
+    "expertise": "Экспертность",
+    "engagement": "Вовлечение",
+    "social_proof": "Социальное доказательство",
+    "education": "Обучение",
+    "course_trust": "Доверие к курсу",
+    "student_results": "Результаты учеников",
+    "community": "Комьюнити",
+    "reviews": "Отзывы",
+    "high": "Высокая",
+    "medium": "Средняя",
+    "low": "Низкая",
+    "reach": "Охват",
+    "trust": "Доверие",
+    "warmup": "Прогрев",
+    "sales": "Продажи",
+    "unknown": "Не определено",
+}
+
+
+def tr(value):
+    """Translate known English tokens to Russian; pass through everything else."""
+    if value is None:
+        return value
+    s = str(value).strip()
+    return TRANSLATE.get(s.lower(), s)
+
 
 def is_empty(value):
     return str(value or "").strip().lower() in _EMPTY_VALS
@@ -91,7 +121,7 @@ def img_thumb(src_path, alt_text=""):
 
 def render_evidence_list(evidence):
     if not evidence:
-        return '<p class="dim">Evidence отсутствует в JSON</p>'
+        return '<p class="dim">Доказательства отсутствуют в JSON</p>'
     items = "".join(f"<li>{h(e)}</li>" for e in evidence)
     return f'<ul class="evidence-list">{items}</ul>'
 
@@ -106,7 +136,7 @@ def render_source_refs(refs):
 def field_value_or_warning(label, value):
     if is_empty(value):
         return f'<span class="not-found">⚠ {h(label)}: не обнаружено</span>'
-    return f'<span class="found-val">{h(value)}</span>'
+    return f'<span class="found-val">{h(tr(value))}</span>'
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +407,16 @@ section h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; color
     .two-col { grid-template-columns: 1fr; }
     .post-layout { grid-template-columns: 1fr; }
 }
+
+/* ---- disclaimer ---- */
+.disclaimer {
+    background: #fef9e7;
+    border-bottom: 1px solid #f5b942;
+    color: #7d6608;
+    font-size: 12px;
+    padding: 8px 32px;
+    line-height: 1.5;
+}
 """
 
 
@@ -416,7 +456,7 @@ def section_summary(acc, hl):
             suffix = f' <span class="dim">…ещё {len(srcs)-6}</span>' if len(srcs) > 6 else ''
             parts.append(
                 f'<div class="field-row">'
-                f'<span class="field-label">{h(role)}</span>'
+                f'<span class="field-label">{h(tr(role))}</span>'
                 f'<span class="field-value">{refs_html}{suffix}</span>'
                 f'</div>'
             )
@@ -437,13 +477,13 @@ def section_summary(acc, hl):
     parts.append(
         f'<div class="field-row">'
         f'<span class="field-label">Доминирует</span>'
-        f'<span class="field-value">{badge(hl_dominant, "role")}</span>'
+        f'<span class="field-value">{badge(tr(hl_dominant), "role")}</span>'
         f'</div>'
     )
     hl_roles = hl.get("role_frequency", {})
     if hl_roles:
         roles_str = ", ".join(
-            f"{r} ({c})" for r, c in sorted(hl_roles.items(), key=lambda x: -x[1])
+            f"{tr(r)} ({c})" for r, c in sorted(hl_roles.items(), key=lambda x: -x[1])
         )
         parts.append(f'<div style="font-size:12px;color:#7f8c8d;margin-top:4px">{h(roles_str)}</div>')
     parts.append(
@@ -498,13 +538,13 @@ def section_summary(acc, hl):
     parts.append(
         f'<div class="field-row">'
         f'<span class="field-label">Посты ({n_posts} шт.)</span>'
-        f'<span class="field-value">{badge(conf_acc, conf_acc)}</span>'
+        f'<span class="field-value">{badge(tr(conf_acc), conf_acc)}</span>'
         f'</div>'
     )
     parts.append(
         f'<div class="field-row">'
         f'<span class="field-label">Хайлайт</span>'
-        f'<span class="field-value">{badge(conf_hl, conf_hl)}</span>'
+        f'<span class="field-value">{badge(tr(conf_hl), conf_hl)}</span>'
         f'</div>'
     )
     parts.append('</div></div>')
@@ -561,8 +601,8 @@ def section_posts(posts_data, plan_index):
             f'{badge(status, status.lower())} '
             f'<span>{h(content_id)}</span> '
             f'{badge(ptype, "default")} '
-            f'{badge(funnel_role, "role")} '
-            f'уверенность: {badge(confidence, confidence)}'
+            f'{badge(tr(funnel_role), "role")} '
+            f'уверенность: {badge(tr(confidence), confidence)}'
             f'{url_link}'
             f'</div>'
         )
@@ -637,7 +677,7 @@ def section_posts(posts_data, plan_index):
                 parts.append('</ul>')
 
         parts.append('<div class="evidence-block">')
-        parts.append('<h4>Evidence</h4>')
+        parts.append('<h4>Доказательства</h4>')
         parts.append(render_evidence_list(evidence))
         parts.append('</div>')
 
@@ -688,7 +728,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
         parts.append(f'<div class="card" id="{h(batch_id)}">')
 
         # batch header
-        roles_html = " ".join(badge(r, "role") for r in main_roles)
+        roles_html = " ".join(badge(tr(r), "role") for r in main_roles)
         parts.append('<div class="batch-header">')
         parts.append(
             f'<h3>Batch {h(batch_idx)} '
@@ -698,7 +738,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
         parts.append(
             f'<div style="margin-top:5px">{roles_html} '
             f'{badge(status, status.lower())} '
-            f'уверенность: {badge(confidence, confidence)}{h(dss_str)}</div>'
+            f'уверенность: {badge(tr(confidence), confidence)}{h(dss_str)}</div>'
         )
         parts.append('</div>')
 
@@ -748,7 +788,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
             parts.append('</ul>')
 
         parts.append('<div class="evidence-block">')
-        parts.append('<h4>Evidence</h4>')
+        parts.append('<h4>Доказательства</h4>')
         parts.append(render_evidence_list(evidence))
         parts.append('</div>')
         parts.append('</div>')  # left
@@ -820,7 +860,7 @@ def section_quotes(batches_data):
         parts.append('<p class="dim">visible_text не найден в JSON батчей.</p>')
     else:
         for item in seen.values():
-            roles_html = " ".join(badge(r, "role") for r in item["roles"])
+            roles_html = " ".join(badge(tr(r), "role") for r in item["roles"])
             parts.append('<div class="quote-item">')
             parts.append(f'&#8220;{h(item["text"])}&#8221;')
             parts.append(
@@ -965,6 +1005,11 @@ def build_html(body_html, acc, hl):
   </div>
 </div>
 <nav>{nav_html}</nav>
+<div class="disclaimer">
+  ⓘ Часть смысловых формулировок может быть на английском, если она пришла из JSON-анализа.
+  Без повторного LLM-перевода отчёт переводит интерфейс, подписи и типовые значения,
+  но не переписывает исходные evidence-поля.
+</div>
 <div class="container">
 {body_html}
 </div>
