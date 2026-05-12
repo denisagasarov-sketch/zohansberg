@@ -1,0 +1,81 @@
+{
+  "actors": {
+    "singhera07/instagram-scraper": {
+      "purpose": "primary highlights index actor candidate",
+      "status": "confirmed_for_highlights_index",
+      "confidence": "high",
+      "last_verified": "2026-05-12",
+      "confirmed_actions": {
+        "highlights": {
+          "tested": true,
+          "status": "confirmed_for_highlights_index",
+          "confidence": "high",
+          "input_schema_source": "manual_input_from_successful_apify_run",
+          "safe_input_payload_example": {
+            "action": "highlights",
+            "limit": 12,
+            "username": "vlada_kliuiko"
+          },
+          "tested_account": "vlada_kliuiko",
+          "confirmed_output_fields": [
+            "id",
+            "title",
+            "croppedThumbnail",
+            "owner.id",
+            "owner.username"
+          ],
+          "observed_result": {
+            "returned_highlight_objects": true,
+            "previously_observed_count": {
+              "value": 32,
+              "source": "user_reported_previous_successful_run",
+              "confidence": "medium"
+            },
+            "count_behavior_note": "Payload has limit=12; Stage 5B-1 must verify whether this limit restricts returned highlights or not."
+          },
+          "recommended_use": [
+            "primary highlights index actor",
+            "use id as highlight_id",
+            "use title as highlight title",
+            "use croppedThumbnail as cover image",
+            "use owner.username to bind highlight to profile"
+          ],
+          "compatibility": {
+            "stories_viewer_actor": "igview-owner/instagram-highlights-stories-viewer",
+            "verdict": "compatible",
+            "tested_ids": [
+              {
+                "highlight_id": "17874797856565339",
+                "role": "control",
+                "stories_count": 57
+              },
+              {
+                "highlight_id": "18110898391654002",
+                "role": "candidate",
+                "stories_count": 17
+              }
+            ],
+            "recommended_architecture": [
+              "singhera07/instagram-scraper for highlights index",
+              "igview-owner/instagram-highlights-stories-viewer for stories by highlight_id"
+            ]
+          },
+          "limitations": [
+            "Only highlights action payload is confirmed.",
+            "Profile/posts/highlight_stories actions are not confirmed.",
+            "Do not use for profile/posts until capability check proves it.",
+            "Do not assume limit=12 returns all highlights.",
+            "Stage 5B-1 must verify count behavior.",
+            "Previously observed count of 32 highlights is user-reported, not confirmed from committed raw output."
+          ],
+          "stage5b1_notes": [
+            "Use this payload as the starting point for Stage 5B-1.",
+            "Stage 5B-1 must verify actual returned count.",
+            "Do not silently treat limit=12 as final production setting.",
+            "If the actor returns only 12 highlights, test higher limit only after dry-run and explicit user approval."
+          ]
+        }
+      }
+    }
+  }
+}
