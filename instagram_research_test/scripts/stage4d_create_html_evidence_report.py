@@ -393,6 +393,7 @@ def section_summary(acc, hl):
     # --- левая колонка ---
     parts.append('<div>')
 
+    # Что продает
     primary_offer = acc.get("primary_offer", {})
     parts.append('<div class="card">')
     parts.append('<div class="card-header">Что продает аккаунт</div>')
@@ -402,6 +403,7 @@ def section_summary(acc, hl):
     parts.append(render_source_refs(primary_offer.get("source_refs", [])))
     parts.append('</div></div>')
 
+    # Роль постов (funnel)
     funnel_roles = acc.get("funnel_roles", {})
     parts.append('<div class="card">')
     parts.append('<div class="card-header">Роль постов (funnel)</div>')
@@ -422,6 +424,7 @@ def section_summary(acc, hl):
         parts.append('<p class="dim">Нет данных</p>')
     parts.append('</div></div>')
 
+    # Роль хайлайта
     hl_dominant = hl.get("dominant_role", "—")
     hl_summary  = hl.get("summary", "")
     hl_stories  = hl.get("stories_total", "?")
@@ -455,6 +458,7 @@ def section_summary(acc, hl):
     # --- правая колонка ---
     parts.append('<div>')
 
+    # На чем строится доверие
     trust_mechanics = acc.get("trust_mechanics", [])
     parts.append('<div class="card">')
     parts.append('<div class="card-header">На чём строится доверие</div>')
@@ -467,6 +471,7 @@ def section_summary(acc, hl):
         parts.append('<p class="dim">Нет данных</p>')
     parts.append('</div></div>')
 
+    # Слабые места
     weak_spots = acc.get("weak_spots", [])
     parts.append('<div class="card">')
     parts.append('<div class="card-header">Слабые места / пробелы</div>')
@@ -483,6 +488,7 @@ def section_summary(acc, hl):
         parts.append('<p class="dim">Нет данных</p>')
     parts.append('</div></div>')
 
+    # Уверенность
     conf_acc = acc.get("confidence", "?")
     conf_hl  = hl.get("confidence", "?")
     n_posts  = acc.get("analyzed_posts_count", "?")
@@ -544,6 +550,7 @@ def section_posts(posts_data, plan_index):
 
         parts.append(f'<div class="card" id="post-{h(content_id)}">')
 
+        # header
         url_link = (
             f'<a href="{h(url)}" target="_blank" '
             f'style="font-size:11px;color:#2980b9;margin-left:4px">{h(url[:70])}</a>'
@@ -560,8 +567,10 @@ def section_posts(posts_data, plan_index):
             f'</div>'
         )
 
+        # two-panel: visuals | analysis
         parts.append('<div class="post-layout">')
 
+        # visuals
         parts.append('<div class="post-visuals">')
         if prepared_paths:
             for pp in prepared_paths:
@@ -570,6 +579,7 @@ def section_posts(posts_data, plan_index):
             parts.append('<p class="dim" style="color:#636e72;font-size:11px">Нет путей в плане</p>')
         parts.append('</div>')
 
+        # analysis
         parts.append('<div class="post-analysis">')
 
         def fr(label, value):
@@ -618,7 +628,7 @@ def section_posts(posts_data, plan_index):
             parts.append('</ul>')
 
         if limitations:
-            lim_visible = [lim for lim in limitations if not str(lim).startswith("missing")]
+            lim_visible = [l for l in limitations if not str(l).startswith("missing")]
             if lim_visible:
                 parts.append('<h4>Ограничения</h4>')
                 parts.append('<ul class="evidence-list">')
@@ -677,6 +687,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
 
         parts.append(f'<div class="card" id="{h(batch_id)}">')
 
+        # batch header
         roles_html = " ".join(badge(r, "role") for r in main_roles)
         parts.append('<div class="batch-header">')
         parts.append(
@@ -696,8 +707,10 @@ def section_highlights(batches_data, hl_plan_index, story_index):
         if summary_text:
             parts.append(f'<p style="margin-bottom:12px;font-size:13px">{h(summary_text)}</p>')
 
+        # two-col: fields | story grid
         parts.append('<div class="two-col">')
 
+        # left: fields + evidence
         parts.append('<div>')
         parts.append(
             f'<div class="field-row">'
@@ -740,6 +753,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
         parts.append('</div>')
         parts.append('</div>')  # left
 
+        # right: story grid
         parts.append('<div>')
         parts.append('<h4>Кадры и stories</h4>')
         parts.append('<div class="story-grid">')
@@ -748,6 +762,7 @@ def section_highlights(batches_data, hl_plan_index, story_index):
             s_info  = story_index.get(str(sid), {})
             s_paths = s_info.get("prepared_paths", [])
 
+            # Fallback: divide batch prepared_paths across stories by index
             if not s_paths and prepared_paths:
                 n_stories = max(1, len(story_ids))
                 per = max(1, len(prepared_paths) // n_stories)
@@ -788,7 +803,7 @@ def section_quotes(batches_data):
         '</p>'
     )
 
-    seen = {}
+    seen = {}  # normalized_key → {text, source, roles}
     for batch_id, batch in batches_data:
         main_roles   = batch.get("inferred_meanings", {}).get("main_roles", [])
         visible_text = batch.get("observed_facts", {}).get("visible_text", [])
@@ -824,30 +839,32 @@ def section_trust(acc, hl):
     parts.append('<section id="trust">')
     parts.append('<h2>5. Механики доверия</h2>')
 
+    # merge from both summaries
     merged = {}
     for tm in acc.get("trust_mechanics", []):
         key = tm.get("mechanic", "").strip().lower()
         if key:
             merged[key] = {
-                "mechanic":    tm.get("mechanic", ""),
+                "mechanic": tm.get("mechanic", ""),
                 "source_refs": list(tm.get("source_refs", [])),
-                "origin":      ["account_summary"],
+                "origin": ["account_summary"],
             }
     for tm in hl.get("trust_mechanics", []):
         key = tm.get("mechanic", "").strip().lower()
         if not key:
             continue
         if key in merged:
+            existing = merged[key]["source_refs"]
             for ref in tm.get("source_refs", []):
-                if ref not in merged[key]["source_refs"]:
-                    merged[key]["source_refs"].append(ref)
+                if ref not in existing:
+                    existing.append(ref)
             if "highlight_summary" not in merged[key]["origin"]:
                 merged[key]["origin"].append("highlight_summary")
         else:
             merged[key] = {
-                "mechanic":    tm.get("mechanic", ""),
+                "mechanic": tm.get("mechanic", ""),
                 "source_refs": list(tm.get("source_refs", [])),
-                "origin":      ["highlight_summary"],
+                "origin": ["highlight_summary"],
             }
 
     if not merged:
@@ -967,6 +984,7 @@ def main():
     account_summary   = load_json(ACCOUNT_SUMMARY)
     highlight_summary = load_json(HIGHLIGHT_SUMMARY)
 
+    # Load post JSONs
     posts_data = []
     if POSTS_DIR.exists():
         for pf in sorted(POSTS_DIR.glob("*.json")):
@@ -976,6 +994,7 @@ def main():
     else:
         print(f"  WARNING: {POSTS_DIR} не найдена", file=sys.stderr)
 
+    # Load batch JSONs
     batches_data = []
     if BATCHES_DIR.exists():
         for bf in sorted(BATCHES_DIR.glob("*.json")):
