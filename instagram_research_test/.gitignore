@@ -17,6 +17,8 @@ data/normalized/stage5a2b_pinned_posts_schema_summary.json
 report/stage_5a2b_pinned_post_details_report.md
 data/normalized/stage5a2c_pinned_posts_semantic.json
 data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json
+data/normalized/stage5a2c_pinned_posts_semantic_fixed.json
+data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json
 report/stage_5a2c_pinned_posts_caption_analysis_report.md
 analysis/stage5a2c_cache/
 __pycache__/

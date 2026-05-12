@@ -23,15 +23,15 @@ STAGE5A2B_PATH = NORM_DIR / "stage5a2b_pinned_posts_details.json"
 
 SEMANTIC_OUTPUT_PATH  = NORM_DIR / "stage5a2c_pinned_posts_semantic.json"
 GS_ROWS_OUTPUT_PATH   = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows.json"
+SEMANTIC_FIXED_PATH   = NORM_DIR / "stage5a2c_pinned_posts_semantic_fixed.json"
+GS_ROWS_FIXED_PATH    = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows_fixed.json"
 
 ACCOUNT         = "vlada_kliuiko"
 EXPECTED_POSTS  = 3
-PROMPT_VERSION  = "v1"
-DEFAULT_MODEL   = "gpt-4o-mini"  # same as Stage 5C; text-only here
+PROMPT_VERSION  = "v2"           # bumped for quality fix
+DEFAULT_MODEL   = "gpt-4o-mini"
 
-# Conservative cost estimate for text-only gpt-4o-mini
-# ~1500 input tokens + ~300 output per call
-# $0.15/1M input + $0.60/1M output ≈ $0.0004 per call
+# Conservative cost estimate per call (~1500 input + ~300 output tokens)
 COST_PER_CALL: dict[str, float] = {
     "gpt-4o-mini": 0.0004,
     "gpt-4o":      0.008,
@@ -54,9 +54,19 @@ ALLOWED_FUNNEL_ROLES = {
     "знакомство", "доверие", "прогрев", "продажа", "лидогенерация",
 }
 
+# Kept for backward compat; atom-level validation uses ALLOWED_DESTINATION_ATOMS
 ALLOWED_CTA_DESTINATIONS = {
-    "директ", "комментарии", "био-ссылка", "анкета",
-    "закрытый канал", "консультация", "курс", "сайт", "unknown",
+    "директ", "комментарии", "био-ссылка", "анкета", "анкета предзаписи",
+    "закрытый канал", "консультация", "курс", "сайт", "бот", "unknown",
+}
+
+ALLOWED_DESTINATION_ATOMS = ALLOWED_CTA_DESTINATIONS  # same set
+
+# Semantic classification for smart composite-path splitting
+_DEST_CHANNELS  = {"директ", "комментарии", "био-ссылка", "бот"}
+_DEST_ENDPOINTS = {
+    "анкета", "анкета предзаписи", "закрытый канал",
+    "консультация", "курс", "сайт", "unknown",
 }
 
 GS_FIELD_ORDER = [
@@ -73,6 +83,31 @@ GS_FIELD_ORDER = [
     "Роль в воронке",
 ]
 
+# ── CTA detection regexes ──────────────────────────────────────────────────
+
+# Strong imperative action verbs that constitute a real CTA
+_STRONG_VERBS_RE = re.compile(
+    r"\b(?:"
+    r"пишите|напишите|оставьте|переходите|перейдите|заполните|"
+    r"регистрируйтесь|зарегистрируйтесь|отправьте|забронируйте|"
+    r"подпишитесь|нажмите|жмите|запишитесь|приходите|кликните|"
+    r"получите\s+доступ"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Weak imperative forms that are NOT strong CTA verbs (excluded from general check)
+_WEAK_IMPERATIVES = {
+    "получите", "узнайте", "читайте", "смотрите", "следите",
+    "ждите", "скажите", "думайте", "знайте",
+}
+
+# Patterns that indicate the text is a thesis/forecast/teaser, not a CTA
+_INVALID_CTA_STARTERS_RE = re.compile(
+    r"^(?:спойлер|как\s+|что\s+|почему\s+|когда\s+|зачем\s+|в\s+20\d{2}\s+|\d{4}\s+год)",
+    re.IGNORECASE,
+)
+
 # ── Prompts ────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """\
@@ -80,7 +115,49 @@ SYSTEM_PROMPT = """\
 Тебе дают полный текст (caption) закрепленного поста.
 Проанализируй ТОЛЬКО текст. Не домысливай из картинок или видео.
 Верни ТОЛЬКО JSON-объект — без markdown, без пояснений, только JSON.
-Все текстовые значения — на русском языке."""
+Все текстовые значения — на русском языке.
+
+━━━ ПРАВИЛА CTA ━━━
+CTA (призыв к действию) — это только явный призыв к действию, когда текст просит читателя что-то СДЕЛАТЬ.
+
+ВАЛИДНЫЙ CTA содержит глагол-действие: пишите, напишите, оставьте заявку,
+переходите, заполните, регистрируйтесь, нажмите, запишитесь и т.п.
+
+Примеры ВАЛИДНОГО CTA:
+  - "пишите «АНКЕТА» в директ и комментарии"
+  - "оставьте заявку на консультацию"
+  - "переходите по ссылке в био"
+  - "заполните анкету"
+  - "напишите слово «консультация» в комментариях"
+
+НЕ является CTA:
+  - тезис, инсайт, прогноз, спойлер, тема, вопрос, обещание
+  - "Спойлер: в 2026 году..."
+  - "как прогнозировать результаты"
+  - "что изменится в маркетинге"
+  - "почему большинство это проспит"
+
+Если явного призыва к действию нет — "Какой CTA" и "Куда ведет CTA" = "".
+
+━━━ ПРАВИЛА "Почему закреплен" ━━━
+Обязательно начни с "Вероятно". Будь конкретным — ссылайся на содержание
+caption. Объясни стратегическую задачу закрепа (прогрев, доверие, вход в воронку и т.п.).
+
+ПЛОХО (общее): "чтобы привлечь внимание", "чтобы рассказать о курсе"
+ХОРОШО (конкретное): "Вероятно, закреплен как экспертный прогрев: показывает
+метод работы, прогнозирование результата и закрывает возражение про гарантии."
+
+━━━ ПРАВИЛА составных путей ━━━
+"Куда ведет CTA" может быть составным. Используй → для шагов, / для параллельных каналов.
+Например: "директ / комментарии → анкета предзаписи → закрытый канал"
+
+Допустимые атомы: директ | комментарии | био-ссылка | анкета | анкета предзаписи |
+закрытый канал | консультация | курс | сайт | бот | unknown
+
+━━━ ПРАВИЛА "Роль в воронке" ━━━
+Допустимые значения: знакомство | доверие | прогрев | продажа | лидогенерация
+Составные роли разрешены через /: "доверие / прогрев", "доверие / лидогенерация"
+Используй только перечисленные атомы."""
 
 
 def build_user_prompt(post: dict) -> str:
@@ -91,7 +168,7 @@ def build_user_prompt(post: dict) -> str:
     permalink    = post.get("permalink") or ""
 
     funnel_roles_str = " | ".join(sorted(ALLOWED_FUNNEL_ROLES))
-    cta_dest_str     = " | ".join(sorted(ALLOWED_CTA_DESTINATIONS))
+    cta_dest_str     = " | ".join(sorted(ALLOWED_DESTINATION_ATOMS))
 
     return f"""\
 Закрепленный пост Instagram #{position}.
@@ -102,16 +179,16 @@ Permalink: {permalink}
 {caption}
 === END CAPTION ===
 
-Верни JSON по схеме ниже. Если поле не поддерживается текстом — верни пустую строку "".
+Верни JSON по схеме ниже. Пустая строка "" = поле не поддерживается текстом.
 
 {{
   "Тема поста": "<одна строка, макс 160 символов>",
-  "Почему закреплен": "<ОБЯЗАТЕЛЬНО начни с Вероятно: инференс почему автор закрепил этот пост, макс 250 символов>",
+  "Почему закреплен": "<ОБЯЗАТЕЛЬНО начни с 'Вероятно': конкретный инференс со ссылкой на содержание caption, макс 250 символов>",
   "Что в тексте поста": "<краткая структура текста поста, макс 350 символов>",
   "Ключевые смыслы": "<только смыслы из текста, не придумывать, макс 500 символов>",
-  "Какой CTA": "<точный CTA из текста или пустая строка, макс 180 символов>",
-  "Куда ведет CTA": "<одно из: {cta_dest_str}; или пустая строка если CTA нет>",
-  "Роль в воронке": "<одно или два из: {funnel_roles_str}; несколько через / >",
+  "Какой CTA": "<ТОЛЬКО явный призыв к действию из текста или '' — НЕ тезис, НЕ спойлер, макс 180 символов>",
+  "Куда ведет CTA": "<допустимые атомы: {cta_dest_str}; составной путь: 'директ / комментарии → анкета предзаписи'; '' если CTA нет>",
+  "Роль в воронке": "<одно или несколько из: {funnel_roles_str}; несколько через /, напр. 'доверие / прогрев'>",
   "confidence": {{
     "Тема поста": "high | medium | low",
     "Почему закреплен": "high | medium | low",
@@ -126,15 +203,16 @@ Permalink: {permalink}
     "cta_quotes": ["<точная CTA фраза из текста, если есть>"],
     "source_notes": []
   }},
-  "limitations": ["<что нельзя определить из текста>"]
+  "limitations": ["<что нельзя определить из текста — кратко>"]
 }}
 
 ВАЖНО:
-- Поле "Почему закреплен" — всегда инференс, не факт. Начни с "Вероятно".
-- "Роль в воронке" — используй только из списка: {funnel_roles_str}
-- "Куда ведет CTA" — используй только из списка или пустую строку
-- Не придумывай позиционирование, не добавляй то, чего нет в тексте
-- Не используй общие формулировки "экспертный контент" без доказательств из текста"""
+- "Почему закреплен" — всегда инференс, не факт. Начни с "Вероятно". Будь конкретным.
+- "Роль в воронке" — только из списка: {funnel_roles_str}; составные разрешены
+- "Куда ведет CTA" — только из атомов: {cta_dest_str}; или ""
+- "Какой CTA" — только если есть явный глагол-действие в тексте; иначе ""
+- Если CTA нет — "Куда ведет CTA" тоже ""
+- Не придумывай смыслы, которых нет в тексте"""
 
 
 # ── Cache ──────────────────────────────────────────────────────────────────
@@ -172,71 +250,288 @@ def save_to_cache(result: dict, post_id: str, caption: str, model: str):
     )
 
 
+# ── CTA helpers ────────────────────────────────────────────────────────────
+
+def _is_valid_cta(cta: str) -> bool:
+    """
+    Return True if cta contains an explicit action instruction.
+    Empty string is valid (means no CTA was found — acceptable).
+    """
+    if not cta or not cta.strip():
+        return True   # empty = no CTA declared; caller handles empty separately
+
+    text = cta.strip()
+
+    # Thesis/teaser/forecast starters → definitely not a CTA
+    if _INVALID_CTA_STARTERS_RE.match(text):
+        return False
+
+    # Strong imperative action verb present → valid CTA
+    if _STRONG_VERBS_RE.search(text):
+        return True
+
+    # Any non-weak imperative form (-те/-ите/-йте) + channel/destination marker → valid
+    imperative_re = re.compile(r"\b\w+(?:те|ите|йте)\b", re.IGNORECASE)
+    channel_markers_re = re.compile(
+        r"\b(?:директ|комментари|ссылку?|био|анкет|форму?|консультаци|канал|боту?|сайт|курс)\b",
+        re.IGNORECASE,
+    )
+    if imperative_re.search(text) and channel_markers_re.search(text):
+        all_imps = [m.lower() for m in imperative_re.findall(text)]
+        strong_imps = [m for m in all_imps if m not in _WEAK_IMPERATIVES]
+        if strong_imps:
+            return True
+
+    return False
+
+
+def _normalize_cta_destination(value: str) -> tuple[str, list[str]]:
+    """
+    Normalize a CTA destination string, allowing composite paths.
+
+    Parallel channels separated by / (e.g. "директ / комментарии").
+    Sequential steps separated by → (e.g. "анкета предзаписи → закрытый канал").
+    Mixed input with | or -> is normalized automatically.
+    Channels and endpoints in the same chunk are smart-split on → boundary.
+
+    Returns (normalized_string, warnings).
+    """
+    if not value or not value.strip():
+        return "", []
+
+    warns: list[str] = []
+    v = value.strip()
+
+    # Normalize explicit arrow variants to sentinel \x00
+    v = re.sub(r"\s*→\s*", "\x00", v)       # Unicode arrow
+    v = re.sub(r"\s*(?:->|=>)\s*", "\x00", v)  # ASCII arrows
+    # Normalize parallel separators to sentinel \x01
+    v = re.sub(r"\s*\|\s*", "\x01", v)
+    v = re.sub(r"\s*/\s*", "\x01", v)
+    v = re.sub(r"\s{2,}", " ", v)
+
+    sequential_chunks = [c for c in v.split("\x00") if c.strip()]
+    result_parts: list[str] = []
+
+    for chunk in sequential_chunks:
+        raw_atoms = [a.strip().lower() for a in chunk.split("\x01") if a.strip()]
+        valid_atoms: list[str] = []
+        for atom in raw_atoms:
+            if atom in ALLOWED_DESTINATION_ATOMS:
+                valid_atoms.append(atom)
+            else:
+                warns.append(f"Куда ведет CTA: unknown atom '{atom}' removed")
+
+        if not valid_atoms:
+            continue
+
+        channels  = [a for a in valid_atoms if a in _DEST_CHANNELS]
+        endpoints = [a for a in valid_atoms if a in _DEST_ENDPOINTS]
+
+        if channels and endpoints:
+            # Channels lead to endpoints — insert implicit sequential boundary
+            result_parts.append(" / ".join(channels))
+            result_parts.append(" / ".join(endpoints))
+        else:
+            result_parts.append(" / ".join(valid_atoms))
+
+    result = " → ".join(result_parts)
+    if not result and value.strip():
+        warns.append("Куда ведет CTA: all atoms were invalid; cleared")
+    return result, warns
+
+
+def _extract_destination_atoms(value: str) -> list[str]:
+    """Split a (possibly composite) destination path into individual atoms."""
+    if not value:
+        return []
+    parts = re.split(r"[→/]", value)
+    return [p.strip().lower() for p in parts if p.strip()]
+
+
+def _normalize_funnel_role(value: str) -> tuple[str, list[str]]:
+    """
+    Validate and normalize a funnel role string.
+    Composite roles (e.g. "доверие / прогрев") are allowed.
+    Returns (normalized_string, warnings).
+    """
+    if not value or not value.strip():
+        return "", []
+
+    warns: list[str] = []
+    tokens = [t.strip().lower() for t in re.split(r"[/,]", value) if t.strip()]
+    valid_tokens: list[str] = []
+    for t in tokens:
+        if t in ALLOWED_FUNNEL_ROLES:
+            valid_tokens.append(t)
+        else:
+            warns.append(f"Роль в воронке: unexpected value '{t}' removed")
+
+    result = " / ".join(valid_tokens)
+    return result, warns
+
+
 # ── Response parser & validator ────────────────────────────────────────────
 
-def _validate_and_fix(raw: dict, post: dict) -> tuple[dict, list[str]]:
+def _validate_and_fix(
+    raw: dict, post: dict
+) -> tuple[dict, list[str], list[dict]]:
     """
-    Validate OpenAI response, apply cell limits, enforce constraints.
-    Returns (fixed_dict, validation_warnings).
+    Validate OpenAI response, apply cell limits, enforce all constraints.
+    Returns (fixed_dict, validation_warnings, postprocessing_notes).
     """
-    warns = []
+    warns:    list[str]  = []
+    pp_notes: list[dict] = []
     fixed = dict(raw)
 
-    # "Почему закреплен" must start with inference marker
+    # 1. "Почему закреплен" inference prefix
     pz = fixed.get("Почему закреплен", "")
-    if pz and not re.match(r"^(Вероятно|Возможно|По всей видимости|Скорее всего)", pz, re.I):
+    if pz and not re.match(
+        r"^(Вероятно|Возможно|По всей видимости|Скорее всего)", pz, re.IGNORECASE
+    ):
+        orig = pz
         fixed["Почему закреплен"] = "Вероятно, " + pz
         warns.append("Почему закреплен: prepended 'Вероятно, ' — was missing inference marker")
+        pp_notes.append({
+            "field": "Почему закреплен",
+            "original_value": orig,
+            "final_value": fixed["Почему закреплен"],
+            "reason": "Missing inference prefix; auto-prepended",
+        })
 
-    # "Роль в воронке" — validate tokens
+    # 2. CTA validity check
+    cta = fixed.get("Какой CTA", "")
+    if cta and not _is_valid_cta(cta):
+        orig_cta  = cta
+        orig_dest = fixed.get("Куда ведет CTA", "")
+        fixed["Какой CTA"]    = ""
+        fixed["Куда ведет CTA"] = ""
+        conf = fixed.setdefault("confidence", {})
+        conf["Какой CTA"]    = "low"
+        conf["Куда ведет CTA"] = "low"
+        warns.append("Какой CTA: explicit CTA not found; cleared")
+        if orig_dest:
+            warns.append("Куда ведет CTA: cleared because CTA was invalid")
+        pp_notes.append({
+            "field": "Какой CTA",
+            "original_value": orig_cta,
+            "final_value": "",
+            "reason": "No explicit action instruction (imperative verb) found",
+        })
+        if orig_dest:
+            pp_notes.append({
+                "field": "Куда ведет CTA",
+                "original_value": orig_dest,
+                "final_value": "",
+                "reason": "Cleared because CTA was invalid",
+            })
+
+    # 3. CTA destination handling
+    cta_now = fixed.get("Какой CTA", "")
+    if cta_now:
+        # CTA is valid and present — normalize destination
+        dest = fixed.get("Куда ведет CTA", "")
+        normalized_dest, dest_warns = _normalize_cta_destination(dest)
+        if dest_warns:
+            warns.extend(dest_warns)
+        if normalized_dest != dest:
+            orig_dest = dest
+            fixed["Куда ведет CTA"] = normalized_dest
+            pp_notes.append({
+                "field": "Куда ведет CTA",
+                "original_value": orig_dest,
+                "final_value": normalized_dest,
+                "reason": "Normalized composite destination path",
+            })
+    else:
+        # No CTA → destination must be empty
+        dest_val = fixed.get("Куда ведет CTA", "")
+        if dest_val:
+            fixed["Куда ведет CTA"] = ""
+            warns.append("Куда ведет CTA: cleared because CTA is empty")
+            pp_notes.append({
+                "field": "Куда ведет CTA",
+                "original_value": dest_val,
+                "final_value": "",
+                "reason": "CTA is empty; destination must also be empty",
+            })
+
+    # 4. Funnel role normalization (allow composite)
     rv = fixed.get("Роль в воронке", "")
     if rv:
-        tokens = [t.strip() for t in rv.replace(",", "/").split("/") if t.strip()]
-        bad_tokens = [t for t in tokens if t not in ALLOWED_FUNNEL_ROLES]
-        if bad_tokens:
-            warns.append(f"Роль в воронке: unexpected values {bad_tokens}; cleared")
-            fixed["Роль в воронке"] = ""
+        normalized_rv, role_warns = _normalize_funnel_role(rv)
+        if role_warns:
+            warns.extend(role_warns)
+        if normalized_rv != rv:
+            orig_rv = rv
+            fixed["Роль в воронке"] = normalized_rv
+            if not normalized_rv:
+                pp_notes.append({
+                    "field": "Роль в воронке",
+                    "original_value": orig_rv,
+                    "final_value": "",
+                    "reason": "All role atoms were invalid",
+                })
+            else:
+                pp_notes.append({
+                    "field": "Роль в воронке",
+                    "original_value": orig_rv,
+                    "final_value": normalized_rv,
+                    "reason": "Normalized composite role",
+                })
 
-    # "Куда ведет CTA" — validate
-    kv = fixed.get("Куда ведет CTA", "")
-    if kv and kv not in ALLOWED_CTA_DESTINATIONS and kv != "":
-        warns.append(f"Куда ведет CTA: '{kv}' not in allowed list; cleared")
-        fixed["Куда ведет CTA"] = ""
+    # 5. Хук / первый экран always empty (visual/OCR not done)
+    hook = fixed.get("Хук / первый экран", "")
+    if hook:
+        fixed["Хук / первый экран"] = ""
+        warns.append("Хук / первый экран: cleared — visual/OCR not done in this stage")
+        pp_notes.append({
+            "field": "Хук / первый экран",
+            "original_value": hook,
+            "final_value": "",
+            "reason": "Caption-only stage; visual/OCR not done",
+        })
 
-    # Cell length enforcement
+    # 6. Cell length enforcement
     for field, limit in CELL_LIMITS.items():
         if limit == 0:
             continue
         val = fixed.get(field, "")
         if isinstance(val, str) and len(val) > limit:
+            orig_val = val
             fixed[field] = val[:limit]
             warns.append(f"{field}: truncated to {limit} chars")
+            pp_notes.append({
+                "field": field,
+                "original_value": orig_val,
+                "final_value": fixed[field],
+                "reason": f"Exceeded cell limit ({limit} chars)",
+            })
 
-    # Low confidence → prefer empty
+    # 7. Low-confidence note (informational only, no clearing)
     conf = fixed.get("confidence", {})
     for field in ["Ключевые смыслы", "Роль в воронке"]:
         if conf.get(field) == "low" and fixed.get(field):
             warns.append(f"{field}: confidence=low; keeping value but noting uncertainty")
 
-    # Validate required keys
-    required = list(CELL_LIMITS.keys())
-    required.remove("Хук / первый экран")
+    # 8. Ensure required keys present
+    required = [k for k in CELL_LIMITS if k != "Хук / первый экран"]
     for k in required:
         if k not in fixed:
             fixed[k] = ""
             warns.append(f"{k}: missing from OpenAI response; set to empty")
 
-    # Ensure confidence dict has all semantic fields
+    # 9. Ensure confidence dict is complete
     if "confidence" not in fixed:
         fixed["confidence"] = {}
     for field in CELL_LIMITS:
         if field == "Хук / первый экран":
             fixed["confidence"][field] = "low"
-        elif field not in fixed.get("confidence", {}):
+        elif field not in fixed["confidence"]:
             fixed["confidence"][field] = "low"
             warns.append(f"confidence[{field}]: missing; set to low")
 
-    return fixed, warns
+    return fixed, warns, pp_notes
 
 
 # ── OpenAI caller ──────────────────────────────────────────────────────────
@@ -256,13 +551,14 @@ def analyze_post_caption(
     position = post.get("position", 0)
 
     base_result = {
-        "status":    None,
-        "post_id":   post_id,
-        "position":  position,
-        "model":     model,
-        "prompt_version": PROMPT_VERSION,
-        "tokens_used":    None,
-        "from_cache":     False,
+        "status":           None,
+        "post_id":          post_id,
+        "position":         position,
+        "model":            model,
+        "prompt_version":   PROMPT_VERSION,
+        "tokens_used":      None,
+        "from_cache":       False,
+        "postprocessing_notes": [],
     }
 
     if not caption:
@@ -295,13 +591,13 @@ def analyze_post_caption(
         raw_content = response.choices[0].message.content
         tokens_used = response.usage.total_tokens if response.usage else None
     except Exception as exc:
-        return {**base_result, "status": "openai_error", "error": str(exc), "from_cache": False}
+        return {**base_result, "status": "openai_error", "error": str(exc)}
 
     # Parse JSON
     try:
         analysis = json.loads(raw_content)
     except Exception:
-        # Retry with repair prompt
+        # Repair retry
         repair_messages = messages + [
             {"role": "assistant", "content": raw_content},
             {"role": "user",      "content": "Ответ выше не является валидным JSON. Верни ТОЛЬКО JSON без markdown."},
@@ -321,20 +617,20 @@ def analyze_post_caption(
         except Exception as exc2:
             return {
                 **base_result,
-                "status": "json_parse_failed",
-                "error":  f"JSON parse failed after repair: {exc2}",
+                "status":      "json_parse_failed",
+                "error":       f"JSON parse failed after repair: {exc2}",
                 "raw_content": raw_content,
-                "from_cache": False,
             }
 
-    validated, val_warns = _validate_and_fix(analysis, post)
+    validated, val_warns, pp_notes = _validate_and_fix(analysis, post)
     result = {
         **base_result,
-        "status":              "analyzed",
-        "analysis":            validated,
-        "validation_warnings": val_warns,
-        "tokens_used":         tokens_used,
-        "from_cache":          False,
+        "status":               "analyzed",
+        "analysis":             validated,
+        "validation_warnings":  val_warns,
+        "postprocessing_notes": pp_notes,
+        "tokens_used":          tokens_used,
+        "from_cache":           False,
     }
     save_to_cache(result, post_id, caption, model)
     return result
@@ -344,8 +640,8 @@ def analyze_post_caption(
 
 def build_semantic_post(post: dict, openai_result: dict) -> dict:
     """Merge post metadata with OpenAI analysis into per-post semantic structure."""
-    status    = openai_result.get("status")
-    analysis  = openai_result.get("analysis") or {}
+    status     = openai_result.get("status")
+    analysis   = openai_result.get("analysis") or {}
     from_cache = openai_result.get("from_cache", False)
 
     cache_status = "hit" if from_cache else ("miss" if status == "analyzed" else "failed")
@@ -386,11 +682,14 @@ def build_semantic_post(post: dict, openai_result: dict) -> dict:
         "tokens_used":     openai_result.get("tokens_used"),
         "openai_status":   status,
 
-        "google_sheet_fields": gs_fields,
-        "confidence":          confidence,
-        "evidence":            analysis.get("evidence") or {"caption_quotes": [], "cta_quotes": [], "source_notes": []},
-        "limitations":         limitations,
-        "validation_warnings": openai_result.get("validation_warnings") or [],
+        "google_sheet_fields":  gs_fields,
+        "confidence":           confidence,
+        "evidence":             analysis.get("evidence") or {
+            "caption_quotes": [], "cta_quotes": [], "source_notes": []
+        },
+        "limitations":          limitations,
+        "validation_warnings":  openai_result.get("validation_warnings") or [],
+        "postprocessing_notes": openai_result.get("postprocessing_notes") or [],
     }
 
 
@@ -428,10 +727,10 @@ def build_full_output(
     total_tokens: int,
     total_cost: float,
 ) -> dict:
-    run_ts = datetime.now(timezone.utc).isoformat()
+    run_ts       = datetime.now(timezone.utc).isoformat()
     n_cache_hits = sum(1 for p in semantic_posts if p.get("cache_status") == "hit")
     n_new        = sum(1 for p in semantic_posts if p.get("cache_status") == "miss")
-    n_failed     = sum(1 for p in semantic_posts if p.get("openai_status") not in ("analyzed", None))
+    n_failed     = sum(1 for p in semantic_posts if p.get("openai_status") not in ("analyzed",))
 
     return {
         "account":        ACCOUNT,
@@ -444,11 +743,11 @@ def build_full_output(
         "visual_analyzed": False,
         "ocr_analyzed":    False,
         "cache_summary": {
-            "hits":     n_cache_hits,
-            "new":      n_new,
-            "failed":   n_failed,
+            "hits":   n_cache_hits,
+            "new":    n_new,
+            "failed": n_failed,
         },
-        "total_tokens_used": total_tokens,
+        "total_tokens_used":  total_tokens,
         "estimated_cost_usd": round(total_cost, 4),
         "posts": semantic_posts,
     }
@@ -463,12 +762,12 @@ def build_gs_rows_output(
         headers = GS_FIELD_ORDER
 
     posts_by_pos = {p.get("position"): p for p in stage5a2b_posts}
-    rows = []
-    rows_as_dicts = []
+    rows: list[list[str]]  = []
+    rows_as_dicts: list[dict] = []
     for sem in semantic_posts:
-        pos   = sem.get("position")
-        a2b   = posts_by_pos.get(pos, {})
-        row   = build_gs_row(sem, a2b, headers)
+        pos  = sem.get("position")
+        a2b  = posts_by_pos.get(pos, {})
+        row  = build_gs_row(sem, a2b, headers)
         rows.append(row)
         rows_as_dicts.append(dict(zip(headers, row)))
 
@@ -511,39 +810,68 @@ def validate_output(output: dict) -> list[str]:
         errors.append(f"Output has only {len(posts)} posts, expected {EXPECTED_POSTS}")
 
     for sem in posts:
-        gf = sem.get("google_sheet_fields") or {}
+        gf  = sem.get("google_sheet_fields") or {}
+        pos = sem.get("position")
+
+        # All GS fields must be present
         for key in GS_FIELD_ORDER:
             if key in ("Конкурент", "Ссылка на пост", "Позиция закрепа"):
                 continue
             if key not in gf:
-                errors.append(f"Post {sem.get('position')}: missing google_sheet_field '{key}'")
+                errors.append(f"Post {pos}: missing google_sheet_field '{key}'")
 
+        # Хук always empty
         if gf.get("Хук / первый экран", "") != "":
-            errors.append(f"Post {sem.get('position')}: 'Хук / первый экран' must be empty")
+            errors.append(f"Post {pos}: 'Хук / первый экран' must be empty (caption-only stage)")
 
+        # No visual/OCR claims
         if sem.get("visual_analyzed") is True:
-            errors.append(f"Post {sem.get('position')}: visual_analyzed=True — this stage is caption-only")
+            errors.append(f"Post {pos}: visual_analyzed=True — this stage is caption-only")
         if sem.get("ocr_analyzed") is True:
-            errors.append(f"Post {sem.get('position')}: ocr_analyzed=True — this stage is caption-only")
+            errors.append(f"Post {pos}: ocr_analyzed=True — this stage is caption-only")
 
+        # CTA + destination consistency
+        cta  = gf.get("Какой CTA", "")
+        dest = gf.get("Куда ведет CTA", "")
+        if not cta and dest:
+            errors.append(f"Post {pos}: 'Куда ведет CTA' is set but 'Какой CTA' is empty")
+        if cta and not _is_valid_cta(cta):
+            errors.append(f"Post {pos}: 'Какой CTA' failed validity check: {cta[:60]!r}")
+
+        # Destination atoms
+        if dest:
+            bad_atoms = [
+                a for a in _extract_destination_atoms(dest)
+                if a not in ALLOWED_DESTINATION_ATOMS
+            ]
+            if bad_atoms:
+                errors.append(f"Post {pos}: 'Куда ведет CTA' has invalid atoms: {bad_atoms}")
+
+        # Funnel role atoms
         rv = gf.get("Роль в воронке", "")
         if rv:
-            tokens = [t.strip() for t in rv.replace(",", "/").split("/") if t.strip()]
-            for t in tokens:
-                if t not in ALLOWED_FUNNEL_ROLES:
-                    errors.append(f"Post {sem.get('position')}: Роль в воронке has invalid value '{t}'")
+            tokens = [t.strip().lower() for t in re.split(r"[/,]", rv) if t.strip()]
+            bad_tokens = [t for t in tokens if t not in ALLOWED_FUNNEL_ROLES]
+            if bad_tokens:
+                errors.append(f"Post {pos}: 'Роль в воронке' has invalid atoms: {bad_tokens}")
 
+        # Почему закреплен prefix
+        pz = gf.get("Почему закреплен", "")
+        if pz and not re.match(r"^(Вероятно|Возможно|По всей видимости|Скорее всего)", pz, re.IGNORECASE):
+            errors.append(f"Post {pos}: 'Почему закреплен' must start with inference marker")
+
+        # Cell limits
         for field, limit in CELL_LIMITS.items():
             if limit == 0:
                 continue
             val = gf.get(field, "")
             if val and len(val) > limit:
-                errors.append(f"Post {sem.get('position')}: {field} exceeds {limit} chars ({len(val)})")
+                errors.append(f"Post {pos}: {field} exceeds {limit} chars ({len(val)})")
 
     return errors
 
 
-# ── Main run entry points ─────────────────────────────────────────────────
+# ── Main run entry points ──────────────────────────────────────────────────
 
 def load_stage5a2b() -> tuple[dict, list[str]]:
     errors = []
@@ -571,7 +899,7 @@ def run_analysis(
     if errs:
         raise ValueError("\n".join(errs))
 
-    cost_estimate = COST_PER_CALL.get(model, 0.001)
+    cost_estimate  = COST_PER_CALL.get(model, 0.001)
     total_estimated = cost_estimate * len(posts)
     if total_estimated > budget_usd:
         raise ValueError(
@@ -579,9 +907,9 @@ def run_analysis(
             "Increase --budget-max-usd or reduce scope."
         )
 
-    semantic_posts = []
-    total_tokens   = 0
-    total_cost     = 0.0
+    semantic_posts: list[dict] = []
+    total_tokens = 0
+    total_cost   = 0.0
 
     for post in posts:
         pos = post.get("position")
@@ -596,10 +924,11 @@ def run_analysis(
         if not result.get("from_cache"):
             total_cost += cost_estimate
 
-        status = result.get("status")
+        status     = result.get("status")
         cache_note = " [cache hit]" if result.get("from_cache") else ""
+        pp_count   = len(result.get("postprocessing_notes") or [])
         if status == "analyzed":
-            print(f"    OK{cache_note} — {used} tokens")
+            print(f"    OK{cache_note} — {used} tokens, {pp_count} postprocessing fixes")
         else:
             print(f"    FAILED: {result.get('error', status)}")
 
@@ -617,7 +946,6 @@ def run_analysis(
     )
     print(f"  Semantic output: {SEMANTIC_OUTPUT_PATH.relative_to(BASE)}")
 
-    # Google Sheets rows
     gs_rows = build_gs_rows_output(semantic_posts, posts)
     GS_ROWS_OUTPUT_PATH.write_text(
         json.dumps(gs_rows, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -625,3 +953,173 @@ def run_analysis(
     print(f"  GS rows output: {GS_ROWS_OUTPUT_PATH.relative_to(BASE)}")
 
     return output
+
+
+# ── Regression checks ──────────────────────────────────────────────────────
+
+def run_regression_checks() -> tuple[int, int, list[str]]:
+    """
+    Run deterministic regression checks on all validation/normalization logic.
+    Returns (passed_count, failed_count, error_messages).
+    No external calls. No file I/O.
+    """
+    passed = 0
+    failed = 0
+    errors: list[str] = []
+
+    def ok(label: str, cond: bool):
+        nonlocal passed, failed
+        if cond:
+            passed += 1
+        else:
+            failed += 1
+            errors.append(f"FAIL [{label}]")
+
+    def eq(label: str, actual, expected):
+        nonlocal passed, failed
+        if actual == expected:
+            passed += 1
+        else:
+            failed += 1
+            errors.append(f"FAIL [{label}]: expected {expected!r}, got {actual!r}")
+
+    # ── CTA validity ──────────────────────────────────────────────────────
+    ok("CTA invalid: спойлер thesis",
+       not _is_valid_cta("Спойлер: в 2026 вопрос «а где гарантии?»..."))
+    ok("CTA invalid: как прогнозировать",
+       not _is_valid_cta("как прогнозировать результаты"))
+    ok("CTA invalid: что изменится",
+       not _is_valid_cta("что изменится в маркетинге"))
+    ok("CTA invalid: почему большинство",
+       not _is_valid_cta("почему большинство это проспит"))
+    ok("CTA invalid: в 2026 году",
+       not _is_valid_cta("в 2026 году этот вопрос станет главным"))
+    ok("CTA valid: пишите АНКЕТА в директ",
+       _is_valid_cta("пишите «АНКЕТА» в директ и комментарии"))
+    ok("CTA valid: Пишите слово консультация",
+       _is_valid_cta("Пишите слово «консультация» в комментариях"))
+    ok("CTA valid: оставьте заявку",
+       _is_valid_cta("оставьте заявку на консультацию"))
+    ok("CTA valid: переходите по ссылке в био",
+       _is_valid_cta("переходите по ссылке в био"))
+    ok("CTA valid: заполните анкету",
+       _is_valid_cta("заполните анкету предзаписи"))
+    ok("CTA invalid: получите бонусы (no strong verb)",
+       not _is_valid_cta("получите бонусы"))
+    ok("CTA invalid: получите ссылку на анкету (weak verb only)",
+       not _is_valid_cta("получите ссылку на анкету"))
+    ok("CTA valid: напишите + получите ссылку (has strong verb)",
+       _is_valid_cta("напишите нам в директ и получите ссылку на анкету"))
+    ok("CTA empty: always valid",
+       _is_valid_cta(""))
+    ok("CTA valid: нажмите",
+       _is_valid_cta("нажмите кнопку ниже"))
+    ok("CTA valid: запишитесь на консультацию",
+       _is_valid_cta("запишитесь на бесплатную консультацию"))
+
+    # ── Destination normalization ─────────────────────────────────────────
+    n1, _ = _normalize_cta_destination("директ | комментарии | анкета")
+    eq("Dest: pipes + mixed → smart split",
+       n1, "директ / комментарии → анкета")
+
+    n2, _ = _normalize_cta_destination(
+        "директ / комментарии → анкета предзаписи → закрытый канал"
+    )
+    eq("Dest: explicit multi-step preserved",
+       n2, "директ / комментарии → анкета предзаписи → закрытый канал")
+
+    n3, _ = _normalize_cta_destination("комментарии → консультация")
+    eq("Dest: simple sequential", n3, "комментарии → консультация")
+
+    n4, warns4 = _normalize_cta_destination("bio-link → site")
+    eq("Dest: invalid English atoms cleared", n4, "")
+    ok("Dest: invalid atoms produce warnings", len(warns4) > 0)
+
+    n5, _ = _normalize_cta_destination("директ / комментарии → анкета предзаписи")
+    eq("Dest: compound atom preserved",
+       n5, "директ / комментарии → анкета предзаписи")
+
+    n6, _ = _normalize_cta_destination("директ")
+    eq("Dest: single channel atom", n6, "директ")
+
+    n7, _ = _normalize_cta_destination("директ | комментарии")
+    eq("Dest: parallel channels only", n7, "директ / комментарии")
+
+    n8, _ = _normalize_cta_destination("анкета предзаписи -> закрытый канал")
+    eq("Dest: ASCII arrow normalized",
+       n8, "анкета предзаписи → закрытый канал")
+
+    # ── Role normalization ────────────────────────────────────────────────
+    r1, _ = _normalize_funnel_role("доверие / прогрев")
+    eq("Role: composite доверие/прогрев", r1, "доверие / прогрев")
+
+    r2, _ = _normalize_funnel_role("доверие / лидогенерация")
+    eq("Role: composite доверие/лидогенерация", r2, "доверие / лидогенерация")
+
+    r3, _ = _normalize_funnel_role("лидогенерация / продажа")
+    eq("Role: composite лидогенерация/продажа", r3, "лидогенерация / продажа")
+
+    r4, rw4 = _normalize_funnel_role("экспертность")
+    eq("Role: invalid atom cleared", r4, "")
+    ok("Role: invalid atom produces warning", len(rw4) > 0)
+
+    r5, _ = _normalize_funnel_role("доверие / прогрев / лидогенерация")
+    eq("Role: triple composite", r5, "доверие / прогрев / лидогенерация")
+
+    r6, _ = _normalize_funnel_role("лидогенерация")
+    eq("Role: single valid atom", r6, "лидогенерация")
+
+    r7, _ = _normalize_funnel_role("доверие,прогрев")
+    eq("Role: comma separator normalized", r7, "доверие / прогрев")
+
+    # ── Postprocessing (_validate_and_fix) ────────────────────────────────
+
+    # Invalid CTA → cleared, destination cleared
+    raw_a = {
+        "Какой CTA":    "Спойлер: в 2026 вопрос «а где гарантии?»...",
+        "Куда ведет CTA": "директ",
+        "Роль в воронке": "доверие / прогрев",
+    }
+    fa, wa, na = _validate_and_fix(raw_a, {})
+    eq("PP: invalid CTA cleared", fa.get("Какой CTA"), "")
+    eq("PP: dest cleared when CTA invalid", fa.get("Куда ведет CTA"), "")
+    ok("PP: pp_note recorded for invalid CTA",
+       any(n["field"] == "Какой CTA" for n in na))
+    eq("PP: valid role preserved", fa.get("Роль в воронке"), "доверие / прогрев")
+
+    # Valid CTA with messy destination → normalized
+    raw_b = {
+        "Какой CTA":    "пишите «АНКЕТА» в директ и комментарии",
+        "Куда ведет CTA": "директ | комментарии | анкета предзаписи",
+    }
+    fb, _, nb = _validate_and_fix(raw_b, {})
+    ok("PP: valid CTA preserved", bool(fb.get("Какой CTA")))
+    eq("PP: destination normalized",
+       fb.get("Куда ведет CTA"),
+       "директ / комментарии → анкета предзаписи")
+
+    # Empty CTA → destination must be empty
+    raw_c = {"Какой CTA": "", "Куда ведет CTA": "директ"}
+    fc, wc, _ = _validate_and_fix(raw_c, {})
+    eq("PP: empty CTA → dest cleared", fc.get("Куда ведет CTA"), "")
+
+    # Хук always empty
+    raw_d = {"Хук / первый экран": "красивый первый кадр"}
+    fd, _, nd = _validate_and_fix(raw_d, {})
+    eq("PP: Хук always empty", fd.get("Хук / первый экран"), "")
+    ok("PP: pp_note for Хук clearing",
+       any(n["field"] == "Хук / первый экран" for n in nd))
+
+    # Вероятно prefix
+    raw_e = {"Почему закреплен": "закреплен чтобы привлечь заявки"}
+    fe, _, _ = _validate_and_fix(raw_e, {})
+    ok("PP: Вероятно prefix added",
+       fe.get("Почему закреплен", "").startswith("Вероятно"))
+
+    # No prefix needed if already present
+    raw_f = {"Почему закреплен": "Вероятно, закреплен как вход в воронку"}
+    ff, wf, _ = _validate_and_fix(raw_f, {})
+    eq("PP: Вероятно prefix not doubled",
+       ff.get("Почему закреплен"), "Вероятно, закреплен как вход в воронку")
+
+    return passed, failed, errors

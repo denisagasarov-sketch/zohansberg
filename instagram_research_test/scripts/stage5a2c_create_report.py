@@ -147,6 +147,20 @@ def create_report() -> Path:
                 lines.append(f"> Error: {err}")
             lines.append("")
 
+        pp_notes = sem.get("postprocessing_notes") or []
+        if pp_notes:
+            lines.append(f"**Postprocessing fixes ({len(pp_notes)}):**")
+            lines.append("")
+            lines.append("| Field | Original | Final | Reason |")
+            lines.append("|---|---|---|---|")
+            for note in pp_notes:
+                orig  = _trunc(str(note.get("original_value") or ""), 60)
+                final = _trunc(str(note.get("final_value") or ""), 60)
+                lines.append(
+                    f"| {note.get('field', '—')} | {orig} | {final} | {note.get('reason', '—')} |"
+                )
+            lines.append("")
+
         if warns:
             lines.append(f"**Validation warnings ({len(warns)}):**")
             for w in warns:

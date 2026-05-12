@@ -91,6 +91,39 @@ python3 scripts/stage5a2c_run_local.py --analyze --budget-max-usd 1.00 --model g
 python3 scripts/stage5a2c_run_local.py --create-report
 ```
 
+### 6. Validate existing output (read-only)
+
+```bash
+python3 scripts/stage5a2c_run_local.py --validate-existing-output
+```
+
+Reads existing semantic and GS rows JSON, runs all validation checks and
+deterministic postprocessing to detect any issues. No OpenAI calls. No files written.
+
+### 7. Validate and write corrected copies
+
+```bash
+python3 scripts/stage5a2c_run_local.py --validate-existing-output --write-fixed
+```
+
+If postprocessing fixes are needed, writes corrected output to `_fixed.json` variants.
+Original files are preserved.
+
+```bash
+python3 scripts/stage5a2c_run_local.py --validate-existing-output --write-fixed --overwrite
+```
+
+Overwrites original files with fixed versions.
+
+### 8. Run regression checks only
+
+```bash
+python3 scripts/stage5a2c_run_local.py --regression-checks
+```
+
+Runs 44 deterministic tests on CTA validation, destination normalization, role
+normalization, and postprocessing. No files. No external calls.
+
 ---
 
 ## Output files
@@ -99,9 +132,11 @@ All runtime outputs are gitignored.
 
 | File | Description |
 |---|---|
-| `data/normalized/stage5a2c_pinned_posts_semantic.json` | Per-post semantic analysis with confidence, evidence, limitations |
-| `data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json` | GS-ready rows (headers + values) for "Закрепленные посты" |
-| `analysis/stage5a2c_cache/<key>.json` | Per-post cache keyed by (post_id, model, prompt_version, caption hash) |
+| `data/normalized/stage5a2c_pinned_posts_semantic.json` | Per-post semantic analysis with confidence, evidence, postprocessing_notes |
+| `data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json` | GS-ready rows for "Закрепленные посты" |
+| `data/normalized/stage5a2c_pinned_posts_semantic_fixed.json` | Fixed copy (written by --write-fixed) |
+| `data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json` | Fixed GS rows copy |
+| `analysis/stage5a2c_cache/<key>.json` | Cache keyed by (post_id, model, prompt_version, caption_sha256) |
 | `report/stage_5a2c_pinned_posts_caption_analysis_report.md` | Human-readable analysis report |
 
 ---
@@ -111,13 +146,43 @@ All runtime outputs are gitignored.
 | Field | Rule |
 |---|---|
 | Тема поста | Max 160 chars |
-| Почему закреплен | Must start with "Вероятно" (inference prefix enforced automatically) |
+| Почему закреплен | Must start with "Вероятно"; evidence-based; auto-prepended if missing |
 | Хук / первый экран | **Always empty** — visual/OCR not done in this stage |
 | Что в тексте поста | Max 350 chars |
 | Ключевые смыслы | Max 500 chars |
-| Какой CTA | Max 180 chars |
-| Куда ведет CTA | Must be one of: `директ` \| `комментарии` \| `био-ссылка` \| `анкета` \| `закрытый канал` \| `консультация` \| `курс` \| `сайт` \| `unknown` \| *(empty if no CTA)* |
-| Роль в воронке | Must be from: `знакомство` \| `доверие` \| `прогрев` \| `продажа` \| `лидогенерация` |
+| Какой CTA | Must contain explicit action verb (пишите/оставьте/переходите/etc.); cleared if invalid |
+| Куда ведет CTA | Composite paths allowed: `директ / комментарии → анкета предзаписи → закрытый канал`; atoms validated |
+| Роль в воронке | Composite allowed: `доверие / прогрев`; atoms validated against allowed list |
+
+### CTA validity rules
+
+A CTA is valid only if it contains a **strong imperative action verb**:
+`пишите`, `напишите`, `оставьте`, `переходите`, `перейдите`, `заполните`,
+`регистрируйтесь`, `отправьте`, `забронируйте`, `подпишитесь`, `нажмите`,
+`запишитесь`, `приходите`, `получите доступ`
+
+**Not valid CTA:** thesis, teaser, forecast, insight, spójler, или вопрос.
+
+Invalid examples (auto-cleared by postprocessing):
+- `Спойлер: в 2026 году...`
+- `как прогнозировать результаты`
+- `получите ссылку на анкету` *(weak verb only, no strong action)*
+
+### CTA destination atoms
+
+Allowed atoms: `директ` | `комментарии` | `био-ссылка` | `анкета` | `анкета предзаписи` |
+`закрытый канал` | `консультация` | `курс` | `сайт` | `бот` | `unknown`
+
+Composite path: `"директ / комментарии → анкета предзаписи → закрытый канал"`
+- `/` = parallel channels
+- `→` = sequential steps
+- Mixed input (`|`, `->`) is auto-normalized
+
+### Funnel role atoms
+
+Allowed: `знакомство` | `доверие` | `прогрев` | `продажа` | `лидогенерация`
+
+Composite: `"доверие / прогрев"`, `"доверие / лидогенерация"`, `"прогрев / лидогенерация"`
 
 ---
 
