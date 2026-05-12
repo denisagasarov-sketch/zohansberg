@@ -169,6 +169,27 @@ def create_report(coverage_map, sheet_summaries, meta, out_path):
     # Section 8: Recommended next build step
     lines.append("## 8. Recommended Next Build Step")
     lines.append("")
+
+    landing_missing = sum(1 for r in coverage_map
+                          if r.get("sheet_id") == "landing" and r["status_current_data"] == STATUS_MISSING)
+    funnel_missing  = sum(1 for r in coverage_map
+                          if r.get("sheet_id") == "funnel"   and r["status_current_data"] == STATUS_MISSING)
+    bot_missing     = sum(1 for r in coverage_map
+                          if r.get("sheet_id") == "bot_lead_magnet" and r["status_current_data"] == STATUS_MISSING)
+
+    if landing_missing > 0 or funnel_missing > 0 or bot_missing > 0:
+        lines.append("**Step 0 (prerequisite) — Link destination classifier.**")
+        lines.append("")
+        lines.append(
+            "Before building landing, funnel, or bot/lead-magnet analysis stages, first "
+            "classify where the bio URL leads: landing page, Taplink/multilink, bot, "
+            "lead magnet, consultation booking, or direct sale. "
+            "The detected destination type determines which sub-stages to prioritize. "
+            "Building landing or bot stages before knowing the destination type risks "
+            "building the wrong stage first."
+        )
+        lines.append("")
+
     if sorted_stages:
         top_stage, top_fields = sorted_stages[0]
         sheet_groups = defaultdict(list)
@@ -176,14 +197,19 @@ def create_report(coverage_map, sheet_summaries, meta, out_path):
             sheet_groups[r["sheet_name"]].append(r)
         sheet_list = ", ".join(sheet_groups.keys())
         lines.append(
-            f"**Build: {top_stage}** — this stage unlocks the most fields ({len(top_fields)} fields "
-            f"across: {sheet_list}). "
+            f"**Step 1 (highest impact): {top_stage}** — unlocks {len(top_fields)} fields "
+            f"across: {sheet_list}. "
             f"After completing this stage, re-run `stage5d_run_local.py` to see updated coverage."
         )
         if len(sorted_stages) > 1:
             second_stage, second_fields = sorted_stages[1]
             lines.append(
-                f" The second-highest impact stage is **{second_stage}** ({len(second_fields)} fields)."
+                f"\n**Step 2: {second_stage}** — unlocks {len(second_fields)} fields."
+            )
+        if len(sorted_stages) > 2:
+            third_stage, third_fields = sorted_stages[2]
+            lines.append(
+                f"\n**Step 3: {third_stage}** — unlocks {len(third_fields)} fields."
             )
     else:
         lines.append("All fields have resolvers assigned. Review partial fields to determine manual fill priority.")
@@ -197,7 +223,7 @@ def create_report(coverage_map, sheet_summaries, meta, out_path):
     source_presence = meta.get("source_presence", {})
     source_notes = {
         "profile_summary": "Instagram profile structural data",
-        "bio_analysis": "AI-analyzed bio fields",
+        "bio_analysis": "Rule-based bio analysis (analysis_method=rule_based; no OpenAI)",
         "pinned_posts_index": "3 pinned posts structural index",
         "highlights_index": "32 highlights structural index",
         "stage5b_summary": "Stage 5B auto stories summary",

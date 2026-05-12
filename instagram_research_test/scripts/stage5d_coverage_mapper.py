@@ -214,14 +214,17 @@ def _bio_field(bio, *keys):
 def _preview(v):
     if v is None:
         return None
+    if isinstance(v, dict) and "value" in v:
+        return _preview(v.get("value"))
     if isinstance(v, list):
         items = v[:3]
         parts = []
         for item in items:
-            s = str(item)
+            inner = _preview(item)
+            s = str(inner) if inner is not None else ""
             if len(s) > 60:
                 s = s[:60] + "..."
-            parts.append(_redact_url(s))
+            parts.append(s)
         result = str(parts)
         return result[:200]
     if isinstance(v, str):
@@ -257,9 +260,7 @@ _RESOLVERS: dict = {}
 
 def _resolve_competitor_always_ready(fdef, sources):
     ps = sources.get("profile_summary")
-    account = _pval(ps, "username", "userName") if ps else ACCOUNT
-    if not account:
-        account = ACCOUNT
+    account = (_bio_field(ps, "username", "userName")[0] if ps else None) or ACCOUNT
     return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
                 ["profile_summary"], ["username"],
                 "Use profile_summary.username or fallback to ACCOUNT constant",
@@ -270,9 +271,7 @@ def _resolve_competitor_always_ready(fdef, sources):
 
 def _r_pd_konkurent(fdef, sources):
     ps = sources.get("profile_summary")
-    account = ACCOUNT
-    if ps:
-        account = _pval(ps, "username", "userName") or ACCOUNT
+    account = (_bio_field(ps, "username", "userName")[0] if ps else None) or ACCOUNT
     return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
                 ["profile_summary"], ["username", "userName"],
                 "Use profile_summary.username or fallback to ACCOUNT constant",
@@ -310,17 +309,17 @@ def _r_pd_name_in_profile(fdef, sources):
     ps = sources.get("profile_summary")
     if ps is None:
         return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
-                    ["profile_summary"], ["fullName", "full_name", "name"],
+                    ["profile_summary"], ["full_name", "fullName", "name"],
                     "profile_summary not available")
-    val = _pval(ps, "fullName", "full_name", "name")
+    val = _bio_field(ps, "full_name", "fullName", "name")[0]
     if val:
         return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                    ["profile_summary"], ["fullName", "full_name", "name"],
-                    "profile_summary.fullName",
+                    ["profile_summary"], ["full_name", "fullName", "name"],
+                    "profile_summary.full_name",
                     preview=_preview(val))
     return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_LOW,
-                ["profile_summary"], ["fullName", "full_name", "name"],
-                "profile_summary present but fullName/name field missing")
+                ["profile_summary"], ["full_name", "fullName", "name"],
+                "profile_summary present but full_name field missing or empty")
 
 _RESOLVERS[_fid("profile_description", "Что вынесено в имя профиля")] = _r_pd_name_in_profile
 
@@ -329,17 +328,17 @@ def _r_pd_bio_text(fdef, sources):
     ps = sources.get("profile_summary")
     if ps is None:
         return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
-                    ["profile_summary"], ["biography", "bio"],
+                    ["profile_summary"], ["bio_text", "biography", "bio"],
                     "profile_summary not available")
-    val = _pval(ps, "biography", "bio")
+    val, ds, _ = _bio_field(ps, "bio_text", "biography", "bio")
     if val:
         return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                    ["profile_summary"], ["biography", "bio"],
-                    "profile_summary.biography",
+                    ["profile_summary"], ["bio_text", "biography", "bio"],
+                    "profile_summary.bio_text",
                     preview=_preview(val))
     return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                ["profile_summary"], ["biography", "bio"],
-                "profile_summary present but biography field missing or empty")
+                ["profile_summary"], ["bio_text", "biography", "bio"],
+                "profile_summary present but bio_text field missing or empty")
 
 _RESOLVERS[_fid("profile_description", "Описание профиля (bio)")] = _r_pd_bio_text
 
@@ -441,7 +440,7 @@ _RESOLVERS[_fid("profile_description", "Аргументы доверия")] = _
 
 def _r_pd_main_cta(fdef, sources):
     bio = sources.get("bio_analysis")
-    val, ds, conf = _bio_field(bio, "cta", "main_cta", "bio_cta", "call_to_action", "главный_cta")
+    val, ds, conf = _bio_field(bio, "cta_text", "cta", "main_cta", "bio_cta", "call_to_action", "главный_cta")
     if bio is None:
         return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_SEMI, None,
                     ["bio_analysis"], ["cta", "main_cta", "bio_cta"],
@@ -472,23 +471,23 @@ def _r_pd_cta_destination(fdef, sources):
     bio = sources.get("bio_analysis")
     url = None
     if ps:
-        url = _pval(ps, "externalUrl", "external_url", "bioUrl", "bio_url", "url", "website")
+        url = _bio_field(ps, "external_url", "externalUrl", "bioUrl", "bio_url")[0]
     if not url and bio and isinstance(bio, dict):
-        url = _pval(bio, "destination", "destination_url", "куда_ведет")
+        url = _bio_field(bio, "cta_destination", "destination", "destination_url", "куда_ведет")[0]
     if url:
         return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
                     ["profile_summary", "bio_analysis"],
-                    ["externalUrl", "external_url", "destination"],
-                    "profile_summary.externalUrl or bio_analysis.destination",
+                    ["external_url", "externalUrl", "cta_destination"],
+                    "profile_summary.external_url or bio_analysis.cta_destination",
                     preview=_redact_url(str(url)))
     if ps is not None or bio is not None:
         return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_LOW,
                     ["profile_summary", "bio_analysis"],
-                    ["externalUrl", "external_url", "destination"],
+                    ["external_url", "externalUrl", "cta_destination"],
                     "sources present but no external URL found; bio may have no external link")
     return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
                 ["profile_summary", "bio_analysis"],
-                ["externalUrl", "external_url"],
+                ["external_url", "externalUrl"],
                 "both profile_summary and bio_analysis not available")
 
 _RESOLVERS[_fid("profile_description", "Куда ведет CTA")] = _r_pd_cta_destination
@@ -499,31 +498,40 @@ _RESOLVERS[_fid("profile_description", "Куда ведет CTA")] = _r_pd_cta_d
 _RESOLVERS[_fid("highlights_analysis", "Конкурент")] = _resolve_competitor_always_ready
 
 
+def _hi_list(sources):
+    """Extract highlights list from highlights_index (dict or list format)."""
+    raw = sources.get("highlights_index")
+    if isinstance(raw, dict):
+        return raw.get("highlights") or []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
 def _r_ha_title(fdef, sources):
-    hi = sources.get("highlights_index")
-    if isinstance(hi, list) and len(hi) > 0:
-        titles = [item.get("title") or item.get("name") or item.get("id", "") for item in hi[:3]]
+    hi = _hi_list(sources)
+    if hi:
+        titles = [_bio_field(item, "title", "name")[0] or str(item.get("highlight_id", "")) for item in hi[:3]]
         titles = [t for t in titles if t]
         return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                    ["highlights_index"], ["title", "name"],
-                    f"highlights_index list; {len(hi)} highlights available",
+                    ["highlights_index"], ["title"],
+                    f"highlights_index; {len(hi)} highlights available",
                     preview=_preview(titles))
     return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
-                ["highlights_index"], ["title", "name"],
+                ["highlights_index"], ["title"],
                 "highlights_index not available or empty")
 
 _RESOLVERS[_fid("highlights_analysis", "Название highlight")] = _r_ha_title
 
 
 def _r_ha_position(fdef, sources):
-    hi = sources.get("highlights_index")
-    if isinstance(hi, list) and len(hi) > 0:
-        positions = [item.get("position") or item.get("order") or item.get("index") for item in hi[:3]]
-        positions = [p for p in positions if p is not None]
+    hi = _hi_list(sources)
+    if hi:
+        positions = [item.get("position") for item in hi[:3] if item.get("position") is not None]
         return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                    ["highlights_index"], ["position", "order", "index"],
-                    f"highlights_index position field; {len(hi)} highlights",
-                    preview=_preview(positions) if positions else f"{len(hi)} items, position field present")
+                    ["highlights_index"], ["position"],
+                    f"highlights_index position field (plain int); {len(hi)} highlights",
+                    preview=_preview(positions) if positions else f"{len(hi)} items")
     return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
                 ["highlights_index"], ["position"],
                 "highlights_index not available or empty")
@@ -591,23 +599,37 @@ _RESOLVERS[_fid("highlights_analysis", "Куда ведет CTA (если ест
 _RESOLVERS[_fid("pinned_posts", "Конкурент")] = _resolve_competitor_always_ready
 
 
+def _pp_list(sources):
+    """Extract pinned posts list from pinned_posts_index (dict or list format)."""
+    raw = sources.get("pinned_posts_index")
+    if isinstance(raw, dict):
+        return raw.get("pinned_posts") or []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
 def _r_pp_url(fdef, sources):
-    pi = sources.get("pinned_posts_index")
-    if isinstance(pi, list) and len(pi) >= 1:
+    pi = _pp_list(sources)
+    pi_raw = sources.get("pinned_posts_index")
+    if pi:
         urls = []
         for item in pi:
-            u = _pval(item, "url", "postUrl", "link", "shortCode")
+            u = _bio_field(item, "url", "postUrl", "link")[0]
             if u:
                 urls.append(_redact_url(str(u)))
         if urls:
             return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                        ["pinned_posts_index"], ["url", "postUrl", "link", "shortCode"],
-                        "pinned_posts_index list; url field per item",
+                        ["pinned_posts_index"], ["url", "postUrl"],
+                        "pinned_posts_index; url field per item (field-wrapped)",
                         preview=_preview(urls))
-    if isinstance(pi, list) and len(pi) >= 1:
         return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_MEDIUM,
                     ["pinned_posts_index"], ["url", "postUrl"],
-                    "pinned_posts_index present but url/postUrl field not found in items")
+                    "pinned_posts_index present but url field not found in items")
+    if pi_raw is not None:
+        return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_MEDIUM,
+                    ["pinned_posts_index"], ["url"],
+                    "pinned_posts_index present but pinned_posts list empty")
     return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
                 ["pinned_posts_index"], ["url", "postUrl"],
                 "pinned_posts_index not available")
@@ -616,18 +638,22 @@ _RESOLVERS[_fid("pinned_posts", "Ссылка на пост")] = _r_pp_url
 
 
 def _r_pp_position(fdef, sources):
-    pi = sources.get("pinned_posts_index")
-    if isinstance(pi, list) and len(pi) >= 1:
-        positions = [item.get("position") or item.get("order") or item.get("pinnedPosition") for item in pi]
-        positions = [p for p in positions if p is not None]
+    pi = _pp_list(sources)
+    pi_raw = sources.get("pinned_posts_index")
+    if pi:
+        positions = [item.get("position") for item in pi if item.get("position") is not None]
         if positions:
             return _rec(fdef, STATUS_READY, STATUS_READY, FILL_AUTO, CONF_HIGH,
-                        ["pinned_posts_index"], ["position", "order", "pinnedPosition"],
-                        "pinned_posts_index position field",
+                        ["pinned_posts_index"], ["position"],
+                        "pinned_posts_index position field (plain int)",
                         preview=_preview(positions))
         return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_MEDIUM,
                     ["pinned_posts_index"], ["position"],
-                    "pinned_posts_index present but position field not found")
+                    "pinned_posts_index present but position field not found in items")
+    if pi_raw is not None:
+        return _rec(fdef, STATUS_PARTIAL, STATUS_READY, FILL_AUTO, CONF_MEDIUM,
+                    ["pinned_posts_index"], ["position"],
+                    "pinned_posts_index present but pinned_posts list empty")
     return _rec(fdef, STATUS_MISSING, STATUS_READY, FILL_AUTO, None,
                 ["pinned_posts_index"], ["position"],
                 "pinned_posts_index not available")
@@ -666,20 +692,25 @@ _RESOLVERS[_fid("pinned_posts", "Хук / первый экран")] = _r_pp_hoo
 
 
 def _r_pp_caption(fdef, sources):
-    pi = sources.get("pinned_posts_index")
-    if isinstance(pi, list) and len(pi) >= 1:
-        captions = [_pval(item, "caption", "text", "description") for item in pi]
+    pi = _pp_list(sources)
+    pi_raw = sources.get("pinned_posts_index")
+    if pi:
+        captions = [_bio_field(item, "caption_preview", "caption", "text")[0] for item in pi]
         captions = [c for c in captions if c]
         if captions:
             return _rec(fdef, STATUS_PARTIAL, STATUS_PARTIAL, FILL_SEMI, CONF_MEDIUM,
-                        ["pinned_posts_index"], ["caption", "text", "description"],
-                        "Raw caption from pinned_posts_index; semantic extraction not yet built",
+                        ["pinned_posts_index"], ["caption_preview", "caption"],
+                        "Raw caption_preview from pinned_posts_index (field-wrapped); semantic extraction not yet built",
                         preview=_preview(captions[0]))
         return _rec(fdef, STATUS_MISSING, STATUS_PARTIAL, FILL_SEMI, CONF_MEDIUM,
-                    ["pinned_posts_index"], ["caption", "text"],
-                    "pinned_posts_index present but caption field not found in items")
+                    ["pinned_posts_index"], ["caption_preview", "caption"],
+                    "pinned_posts_index present but caption_preview field not found in items")
+    if pi_raw is not None:
+        return _rec(fdef, STATUS_MISSING, STATUS_PARTIAL, FILL_SEMI, CONF_MEDIUM,
+                    ["pinned_posts_index"], ["caption_preview"],
+                    "pinned_posts_index present but pinned_posts list empty")
     return _rec(fdef, STATUS_MISSING, STATUS_PARTIAL, FILL_SEMI, CONF_MEDIUM,
-                ["pinned_posts_index"], ["caption"],
+                ["pinned_posts_index"], ["caption_preview"],
                 "pinned_posts_index not available")
 
 _RESOLVERS[_fid("pinned_posts", "Что в тексте поста")] = _r_pp_caption
@@ -706,18 +737,21 @@ _RESOLVERS[_fid("pinned_posts", "Какой CTA")] = _r_pp_cta_type
 
 
 def _r_pp_cta_dest(fdef, sources):
-    pi = sources.get("pinned_posts_index")
-    if isinstance(pi, list) and len(pi) >= 1:
-        links = [_pval(item, "linkUrl", "externalUrl", "link") for item in pi]
+    pi = _pp_list(sources)
+    if pi:
+        links = [_bio_field(item, "linkUrl", "externalUrl", "link")[0] for item in pi]
         links = [l for l in links if l]
         if links:
             return _rec(fdef, STATUS_PARTIAL, STATUS_PARTIAL, FILL_SEMI, CONF_LOW,
-                        ["pinned_posts_index"], ["linkUrl", "externalUrl", "link"],
+                        ["pinned_posts_index"], ["linkUrl", "externalUrl"],
                         "CTA URL from pinned_posts_index link sticker data; destination content not analyzed",
                         preview=_preview([_redact_url(str(l)) for l in links]))
+        return _rec(fdef, STATUS_MISSING, STATUS_PARTIAL, FILL_SEMI, CONF_LOW,
+                    ["pinned_posts_index"], ["linkUrl", "externalUrl"],
+                    "pinned_posts_index present but no linkUrl field found; posts may not have link sticker data")
     return _rec(fdef, STATUS_MISSING, STATUS_PARTIAL, FILL_SEMI, CONF_LOW,
                 ["pinned_posts_index"], ["linkUrl", "externalUrl"],
-                "CTA URL only available if post has explicit link sticker data in normalized index")
+                "pinned_posts_index not available")
 
 _RESOLVERS[_fid("pinned_posts", "Куда ведет CTA")] = _r_pp_cta_dest
 
@@ -782,14 +816,14 @@ def _r_fn_leads_to(fdef, sources):
     bio = sources.get("bio_analysis")
     url = None
     if ps:
-        url = _pval(ps, "externalUrl", "external_url", "bioUrl", "bio_url", "url", "website")
+        url = _bio_field(ps, "external_url", "externalUrl", "bioUrl", "bio_url")[0]
     if not url and bio and isinstance(bio, dict):
-        url = _pval(bio, "destination", "destination_url", "куда_ведет")
+        url = _bio_field(bio, "cta_destination", "destination", "destination_url", "куда_ведет")[0]
     preview = _redact_url(str(url)) if url else None
     return _rec(fdef, STATUS_PARTIAL, STATUS_PARTIAL, FILL_SEMI, CONF_LOW,
                 ["profile_summary", "bio_analysis"],
-                ["externalUrl", "destination"],
-                "URL known from profile_summary/bio_analysis; destination content not analyzed",
+                ["external_url", "cta_destination"],
+                "URL known from profile_summary.external_url / bio_analysis.cta_destination; destination content not analyzed",
                 preview=preview,
                 next_stage="Stage 5E: landing/funnel analyzer")
 
@@ -835,14 +869,14 @@ def _r_la_site_url(fdef, sources):
     bio = sources.get("bio_analysis")
     url = None
     if ps:
-        url = _pval(ps, "externalUrl", "external_url", "bioUrl", "bio_url", "url", "website")
+        url = _bio_field(ps, "external_url", "externalUrl", "bioUrl", "bio_url")[0]
     if not url and bio and isinstance(bio, dict):
-        url = _pval(bio, "destination", "destination_url", "куда_ведет")
+        url = _bio_field(bio, "cta_destination", "destination", "destination_url", "куда_ведет")[0]
     preview = _redact_url(str(url)) if url else None
     return _rec(fdef, STATUS_PARTIAL, STATUS_PARTIAL, FILL_SEMI, CONF_LOW,
                 ["profile_summary", "bio_analysis"],
-                ["externalUrl", "destination"],
-                "Bio URL available but may not be landing; could be Taplink/Linktree; landing confirmation not built",
+                ["external_url", "cta_destination"],
+                "Bio URL known but may be Taplink/Linktree, not landing directly; landing confirmation not built",
                 preview=preview,
                 next_stage="Stage 5E: landing analyzer")
 
@@ -926,14 +960,22 @@ def build_sheet_summaries(coverage_map, sources):
         "highlights_analysis": {
             "row_grain": "highlight",
             "row_source_file": "highlights_index.json",
-            "expected_rows_now_fn": lambda s: len(s["highlights_index"]) if isinstance(s.get("highlights_index"), list) else 0,
+            "expected_rows_now_fn": lambda s: len(
+                (s.get("highlights_index") or {}).get("highlights", [])
+                if isinstance(s.get("highlights_index"), dict)
+                else (s.get("highlights_index") or [])
+            ),
             "expected_rows_pipeline": 32,
             "notes": "32 highlights in index. 3 analyzed by Stage 5C so far.",
         },
         "pinned_posts": {
             "row_grain": "pinned_post",
             "row_source_file": "pinned_posts_index.json",
-            "expected_rows_now_fn": lambda s: len(s["pinned_posts_index"]) if isinstance(s.get("pinned_posts_index"), list) else 0,
+            "expected_rows_now_fn": lambda s: len(
+                (s.get("pinned_posts_index") or {}).get("pinned_posts", [])
+                if isinstance(s.get("pinned_posts_index"), dict)
+                else (s.get("pinned_posts_index") or [])
+            ),
             "expected_rows_pipeline": 3,
             "notes": "3 pinned posts in index. Structural fields ready; semantic fields missing.",
         },
