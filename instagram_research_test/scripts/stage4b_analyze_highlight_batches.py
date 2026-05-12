@@ -12,12 +12,13 @@ BASE = Path(__file__).parent.parent
 
 MODEL = "gpt-4.1-mini"
 
-PLAN_CHECK_PATH = BASE / "data/normalized/stage4b_plan_check.json"
-PLAN_PATH       = BASE / "data/normalized/stage4a_openai_plan.json"
-BATCHES_OUT_DIR = BASE / "analysis/stage4b/highlight_batches"
-RAW_RESP_DIR    = BASE / "analysis/openai_responses/stage4b/highlight_batches"
-SUMMARY_PATH    = BASE / "data/normalized/stage4b_highlight_batches_summary.json"
+PLAN_CHECK_PATH   = BASE / "data/normalized/stage4b_plan_check.json"
+PLAN_PATH         = BASE / "data/normalized/stage4a_openai_plan.json"
+BATCHES_OUT_DIR   = BASE / "analysis/stage4b/highlight_batches"
+RAW_RESP_DIR      = BASE / "analysis/openai_responses/stage4b/highlight_batches"
+SUMMARY_PATH      = BASE / "data/normalized/stage4b_highlight_batches_summary.json"
 NORM_SUMMARY_PATH = BASE / "data/normalized/stage4b_highlight_role_normalization_summary.json"
+POLICY_PATH       = BASE / "prompts/analysis_language_policy_ru.md"
 
 HIGHLIGHT_ID = "17874797856565339"
 
@@ -97,7 +98,13 @@ except ImportError:
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
+_policy = POLICY_PATH.read_text(encoding="utf-8").strip() if POLICY_PATH.exists() else ""
+if not _policy:
+    print(f"  WARNING: policy file not found at {POLICY_PATH}", file=sys.stderr)
+
 SYSTEM_PROMPT = (
+    (_policy + "\n\n---\n\n") if _policy else ""
+) + (
     "You are an Instagram Stories analyst. "
     "Return ONLY valid JSON matching the provided schema. "
     "No markdown. No text outside JSON. "
