@@ -12,5 +12,8 @@ report/stage_5d3_google_sheets_validate_report.md
 report/stage_5d3_google_sheets_write_report.md
 data/normalized/stage5a2a_pinned_posts_source_audit.json
 report/stage_5a2a_pinned_posts_source_audit.md
+data/normalized/stage5a2b_pinned_posts_details.json
+data/normalized/stage5a2b_pinned_posts_schema_summary.json
+report/stage_5a2b_pinned_post_details_report.md
 __pycache__/
 *.pyc
