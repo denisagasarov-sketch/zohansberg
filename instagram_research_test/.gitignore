@@ -3,5 +3,8 @@ output/
 data/raw/
 analysis/openai_responses/
 handoff/
+data/normalized/stage5d_coverage_map.json
+data/normalized/stage5d_coverage_summary.json
+report/stage_5d_coverage_report.md
 __pycache__/
 *.pyc
