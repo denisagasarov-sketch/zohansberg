@@ -2,25 +2,33 @@
 """
 Stage 5C: Local runner for OpenAI Vision story analysis.
 
-Usage:
-  # dry-run — no OpenAI, shows planned calls and cost estimate
-  python scripts/stage5c_run_local.py --dry-run \
-    --max-stories-per-highlight 5 --budget-max-usd 1.00
+Image input mode: base64 by default (fetched in-memory, never written to disk).
+Instagram CDN URLs are NOT passed directly to OpenAI.
+Use --allow-direct-url-mode ONLY for testing; it will fail on Instagram CDN.
 
-  # real run — 5 stories per highlight, spread selection
+Usage:
+  # dry-run
+  python scripts/stage5c_run_local.py \
+    --dry-run --max-stories-per-highlight 5 --budget-max-usd 1.00
+
+  # test media fetch without OpenAI
+  python scripts/stage5c_run_local.py \
+    --test-media-fetch --max-stories-per-highlight 1
+
+  # real run
   python scripts/stage5c_run_local.py \
     --max-stories-per-highlight 5 --budget-max-usd 1.00
 
-  # specific highlights only
+  # specific highlights
   python scripts/stage5c_run_local.py \
     --max-stories-per-highlight 10 --budget-max-usd 2.00 \
     --highlight-ids 17874797856565339,18110898391654002
 
-  # high detail (better OCR, ~3x cost)
+  # high detail (better OCR, ~3-4x cost)
   python scripts/stage5c_run_local.py \
     --max-stories-per-highlight 5 --budget-max-usd 2.00 --detail high
 
-  # force re-analyze even if cached
+  # force re-analyze (ignore cache)
   python scripts/stage5c_run_local.py \
     --max-stories-per-highlight 5 --budget-max-usd 1.00 --force
 """
@@ -50,15 +58,17 @@ def _arg(name: str, default=None):
     return default
 
 
-DRY_RUN = _flag("--dry-run")
-FORCE   = _flag("--force")
+DRY_RUN          = _flag("--dry-run")
+FORCE            = _flag("--force")
+TEST_MEDIA_FETCH = _flag("--test-media-fetch")
+ALLOW_DIRECT_URL = _flag("--allow-direct-url-mode")
+IMAGE_INPUT_MODE = "direct_url" if ALLOW_DIRECT_URL else "base64"
 
 # --max-stories-per-highlight N  (required)
 _msh_raw = _arg("--max-stories-per-highlight")
 if _msh_raw is None:
     print("[ERROR] --max-stories-per-highlight N is required.", file=sys.stderr)
-    print("  Example: python scripts/stage5c_run_local.py --max-stories-per-highlight 5 "
-          "--budget-max-usd 1.00", file=sys.stderr)
+    print("  Example: --max-stories-per-highlight 5 --budget-max-usd 1.00", file=sys.stderr)
     sys.exit(1)
 try:
     MAX_STORIES_PER_HL = int(_msh_raw)
@@ -69,21 +79,25 @@ except ValueError:
           file=sys.stderr)
     sys.exit(1)
 
-# --budget-max-usd X  (required)
+# --budget-max-usd X  (required unless --test-media-fetch or --dry-run)
 _budget_raw = _arg("--budget-max-usd")
-if _budget_raw is None:
-    print("[ERROR] --budget-max-usd X is required (e.g. --budget-max-usd 1.00).", file=sys.stderr)
+BUDGET_MAX_USD: float | None = None
+if _budget_raw is not None:
+    try:
+        BUDGET_MAX_USD = float(_budget_raw)
+        if BUDGET_MAX_USD <= 0:
+            raise ValueError
+    except ValueError:
+        print(f"[ERROR] --budget-max-usd must be a positive number, got: {_budget_raw}",
+              file=sys.stderr)
+        sys.exit(1)
+
+if BUDGET_MAX_USD is None and not TEST_MEDIA_FETCH and not DRY_RUN:
+    print("[ERROR] --budget-max-usd X is required for real runs.", file=sys.stderr)
     print("  Use --dry-run to estimate cost first.", file=sys.stderr)
     sys.exit(1)
-try:
-    BUDGET_MAX_USD = float(_budget_raw)
-    if BUDGET_MAX_USD <= 0:
-        raise ValueError
-except ValueError:
-    print(f"[ERROR] --budget-max-usd must be a positive number, got: {_budget_raw}", file=sys.stderr)
-    sys.exit(1)
 
-# optional args
+# optional
 SELECTION_MODE = _arg("--selection-mode", "spread")
 if SELECTION_MODE not in ("first", "last", "spread"):
     print(f"[ERROR] --selection-mode must be first|last|spread, got: {SELECTION_MODE}",
@@ -98,7 +112,7 @@ if DETAIL not in ("low", "high"):
 
 _hl_ids_raw = _arg("--highlight-ids")
 HIGHLIGHT_IDS: list[str] | None = (
-    [hid.strip() for hid in _hl_ids_raw.split(",") if hid.strip()]
+    [h.strip() for h in _hl_ids_raw.split(",") if h.strip()]
     if _hl_ids_raw else None
 )
 
@@ -110,6 +124,25 @@ HIGHLIGHT_IDS: list[str] | None = (
 def main() -> None:
     import stage5c_analyze_stories as analyzer
 
+    # ------------------------------------------------------------------
+    # Test media fetch (no OpenAI, no API key required)
+    # ------------------------------------------------------------------
+    if TEST_MEDIA_FETCH:
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path=BASE / ".env", override=True)
+        cookie = os.environ.get("INSTAGRAM_SESSION_COOKIE") or None
+        # cookie never printed
+        print("=== Stage 5C: TEST MEDIA FETCH (no OpenAI) ===")
+        print(f"image_input_mode: {IMAGE_INPUT_MODE}")
+        print(f"max_stories_per_hl: {MAX_STORIES_PER_HL}")
+        print(f"selection_mode: {SELECTION_MODE}")
+        print()
+        analyzer.test_media_fetch(MAX_STORIES_PER_HL, SELECTION_MODE, cookie)
+        return  # test_media_fetch calls sys.exit(0)
+
+    # ------------------------------------------------------------------
+    # Dry-run (no OpenAI, no API key required)
+    # ------------------------------------------------------------------
     if DRY_RUN:
         analyzer.run_dry_run(
             max_stories_per_hl   = MAX_STORIES_PER_HL,
@@ -117,11 +150,14 @@ def main() -> None:
             highlight_ids_filter = HIGHLIGHT_IDS,
             model                = MODEL,
             detail               = DETAIL,
-            budget_max_usd       = BUDGET_MAX_USD,
+            budget_max_usd       = BUDGET_MAX_USD or 0.0,
+            image_input_mode     = IMAGE_INPUT_MODE,
         )
         return  # run_dry_run calls sys.exit(0)
 
-    # Real run — validate OPENAI_API_KEY
+    # ------------------------------------------------------------------
+    # Real run — validate credentials
+    # ------------------------------------------------------------------
     from dotenv import load_dotenv
     load_dotenv(dotenv_path=BASE / ".env", override=True)
 
@@ -133,20 +169,32 @@ def main() -> None:
         print("[ERROR] OPENAI_API_KEY does not start with 'sk-' — check .env", file=sys.stderr)
         sys.exit(1)
 
+    cookie = os.environ.get("INSTAGRAM_SESSION_COOKIE") or None
+    # cookie never printed; used for 401/403 retry on media fetch
+
+    if ALLOW_DIRECT_URL:
+        print("[WARN] --allow-direct-url-mode is active.")
+        print("  Instagram CDN URLs will be passed directly to OpenAI.")
+        print("  This is known to fail with 'invalid_image_url' errors.")
+        print("  Remove --allow-direct-url-mode to use base64 (default).")
+        print()
+
     try:
         from openai import OpenAI
     except ImportError:
         raise SystemExit("openai not installed — run: pip install openai")
 
-    client = OpenAI(api_key=api_key)  # key never printed
+    client = OpenAI(api_key=api_key)  # api_key never printed
 
     print("=== Stage 5C: Story Content Analyzer ===")
-    print(f"Model:          {MODEL}")
-    print(f"Detail:         {DETAIL}")
-    print(f"Selection mode: {SELECTION_MODE}")
-    print(f"Max stories/hl: {MAX_STORIES_PER_HL}")
-    print(f"Budget max:     ${BUDGET_MAX_USD:.2f}")
+    print(f"Model:            {MODEL}")
+    print(f"Detail:           {DETAIL}")
+    print(f"Image input mode: {IMAGE_INPUT_MODE}")
+    print(f"Selection mode:   {SELECTION_MODE}")
+    print(f"Max stories/hl:   {MAX_STORIES_PER_HL}")
+    print(f"Budget max:       ${BUDGET_MAX_USD:.2f}")
     print(f"Force re-analyze: {FORCE}")
+    print(f"Cookie for retry: {'present' if cookie else 'not set'}")
     if HIGHLIGHT_IDS:
         print(f"Highlight filter: {HIGHLIGHT_IDS}")
     print()
@@ -159,6 +207,8 @@ def main() -> None:
         model                = MODEL,
         detail               = DETAIL,
         budget_max_usd       = BUDGET_MAX_USD,
+        image_input_mode     = IMAGE_INPUT_MODE,
+        cookie               = cookie,
         force                = FORCE,
     )
 
@@ -177,7 +227,7 @@ def main() -> None:
         print(f"  [WARN] Budget ${BUDGET_MAX_USD:.2f} reached — run again to continue.")
     print()
     print("Runtime outputs (not committed):")
-    print("  data/raw/stage5c_cache/            ← per-story cache (not committed)")
+    print("  data/raw/stage5c_cache/            ← per-story cache")
     print("  data/normalized/stage5c_stories_analysis.json")
     print("  data/normalized/stage5c_highlights_summary.json")
     print("  report/stage_5c_analysis_report.md")
