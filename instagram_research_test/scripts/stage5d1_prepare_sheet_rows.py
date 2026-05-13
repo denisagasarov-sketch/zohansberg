@@ -72,6 +72,7 @@ SOURCE_FILES = {
     "stage5a2c_fixed_rows": BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json",
     "stage5a2c_rows":       BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json",
     "bio_semantic":         BASE / "data/normalized/stage5a2e_bio_semantic.json",
+    "highlights_visual":    BASE / "data/normalized/stage5b2v_highlights_visual.json",
 }
 
 _SECRET_PATTERNS = [
@@ -277,6 +278,48 @@ def _stage5c_index(sources) -> dict:
     return result
 
 
+def _stage5b2v_index(sources: dict) -> dict:
+    """Return {highlight_id: fields_dict} from stage5b2v_highlights_visual.json."""
+    raw = sources.get("highlights_visual")
+    if not raw or not isinstance(raw, dict):
+        return {}
+    result = {}
+    for h in raw.get("analyzed_highlights", []):
+        hid = str(h.get("highlight_id", "")).strip()
+        if hid and not h.get("skipped") and not h.get("parse_error"):
+            result[hid] = h.get("fields", {})
+    return result
+
+
+_CONTENT_TYPE_RU = {
+    "student_review":  "отзывы",
+    "educational":     "обучение",
+    "case_study":      "кейсы",
+    "introduction":    "знакомство",
+    "product":         "продукт",
+    "breakdown":       "разборы",
+    "tools":           "инструменты",
+    "geo_promotion":   "гео-продвижение",
+}
+
+_COMMERCIAL_ROLE_RU = {
+    "trust":      "доверие",
+    "education":  "обучение",
+    "proof":      "социальное доказательство",
+    "lead_gen":   "лидогенерация",
+    "warm_up":    "прогрев",
+    "sales":      "продажа",
+}
+
+
+def _vv_val(fields: dict, field: str) -> str:
+    """Extract value from a stage5b2v field dict if data_status==ok."""
+    f = fields.get(field, {})
+    if isinstance(f, dict) and f.get("data_status") == "ok":
+        return f.get("value", "")
+    return ""
+
+
 def _bio_url(sources) -> str | None:
     """Extract bio external URL from profile_summary or bio_analysis."""
     ps  = sources.get("profile_summary")
@@ -370,6 +413,7 @@ def build_highlights_rows(sources, headers) -> tuple[list, list]:
     """32 rows from highlights_index; semantic fill from stage5c for analyzed highlights."""
     hi_list  = _highlights_list(sources)
     sc_index = _stage5c_index(sources)
+    vv_index = _stage5b2v_index(sources)
     warnings = []
 
     if not hi_list:
@@ -393,12 +437,29 @@ def build_highlights_rows(sources, headers) -> tuple[list, list]:
             "Куда ведет CTA (если есть)":    "",
         }
 
-        if bare_id and bare_id in sc_index:
+        if bare_id and bare_id in vv_index:
+            vv = vv_index[bare_id]
+            row["Тема highlight"]                 = _vv_val(vv, "tema")
+            row["Задача highlight"]               = _vv_val(vv, "zadacha")
+            row["Что внутри (кратко)"]           = _vv_val(vv, "chto_vnutri")
+            row["Какая механика подачи хайлайтс"] = _vv_val(vv, "mekhanika")
+            row["Куда ведет CTA (если есть)"]    = _vv_val(vv, "cta")
+            analyzed_count += 1
+        elif bare_id and bare_id in sc_index:
             sc = sc_index[bare_id]
-            row["Тема highlight"]           = str(sc.get("dominant_content_type") or "")
-            row["Задача highlight"]          = _dominant_role(sc.get("commercial_role_distribution") or {})
-            row["Что внутри (кратко)"]      = _join_list(sc.get("common_tags") or [])
-            row["Куда ведет CTA (если есть)"] = _join_list(sc.get("extracted_ctas") or [])
+            raw_type = str(sc.get("dominant_content_type") or "")
+            raw_role = _dominant_role(sc.get("commercial_role_distribution") or {})
+            ru_type  = _CONTENT_TYPE_RU.get(raw_type, raw_type)
+            ru_role  = _COMMERCIAL_ROLE_RU.get(raw_role, raw_role)
+            if ru_type == raw_type and raw_type:
+                warnings.append(
+                    f"[WARN] Unknown content_type '{raw_type}' for highlight {bare_id} — used as-is"
+                )
+            row["Тема highlight"]                 = ru_type
+            row["Задача highlight"]               = ru_role
+            row["Что внутри (кратко)"]           = _join_list(sc.get("common_tags") or [])
+            row["Куда ведет CTA (если есть)"]    = _join_list(sc.get("extracted_ctas") or [])
+            # Механика подачи — не заполнять из Stage 5C, только из Stage 5B-2V
             analyzed_count += 1
         elif not bare_id:
             warnings.append(f"Highlight has no ID at position {position}; semantic fill skipped")
