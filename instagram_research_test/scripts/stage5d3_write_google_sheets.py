@@ -143,6 +143,23 @@ def load_and_validate_payload(
 # Request builder
 # ---------------------------------------------------------------------------
 
+def _extract_account_label(payload: dict) -> str:
+    sheets = payload.get("sheets", {})
+    for sheet_name, sheet_data in sheets.items():
+        headers = sheet_data.get("headers", [])
+        rows    = sheet_data.get("rows", [])
+        if not rows:
+            continue
+        if "Конкурент" not in headers:
+            continue
+        idx = headers.index("Конкурент")
+        for row in rows:
+            val = row[idx] if len(row) > idx else ""
+            if val and str(val).strip():
+                return str(val).strip()
+    return ""
+
+
 def build_request(
     payload: dict,
     secret: str,
@@ -156,14 +173,15 @@ def build_request(
         sheets_payload = {only_sheet: sheets_payload[only_sheet]}
 
     req = {
-        "secret":           secret,
-        "spreadsheet_id":   payload.get("spreadsheet_id", EXPECTED_SPREADSHEET_ID),
-        "mode":             mode,
-        "start_row":        REQUIRED_START_ROW,
-        "write_id":         write_id,
+        "secret":            secret,
+        "spreadsheet_id":    payload.get("spreadsheet_id", EXPECTED_SPREADSHEET_ID),
+        "mode":              mode,
+        "start_row":         REQUIRED_START_ROW,
+        "write_id":          write_id,
         "allow_empty_clear": allow_empty_clear,
-        "only_sheet":       only_sheet,
-        "sheets":           sheets_payload,
+        "only_sheet":        only_sheet,
+        "account_label":     _extract_account_label(payload),
+        "sheets":            sheets_payload,
     }
     return req
 
