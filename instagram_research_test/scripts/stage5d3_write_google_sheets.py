@@ -16,8 +16,14 @@ from urllib.parse import urlparse
 
 BASE = Path(__file__).parent.parent
 
-PAYLOAD_PATH = BASE / "output" / "stage5d1" / "payload.json"
-OUT_DIR      = BASE / "output" / "stage5d3_write"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT = _args.account
+
+PAYLOAD_PATH = BASE / "output" / ACCOUNT / "stage5d1" / "payload.json"
+OUT_DIR      = BASE / "output" / ACCOUNT / "stage5d3_write"
 REPORT_DIR   = BASE / "report"
 
 EXPECTED_SPREADSHEET_ID = "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
