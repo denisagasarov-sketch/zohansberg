@@ -85,6 +85,8 @@ SOURCE_FILES = {
     "bio_semantic":         BASE / "data/normalized/stage5a2e_bio_semantic.json",
     "highlights_visual":    BASE / "data/normalized/stage5b2v_highlights_visual.json",
     "pinned_hooks":         BASE / "data/normalized/stage5a2d_pinned_hooks.json",
+    "landing_analysis":     BASE / "data/normalized/stage5a2g_landing_analysis.json",
+    "link_destination":     BASE / "data/normalized/stage5a2f_link_destination.json",
 }
 
 _SECRET_PATTERNS = [
@@ -379,6 +381,29 @@ def _bio_url(sources) -> str | None:
     if not url:
         url = _fval(bio, "cta_destination", "destination") if bio else None
     return str(url) if url else None
+
+
+def _landing_fields(sources: dict) -> dict:
+    """Return {field_key: value_str} for all ok fields from stage5a2g_landing_analysis.json."""
+    raw = sources.get("landing_analysis")
+    if not raw or not isinstance(raw, dict):
+        return {}
+    fields = raw.get("fields", {})
+    result = {}
+    for key, val in fields.items():
+        if isinstance(val, dict) and val.get("data_status") == "ok":
+            result[key] = val.get("value", "").strip()
+        else:
+            result[key] = ""
+    return result
+
+
+def _destination_type(sources: dict) -> str:
+    """Return destination_type string from stage5a2f_link_destination.json."""
+    raw = sources.get("link_destination")
+    if not raw or not isinstance(raw, dict):
+        return ""
+    return raw.get("result", {}).get("destination_type", "") or ""
 
 
 # ---------------------------------------------------------------------------
@@ -727,20 +752,42 @@ def build_funnel_rows(sources, headers) -> tuple[list, list]:
     if not url:
         return [], ["No external_url/cta_destination found; no funnel row created"]
 
+    lf    = _landing_fields(sources)
+    dtype = _destination_type(sources)
+    _cta  = lf.get("glavnyy_cta", "")
+    _dest = dtype if dtype else "назначение неизвестно"
+    _path_parts = ["Instagram-профиль", "bio-ссылка", _dest]
+    if _cta:
+        _path_parts.append(_cta)
+    _full_path = " → ".join(_path_parts)
+
     cta_text   = _fval_str(bio, "cta_text", "cta") if bio else ""
     first_step = cta_text if cta_text else "Переход по ссылке в bio"
 
     row = {h: "" for h in headers}
-    row["Конкурент"]    = _account_label(sources)
-    row["Точка входа"]  = "Instagram-профиль"
-    row["Первый шаг"]   = first_step
-    row["Куда ведет"]   = _redact_url(url)
+    row["Конкурент"]                  = _account_label(sources)
+    row["Точка входа"]                = "Instagram-профиль"
+    row["Первый шаг"]                 = first_step
+    row["Куда ведет"]                 = _redact_url(url)
+    row["Полный путь пользователя"]   = _full_path
+    row["Что обещают за переход"]     = lf.get("obeshchanie_rezultata", "")
+    row["Какие продукты предлагают"]  = lf.get("chto_prodayut", "")
+    row["Какие боли используют"]      = lf.get("boli", "")
+    row["Какие посылы используют"]    = lf.get("argumenty", "")
+    row["Финальный CTA"]              = lf.get("glavnyy_cta", "")
 
-    warnings.append(
-        "PROVISIONAL: funnel row uses bio URL only. "
-        "Destination type not classified (landing/bot/lead_magnet/taplink). "
-        "Do not treat as final until link destination classifier runs."
-    )
+    if lf:
+        warnings.append(
+            "Funnel row partially filled from stage5a2g landing analysis. "
+            "Fields requiring manual analysis: Где собирают контакт, "
+            "Через сколько продажа, Как устроен прогрев, tripwire, возражения."
+        )
+    else:
+        warnings.append(
+            "PROVISIONAL: funnel row uses bio URL only. "
+            "Destination type not classified. "
+            "Do not treat as final until link destination classifier runs."
+        )
     return [_make_row(headers, row)], warnings
 
 
@@ -752,15 +799,32 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
     if not url:
         return [], ["No external_url/cta_destination found; no landing row created"]
 
-    row = {h: "" for h in headers}
-    row["Конкурент"]     = _account_label(sources)
-    row["Ссылка на сайт"] = _redact_url(url)
+    lf = _landing_fields(sources)
 
-    warnings.append(
-        "PROVISIONAL: bio URL may be Taplink, multilink, bot link, or consultation form — "
-        "not confirmed as landing page. "
-        "Run link destination classifier before treating this as landing data."
-    )
+    row = {h: "" for h in headers}
+    row["Конкурент"]                    = _account_label(sources)
+    row["Ссылка на сайт"]               = _redact_url(url)
+    row["Что продают"]                  = lf.get("chto_prodayut", "")
+    row["Структура первых 3х экранов"]  = lf.get("pervye_3_ekrana", "")
+    row["Главный заголовок"]            = lf.get("glavnyy_zagolovok", "")
+    row["Подзаголовок"]                 = lf.get("podzagolovok", "")
+    row["Для кого"]                     = lf.get("dlya_kogo", "")
+    row["Обещание результата"]          = lf.get("obeshchanie_rezultata", "")
+    row["Главный CTA"]                  = lf.get("glavnyy_cta", "")
+    row["Соцдоказательства"]            = lf.get("sots_dokazatelstva", "")
+    row["Какие боли раскрывают"]        = lf.get("boli", "")
+    row["Какие аргументы используют"]   = lf.get("argumenty", "")
+    row["Какие блоки есть дальше"]      = lf.get("bloki_dalshe", "")
+
+    if lf:
+        warnings.append(
+            "Landing row filled from stage5a2g landing analysis (Playwright + gpt-4o)."
+        )
+    else:
+        warnings.append(
+            "PROVISIONAL: bio URL may be Taplink, multilink, bot link, or consultation form. "
+            "Run link destination classifier before treating this as landing data."
+        )
     return [_make_row(headers, row)], warnings
 
 
