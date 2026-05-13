@@ -161,6 +161,10 @@ def main():
         help="Load sources, build rows, validate, then print summary without writing any files",
     )
     parser.add_argument(
+        "--account", default="vlada_kliuiko",
+        help="Instagram account to process",
+    )
+    parser.add_argument(
         "--require-pinned-semantic", action="store_true",
         help=(
             "Exit with error if neither stage5a2c_fixed_rows nor stage5a2c_rows "
