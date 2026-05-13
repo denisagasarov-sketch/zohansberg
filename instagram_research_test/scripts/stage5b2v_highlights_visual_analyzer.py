@@ -290,7 +290,7 @@ def call_vision(client, highlight_id: str, title: str,
         try:
             clean = raw.strip()
             if clean.startswith("```"):
-                clean = clean.split("```", 2)[-1] if clean.count("```") >= 2 else clean
+                clean = clean.split("```", 2)[1] if clean.count("```") >= 2 else clean
                 if clean.startswith("json"):
                     clean = clean[4:]
                 if clean.endswith("```"):
