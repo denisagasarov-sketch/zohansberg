@@ -71,6 +71,7 @@ SOURCE_FILES = {
     "coverage_summary":   BASE / "data/normalized/stage5d_coverage_summary.json",
     "stage5a2c_fixed_rows": BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json",
     "stage5a2c_rows":       BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json",
+    "bio_semantic":         BASE / "data/normalized/stage5a2e_bio_semantic.json",
 }
 
 _SECRET_PATTERNS = [
@@ -322,8 +323,14 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
     row["Что вынесено в имя профиля"] = _fval_str(ps,  "full_name", "fullName", "name")
     row["Описание профиля (bio)"]     = _fval_str(ps,  "bio_text", "biography", "bio")
 
-    # Для кого — only if data_status=ok
-    if _fstatus(bio, "target_audience") == "ok":
+    sem = sources.get("bio_semantic")
+    _sem_fields = sem.get("fields", {}) if isinstance(sem, dict) else {}
+
+    # Для кого — bio_semantic P1, bio_analysis fallback
+    _ta = _sem_fields.get("target_audience", {})
+    if isinstance(_ta, dict) and _ta.get("data_status") == "ok":
+        row["Для кого"] = _ta.get("value", "")
+    elif _fstatus(bio, "target_audience") == "ok":
         row["Для кого"] = _fval_str(bio, "target_audience")
     else:
         row["Для кого"] = ""
@@ -331,12 +338,18 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
     # Weak rule-based fields — leave empty
     row["Обещание результата"] = ""
     row["Позиционирование"]    = _bio_lines[0] if _bio_lines else _fval_str(bio, "positioning") or ""
-    row["Аргументы доверия"]   = ""
 
-    # Социальные доказательства — include if value present and not manual_needed
-    sp_status = _fstatus(bio, "social_proof", "социальные_доказательства")
-    if sp_status != "manual_needed":
-        row["Социальные доказательства"] = _fval_str(bio, "social_proof", "социальные_доказательства")
+    # Аргументы доверия — bio_semantic P1
+    _trust = _sem_fields.get("trust_arguments", {})
+    if isinstance(_trust, dict) and _trust.get("data_status") == "ok":
+        row["Аргументы доверия"] = _trust.get("value", "")
+    else:
+        row["Аргументы доверия"] = ""
+
+    # Социальные доказательства — bio_semantic P1
+    _sp = _sem_fields.get("social_proof", {})
+    if isinstance(_sp, dict) and _sp.get("data_status") == "ok":
+        row["Социальные доказательства"] = _sp.get("value", "")
     else:
         row["Социальные доказательства"] = ""
 
