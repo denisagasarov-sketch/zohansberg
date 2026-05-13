@@ -526,6 +526,10 @@ def main():
         "--overwrite", action="store_true",
         help="With --validate-existing-output --write-fixed: overwrite original files",
     )
+    parser.add_argument(
+        "--account", default="vlada_kliuiko",
+        help="Instagram account to process",
+    )
     args = parser.parse_args()
 
     if args.analyze:

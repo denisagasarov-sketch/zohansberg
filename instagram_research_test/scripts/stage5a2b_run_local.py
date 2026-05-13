@@ -292,6 +292,10 @@ def main():
         "--max-posts", type=int, default=3,
         help="Safety limit for --collect (must be 3)",
     )
+    parser.add_argument(
+        "--account", default="vlada_kliuiko",
+        help="Instagram account to process",
+    )
     args = parser.parse_args()
 
     if args.collect:

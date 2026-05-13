@@ -22,6 +22,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 DRY_RUN = "--dry-run" in sys.argv
 
+ACCOUNT = "vlada_kliuiko"
+for i, arg in enumerate(sys.argv):
+    if arg == "--account" and i + 1 < len(sys.argv):
+        ACCOUNT = sys.argv[i + 1]
+        break
+
 
 def main():
     import stage5b1_collect_highlights_index as collector
