@@ -69,6 +69,8 @@ SOURCE_FILES = {
     "stage5c_stories":    BASE / "data/normalized/stage5c_stories_analysis.json",
     "coverage_map":       BASE / "data/normalized/stage5d_coverage_map.json",
     "coverage_summary":   BASE / "data/normalized/stage5d_coverage_summary.json",
+    "stage5a2c_fixed_rows": BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json",
+    "stage5a2c_rows":       BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json",
 }
 
 _SECRET_PATTERNS = [
@@ -382,17 +384,145 @@ def build_highlights_rows(sources, headers) -> tuple[list, list]:
     return rows, warnings
 
 
-def build_pinned_rows(sources, headers) -> tuple[list, list]:
-    """3 rows from pinned_posts_index."""
-    pi_list  = _pinned_list(sources)
-    pi_raw   = sources.get("pinned_posts_index")
+_ALLOWED_ROLE_ATOMS = {"знакомство", "доверие", "прогрев", "продажа", "лидогенерация"}
+_TRUST_KEYWORDS = (
+    "доверие", "опыт", "клиент", "проект", "агентств",
+    "кейс", "команд", "компани", "услуг", "эксперт",
+)
+
+
+def _validate_semantic_pinned(label: str, src_headers: list, src_rows: list,
+                               expected_headers: list, warnings: list) -> bool:
+    """Validate structure of a semantic pinned rows source. Returns True if valid."""
+    if src_headers != expected_headers:
+        warnings.append(
+            f"{label}: headers mismatch — "
+            f"expected {expected_headers}, got {src_headers}. Skipping this source."
+        )
+        return False
+
+    if len(src_rows) != 3:
+        warnings.append(
+            f"{label}: expected 3 rows, got {len(src_rows)}. Skipping this source."
+        )
+        return False
+
+    for i, row in enumerate(src_rows):
+        if len(row) != 11:
+            warnings.append(
+                f"{label}: row {i + 1} has {len(row)} cells, expected 11. Skipping this source."
+            )
+            return False
+
+    return True
+
+
+def _warn_semantic_consistency(label: str, src_headers: list, src_rows: list,
+                                warnings: list) -> tuple[bool, bool]:
+    """Emit semantic consistency warnings. Returns (hook_field_empty, semantic_fields_filled)."""
+    hook_idx = src_headers.index("Хук / первый экран") if "Хук / первый экран" in src_headers else None
+    role_idx = src_headers.index("Роль в воронке")     if "Роль в воронке"     in src_headers else None
+    why_idx  = src_headers.index("Почему закреплен")   if "Почему закреплен"   in src_headers else None
+
+    hook_field_empty = True
+    # Semantic fields = columns 3..10 (Тема поста … Роль в воронке)
+    semantic_cols = list(range(3, 11))
+    semantic_fields_filled = any(
+        str(row[c]).strip() for row in src_rows for c in semantic_cols if c < len(row)
+    )
+
+    for i, row in enumerate(src_rows):
+        pos = i + 1
+
+        if hook_idx is not None:
+            hook_val = str(row[hook_idx] or "")
+            if hook_val.strip():
+                warnings.append(
+                    f"{label} post {pos}: 'Хук / первый экран' is non-empty "
+                    f"('{hook_val[:60]}'). Expected empty after Stage 5A-2C."
+                )
+                hook_field_empty = False
+
+        if role_idx is not None:
+            role_val = str(row[role_idx] or "")
+            if role_val.strip():
+                atoms = [a.strip().lower() for a in re.split(r"[/,;]", role_val) if a.strip()]
+                unknown = [a for a in atoms if a not in _ALLOWED_ROLE_ATOMS]
+                if unknown:
+                    warnings.append(
+                        f"{label} post {pos}: 'Роль в воронке' contains unknown atoms: {unknown}. "
+                        "Allowed: знакомство, доверие, прогрев, продажа, лидогенерация."
+                    )
+
+                if "доверие" in atoms and why_idx is not None:
+                    why_val = str(row[why_idx] or "").lower()
+                    if not any(kw in why_val for kw in _TRUST_KEYWORDS):
+                        warnings.append(
+                            f"{label} post {pos}: role contains 'доверие', but 'Почему закреплен' "
+                            "may understate trust rationale. Source row used as-is."
+                        )
+
+    return hook_field_empty, semantic_fields_filled
+
+
+def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
+    """Build rows for 'Закрепленные посты' with priority-based source selection.
+
+    Priority 1: stage5a2c_fixed_rows  (semantic, use as-is)
+    Priority 2: stage5a2c_rows        (semantic, use as-is)
+    Priority 3: pinned_posts_index    (fallback, semantic fields empty)
+
+    Returns (rows, warnings, pinned_meta).
+    pinned_meta keys: source, rows_count, semantic_fields_filled, hook_field_empty, warnings_count.
+    """
     warnings = []
+    pinned_meta: dict = {
+        "source": None,
+        "rows_count": 0,
+        "semantic_fields_filled": False,
+        "hook_field_empty": True,
+        "warnings_count": 0,
+    }
+
+    # P1 → P2: semantic sources
+    for label in ("stage5a2c_fixed_rows", "stage5a2c_rows"):
+        data = sources.get(label)
+        if data is None:
+            continue
+
+        src_headers = data.get("headers") or []
+        src_rows    = data.get("rows")    or []
+
+        if not _validate_semantic_pinned(label, src_headers, src_rows, headers, warnings):
+            continue
+
+        # Valid — use rows exactly as-is; only validate and warn
+        hook_empty, sem_filled = _warn_semantic_consistency(label, src_headers, src_rows, warnings)
+
+        pinned_meta.update({
+            "source":                label,
+            "rows_count":            len(src_rows),
+            "semantic_fields_filled": sem_filled,
+            "hook_field_empty":      hook_empty,
+            "warnings_count":        len(warnings),
+        })
+        return src_rows, warnings, pinned_meta
+
+    # P3: fallback from pinned_posts_index
+    pi_list = _pinned_list(sources)
+    pi_raw  = sources.get("pinned_posts_index")
 
     if not pi_list:
         msg = "pinned_posts_index.json missing or empty; no rows created"
         if isinstance(pi_raw, dict) and pi_raw.get("manual_needed"):
             msg += "; isPinned field absent in actor output — fill pinned_posts_manual.json manually"
-        return [], [msg]
+        warnings.append(msg)
+        pinned_meta.update({
+            "source": "pinned_posts_index_fallback",
+            "rows_count": 0,
+            "warnings_count": len(warnings),
+        })
+        return [], warnings, pinned_meta
 
     rows = []
     for item in pi_list:
@@ -416,8 +546,18 @@ def build_pinned_rows(sources, headers) -> tuple[list, list]:
         }
         rows.append(_make_row(headers, row))
 
-    warnings.append("Semantic fields (Тема, Почему закреплен, Хук, CTA, Роль) left empty — no pinned post semantic analyzer built yet")
-    return rows, warnings
+    warnings.append(
+        "Semantic fields (Тема, Почему закреплен, Хук, CTA, Роль) left empty — "
+        "pinned_posts_index fallback used; stage5a2c semantic rows not found"
+    )
+    pinned_meta.update({
+        "source":                "pinned_posts_index_fallback",
+        "rows_count":            len(rows),
+        "semantic_fields_filled": False,
+        "hook_field_empty":      True,
+        "warnings_count":        len(warnings),
+    })
+    return rows, warnings, pinned_meta
 
 
 def build_funnel_rows(sources, headers) -> tuple[list, list]:
@@ -486,7 +626,7 @@ _SHEET_BUILDERS = [
 
 
 def build_all_rows(sources, all_headers) -> dict:
-    """Returns {sheet_name: {headers, rows, warnings}}."""
+    """Returns {sheet_name: {headers, rows, warnings[, pinned_meta]}}."""
     result = {}
     for sheet_name, builder_fn in _SHEET_BUILDERS:
         headers = all_headers.get(sheet_name)
@@ -496,8 +636,16 @@ def build_all_rows(sources, all_headers) -> dict:
                 "warnings": [f"No headers found for sheet '{sheet_name}'"],
             }
             continue
-        rows, warnings = builder_fn(sources, headers)
-        result[sheet_name] = {"headers": headers, "rows": rows, "warnings": warnings}
+        ret = builder_fn(sources, headers)
+        if len(ret) == 3:
+            rows, warnings, pinned_meta = ret
+            result[sheet_name] = {
+                "headers": headers, "rows": rows,
+                "warnings": warnings, "pinned_meta": pinned_meta,
+            }
+        else:
+            rows, warnings = ret
+            result[sheet_name] = {"headers": headers, "rows": rows, "warnings": warnings}
     return result
 
 

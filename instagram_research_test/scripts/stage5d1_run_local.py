@@ -124,6 +124,31 @@ def _build_summary(sheet_data: dict, meta: dict, warnings_all: list) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Pinned rows preview
+# ---------------------------------------------------------------------------
+
+def _print_pinned_preview(headers: list, rows: list):
+    """Print a per-row preview of the pinned posts with key semantic fields."""
+    _PREVIEW_FIELDS = [
+        ("Позиция закрепа", "Position"),
+        ("Ссылка на пост",  "URL"),
+        ("Тема поста",      "Topic"),
+        ("Какой CTA",       "CTA"),
+        ("Куда ведет CTA",  "CTA destination"),
+        ("Роль в воронке",  "Funnel role"),
+    ]
+    idx = {h: i for i, h in enumerate(headers)}
+    print("\n=== Закрепленные посты — preview (semantic fields) ===")
+    for row_num, row in enumerate(rows, start=1):
+        print(f"  --- Post {row_num} ---")
+        for field, label in _PREVIEW_FIELDS:
+            col = idx.get(field)
+            val = str(row[col] or "").strip() if col is not None and col < len(row) else ""
+            display = val[:80] if val else "(empty)"
+            print(f"    {label:<18}: {display}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -135,9 +160,17 @@ def main():
         "--dry-run", action="store_true",
         help="Load sources, build rows, validate, then print summary without writing any files",
     )
+    parser.add_argument(
+        "--require-pinned-semantic", action="store_true",
+        help=(
+            "Exit with error if neither stage5a2c_fixed_rows nor stage5a2c_rows "
+            "is available as the pinned posts source"
+        ),
+    )
     args = parser.parse_args()
 
-    dry_run = args.dry_run
+    dry_run          = args.dry_run
+    require_semantic = args.require_pinned_semantic
     if dry_run:
         print("[DRY-RUN] No files will be written.\n")
 
@@ -145,6 +178,19 @@ def main():
     print("Loading source files...")
     sources  = load_sources()
     presence = source_presence()
+
+    # Guard: --require-pinned-semantic
+    if require_semantic:
+        has_fixed = sources.get("stage5a2c_fixed_rows") is not None
+        has_rows  = sources.get("stage5a2c_rows") is not None
+        if not has_fixed and not has_rows:
+            print(
+                "[ERROR] Pinned semantic rows required but not found.\n"
+                "  stage5a2c_pinned_posts_google_sheet_rows_fixed.json — absent\n"
+                "  stage5a2c_pinned_posts_google_sheet_rows.json       — absent\n"
+                "  Run Stage 5A-2C locally to generate these files first."
+            )
+            sys.exit(1)
 
     # 2. Get headers
     headers, warn = read_excel_headers()
@@ -183,15 +229,24 @@ def main():
         print(f"[ERROR] Payload build failed: {e}")
         sys.exit(1)
 
+    # Extract pinned rows metadata
+    pinned_data = sheet_data.get("Закрепленные посты", {})
+    pinned_meta = pinned_data.get("pinned_meta") or {}
+
     ts  = datetime.utcnow().isoformat() + "Z"
     meta = {
-        "generated_at":   ts,
-        "account":        ACCOUNT,
-        "spreadsheet_id": SPREADSHEET_ID,
-        "start_row":      START_ROW,
-        "headers_source": headers_source,
-        "source_presence": presence,
-        "dry_run":        dry_run,
+        "generated_at":               ts,
+        "account":                    ACCOUNT,
+        "spreadsheet_id":             SPREADSHEET_ID,
+        "start_row":                  START_ROW,
+        "headers_source":             headers_source,
+        "source_presence":            presence,
+        "dry_run":                    dry_run,
+        "pinned_rows_source":         pinned_meta.get("source"),
+        "pinned_rows_count":          pinned_meta.get("rows_count", 0),
+        "pinned_semantic_fields_filled": pinned_meta.get("semantic_fields_filled", False),
+        "pinned_hook_field_empty":    pinned_meta.get("hook_field_empty", True),
+        "pinned_warnings_count":      pinned_meta.get("warnings_count", 0),
     }
 
     summary = _build_summary(sheet_data, meta, warnings_all)
@@ -204,6 +259,28 @@ def main():
         total_rows += n
         print(f"  {sname}: {n} rows, {len(data['headers'])} columns")
     print(f"  TOTAL: {total_rows} rows across {len(sheet_data)} sheets")
+
+    # Pinned posts summary
+    pinned_source = pinned_meta.get("source") or "unknown"
+    print("\n=== Закрепленные посты — source info ===")
+    print(f"  Source used:             {pinned_source}")
+    print(f"  Rows count:              {pinned_meta.get('rows_count', 0)}")
+    print(f"  Semantic fields filled:  {'yes' if pinned_meta.get('semantic_fields_filled') else 'no'}")
+    print(f"  Hook field empty:        {'yes' if pinned_meta.get('hook_field_empty', True) else 'NO (unexpected)'}")
+    print(f"  Pinned warnings count:   {pinned_meta.get('warnings_count', 0)}")
+
+    if pinned_source == "pinned_posts_index_fallback" and not require_semantic:
+        print(
+            "  [WARNING] Using fallback source. "
+            "stage5a2c semantic rows not found. "
+            "Run Stage 5A-2C locally to generate fixed rows."
+        )
+
+    # Pinned rows preview
+    pinned_rows = pinned_data.get("rows") or []
+    pinned_hdrs = pinned_data.get("headers") or []
+    if pinned_rows and pinned_hdrs:
+        _print_pinned_preview(pinned_hdrs, pinned_rows)
 
     if warnings_all:
         print(f"\n=== Warnings ({len(warnings_all)}) ===")
