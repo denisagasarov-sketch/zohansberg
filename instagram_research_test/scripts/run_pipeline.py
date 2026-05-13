@@ -109,6 +109,13 @@ STAGE_ORDER = [
         "cost_estimate": "$0",
         "extra_args": ["--write", "--confirm-write"],
     },
+    {
+        "name": "Подсчет затрат",
+        "script": "collect_costs.py",
+        "requires_apify": False,
+        "requires_openai": False,
+        "cost_estimate": "$0",
+    },
 ]
 
 
@@ -206,6 +213,14 @@ def main():
     else:
         print(f"⚠️  Анализ @{account} завершен с ошибками ({failed} stages)")
     print(f"⏱  Время: {minutes} мин {seconds} сек")
+    costs_path = BASE / "output" / account / "costs.json"
+    if costs_path.exists():
+        import json
+        costs = json.load(open(costs_path))
+        total_c = costs.get("totals", {})
+        print(f"💰 OpenAI затраты: ${total_c.get('total_cost_usd', 0):.4f} "
+              f"({total_c.get('total_tokens', 0)} токенов)")
+        print(f"   Apify: см. console.apify.com")
     print(f"📋 Выполнено stages: {completed}/{total}")
     print(f"🔗 Таблица: {SPREADSHEET_URL}")
     print(f"{'='*60}")
