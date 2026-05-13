@@ -22,13 +22,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASE     = Path(__file__).parent.parent
-RAW_DIR  = BASE / "data" / "raw"
-NORM_DIR = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+RAW_DIR  = BASE / "data" / ACCOUNT / "raw"
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 
 INDEX_RAW_PATH = RAW_DIR / "stage5b1_highlights_index_raw.json"
 OUTPUT_PATH    = NORM_DIR / "stage5b2v_highlights_visual.json"
-
-ACCOUNT        = "vlada_kliuiko"
 STAGE          = "stage5b2v"
 PROMPT_VERSION = "v1"
 DEFAULT_MODEL  = "gpt-4o"

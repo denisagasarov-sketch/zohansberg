@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASE      = Path(__file__).parent.parent
-NORM_DIR  = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 CACHE_DIR = BASE / "analysis" / "stage5a2c_cache"
 
 STAGE5A2B_PATH = NORM_DIR / "stage5a2b_pinned_posts_details.json"
@@ -25,8 +30,6 @@ SEMANTIC_OUTPUT_PATH  = NORM_DIR / "stage5a2c_pinned_posts_semantic.json"
 GS_ROWS_OUTPUT_PATH   = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows.json"
 SEMANTIC_FIXED_PATH   = NORM_DIR / "stage5a2c_pinned_posts_semantic_fixed.json"
 GS_ROWS_FIXED_PATH    = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows_fixed.json"
-
-ACCOUNT         = "vlada_kliuiko"
 EXPECTED_POSTS  = 3
 PROMPT_VERSION  = "v2"           # bumped for quality fix
 DEFAULT_MODEL   = "gpt-4o-mini"

@@ -18,11 +18,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASE     = Path(__file__).parent.parent
-RAW_DIR  = BASE / "data" / "raw"
-NORM_DIR = BASE / "data" / "normalized"
-
-ACCOUNT     = "vlada_kliuiko"
-PROFILE_URL = "https://www.instagram.com/vlada_kliuiko/"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT     = _args.account
+PROFILE_URL = f"https://www.instagram.com/{ACCOUNT}/"
+RAW_DIR     = BASE / "data" / ACCOUNT / "raw"
+NORM_DIR    = BASE / "data" / ACCOUNT / "normalized"
 
 # Actor confirmed from Stage 5A-1 source code
 ACTOR_ID = "apify/instagram-scraper"

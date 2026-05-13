@@ -34,6 +34,12 @@ for i, arg in enumerate(sys.argv):
             print(f"[ERROR] --limit must be an integer, got: {sys.argv[i + 1]}", file=sys.stderr)
             sys.exit(1)
 
+ACCOUNT = "vlada_kliuiko"
+for i, arg in enumerate(sys.argv):
+    if arg == "--account" and i + 1 < len(sys.argv):
+        ACCOUNT = sys.argv[i + 1]
+        break
+
 
 def main():
     import stage5b2_collect_highlight_stories as collector

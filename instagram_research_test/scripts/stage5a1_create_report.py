@@ -22,7 +22,12 @@ os_import = __import__("os")
 os_import.environ["PYTHONUTF8"] = "1"
 
 BASE      = Path(__file__).parent.parent
-NORM_DIR  = BASE / "data/normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT   = _args.account
+NORM_DIR  = BASE / "data" / ACCOUNT / "normalized"
 REPORT_DIR = BASE / "report"
 
 

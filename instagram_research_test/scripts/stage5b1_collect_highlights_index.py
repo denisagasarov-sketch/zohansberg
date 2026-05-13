@@ -33,8 +33,13 @@ os.environ["PYTHONUTF8"] = "1"
 from dotenv import load_dotenv
 
 BASE     = Path(__file__).parent.parent  # instagram_research_test/
-RAW_DIR  = BASE / "data/raw"
-NORM_DIR = BASE / "data/normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+RAW_DIR  = BASE / "data" / ACCOUNT / "raw"
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 
 REGISTRY_PATH    = BASE / "config/actors_registry.json"
 RAW_PATH         = RAW_DIR  / "stage5b1_highlights_index_raw.json"
@@ -42,7 +47,6 @@ INDEX_PATH       = NORM_DIR / "highlights_index.json"
 SUMMARY_PATH     = NORM_DIR / "stage5b1_highlights_index_summary.json"
 
 ACTOR_ID         = "singhera07/instagram-scraper"
-ACCOUNT          = "vlada_kliuiko"
 REGISTRY_KEY     = "singhera07/instagram-scraper"
 REGISTRY_ACTION  = "highlights"
 

@@ -17,13 +17,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASE     = Path(__file__).parent.parent
-NORM_DIR = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 
-STAGE5A2F_PATH = NORM_DIR / "stage5a2f_link_destination.json"
-OUTPUT_PATH    = NORM_DIR / "stage5a2g_landing_analysis.json"
-SCREENSHOT_PATH = "output/stage5a2g_screenshot.png"
-
-ACCOUNT        = "vlada_kliuiko"
+STAGE5A2F_PATH  = NORM_DIR / "stage5a2f_link_destination.json"
+OUTPUT_PATH     = NORM_DIR / "stage5a2g_landing_analysis.json"
+SCREENSHOT_PATH = str(BASE / "output" / ACCOUNT / "stage5a2g_screenshot.png")
 STAGE          = "stage5a2g"
 PROMPT_VERSION = "v1"
 DEFAULT_MODEL  = "gpt-4o"

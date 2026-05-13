@@ -290,7 +290,7 @@ def main():
     if dry_run:
         print("\n[DRY-RUN] Complete. No files written.")
         print("Output paths that WOULD be written (not gitignored — all in output/):")
-        out = BASE / "output" / "stage5d1"
+        out = BASE / "output" / ACCOUNT / "stage5d1"
         print(f"  {out}/csv/<sheet>.csv  (utf-8-sig)")
         print(f"  {out}/payload.json")
         print(f"  {out}/stage5d1_summary.json")
@@ -298,7 +298,7 @@ def main():
         return
 
     # 8. Write outputs
-    out_dir = BASE / "output" / "stage5d1"
+    out_dir = BASE / "output" / ACCOUNT / "stage5d1"
     csv_dir = out_dir / "csv"
 
     print("\nWriting CSV files...")

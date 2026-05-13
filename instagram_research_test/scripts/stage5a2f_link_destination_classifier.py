@@ -19,12 +19,15 @@ from pathlib import Path
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 BASE     = Path(__file__).parent.parent
-NORM_DIR = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 
 PROFILE_SUMMARY_PATH = NORM_DIR / "profile_summary.json"
 OUTPUT_PATH          = NORM_DIR / "stage5a2f_link_destination.json"
-
-ACCOUNT        = "vlada_kliuiko"
 STAGE          = "stage5a2f"
 PROMPT_VERSION = "v1"
 DEFAULT_MODEL  = "gpt-4o-mini"

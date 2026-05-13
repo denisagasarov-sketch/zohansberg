@@ -26,12 +26,15 @@ except ImportError:
     sys.exit(1)
 
 BASE      = Path(__file__).parent.parent
-NORM_DIR  = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 
 INPUT_PATH  = NORM_DIR / "stage5a2b_pinned_posts_details.json"
 OUTPUT_PATH = NORM_DIR / "stage5a2d_pinned_hooks.json"
-
-ACCOUNT        = "vlada_kliuiko"
 STAGE          = "stage5a2d"
 PROMPT_VERSION = "v2"
 DEFAULT_MODEL  = "gpt-4o"

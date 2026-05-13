@@ -8,7 +8,11 @@ from urllib.parse import urlparse
 
 BASE = Path(__file__).parent.parent
 
-ACCOUNT        = "vlada_kliuiko"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT        = _args.account
 SPREADSHEET_ID = "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
 START_ROW      = 3
 
@@ -71,22 +75,22 @@ FALLBACK_HEADERS = {
 }
 
 SOURCE_FILES = {
-    "profile_summary":    BASE / "data/normalized/profile_summary.json",
-    "bio_analysis":       BASE / "data/normalized/bio_analysis.json",
-    "pinned_posts_index": BASE / "data/normalized/pinned_posts_index.json",
-    "highlights_index":   BASE / "data/normalized/highlights_index.json",
-    "stage5b_index":      BASE / "data/normalized/stage5b_auto_stories_index.json",
-    "stage5c_highlights": BASE / "data/normalized/stage5c_highlights_summary.json",
-    "stage5c_stories":    BASE / "data/normalized/stage5c_stories_analysis.json",
-    "coverage_map":       BASE / "data/normalized/stage5d_coverage_map.json",
-    "coverage_summary":   BASE / "data/normalized/stage5d_coverage_summary.json",
-    "stage5a2c_fixed_rows": BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows_fixed.json",
-    "stage5a2c_rows":       BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json",
-    "bio_semantic":         BASE / "data/normalized/stage5a2e_bio_semantic.json",
-    "highlights_visual":    BASE / "data/normalized/stage5b2v_highlights_visual.json",
-    "pinned_hooks":         BASE / "data/normalized/stage5a2d_pinned_hooks.json",
-    "landing_analysis":     BASE / "data/normalized/stage5a2g_landing_analysis.json",
-    "link_destination":     BASE / "data/normalized/stage5a2f_link_destination.json",
+    "profile_summary":    BASE / "data" / ACCOUNT / "normalized" / "profile_summary.json",
+    "bio_analysis":       BASE / "data" / ACCOUNT / "normalized" / "bio_analysis.json",
+    "pinned_posts_index": BASE / "data" / ACCOUNT / "normalized" / "pinned_posts_index.json",
+    "highlights_index":   BASE / "data" / ACCOUNT / "normalized" / "highlights_index.json",
+    "stage5b_index":      BASE / "data" / ACCOUNT / "normalized" / "stage5b_auto_stories_index.json",
+    "stage5c_highlights": BASE / "data" / ACCOUNT / "normalized" / "stage5c_highlights_summary.json",
+    "stage5c_stories":    BASE / "data" / ACCOUNT / "normalized" / "stage5c_stories_analysis.json",
+    "coverage_map":       BASE / "data" / ACCOUNT / "normalized" / "stage5d_coverage_map.json",
+    "coverage_summary":   BASE / "data" / ACCOUNT / "normalized" / "stage5d_coverage_summary.json",
+    "stage5a2c_fixed_rows": BASE / "data" / ACCOUNT / "normalized" / "stage5a2c_pinned_posts_google_sheet_rows_fixed.json",
+    "stage5a2c_rows":       BASE / "data" / ACCOUNT / "normalized" / "stage5a2c_pinned_posts_google_sheet_rows.json",
+    "bio_semantic":         BASE / "data" / ACCOUNT / "normalized" / "stage5a2e_bio_semantic.json",
+    "highlights_visual":    BASE / "data" / ACCOUNT / "normalized" / "stage5b2v_highlights_visual.json",
+    "pinned_hooks":         BASE / "data" / ACCOUNT / "normalized" / "stage5a2d_pinned_hooks.json",
+    "landing_analysis":     BASE / "data" / ACCOUNT / "normalized" / "stage5a2g_landing_analysis.json",
+    "link_destination":     BASE / "data" / ACCOUNT / "normalized" / "stage5a2f_link_destination.json",
 }
 
 _SECRET_PATTERNS = [

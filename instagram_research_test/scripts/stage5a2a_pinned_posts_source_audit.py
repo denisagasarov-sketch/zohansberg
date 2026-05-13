@@ -16,9 +16,13 @@ import re
 from pathlib import Path
 
 BASE     = Path(__file__).parent.parent
-NORM_DIR = BASE / "data" / "normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT  = _args.account
+NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 OUT_DIR  = NORM_DIR
-ACCOUNT  = "vlada_kliuiko"
 
 PINNED_INDEX_PATH    = NORM_DIR / "pinned_posts_index.json"
 PROFILE_SUMMARY_PATH = NORM_DIR / "profile_summary.json"
