@@ -13,13 +13,13 @@ Usage:
 """
 
 import argparse
+import base64
+import io
 import json
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 BASE     = Path(__file__).parent.parent
 RAW_DIR  = BASE / "data" / "raw"
@@ -33,9 +33,10 @@ STAGE          = "stage5b2v"
 PROMPT_VERSION = "v1"
 DEFAULT_MODEL  = "gpt-4o"
 
-STORIES_PER_HIGHLIGHT  = 5   # max stories to select per highlight
-MIN_AVAILABLE_IMAGES   = 2   # skip Vision if fewer available after HEAD checks
-IMAGE_DETAIL           = "low"
+STORIES_PER_HIGHLIGHT    = 5   # max stories to select per highlight
+MIN_DOWNLOADABLE_IMAGES  = 2   # skip Vision if fewer images downloaded successfully
+IMAGE_DETAIL             = "low"
+IMAGE_MAX_SIDE           = 512  # resize long side to this before base64
 MAX_TOKENS             = 500
 
 # IDs requested for analysis
@@ -189,33 +190,68 @@ def select_image_urls(stories: list, max_n: int = STORIES_PER_HIGHLIGHT) -> list
 
 
 # ---------------------------------------------------------------------------
-# URL availability check
+# Image download + base64 encoding
 # ---------------------------------------------------------------------------
 
-def check_url_available(url: str, timeout: int = 8) -> tuple[bool, int | None]:
-    """HEAD request to verify URL. Returns (ok, status_code)."""
+_DOWNLOAD_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36"
+    )
+}
+
+
+def download_as_base64(url: str, pil_image_cls, timeout: int = 10) -> str | None:
+    """Download image URL, resize to IMAGE_MAX_SIDE, return base64 data URI or None."""
+    import requests  # imported lazily; only called in non-dry-run mode
+
     try:
-        req = Request(url, method="HEAD")
-        req.add_header("User-Agent", "Mozilla/5.0")
-        with urlopen(req, timeout=timeout) as resp:
-            return resp.status == 200, resp.status
-    except URLError as e:
-        return False, None
-    except Exception:
-        return False, None
+        resp = requests.get(url, timeout=timeout, headers=_DOWNLOAD_HEADERS)
+    except Exception as e:
+        print(f"[WARN] Failed to download image (network error): {url[:80]} — {e}")
+        return None
+
+    if resp.status_code != 200:
+        print(f"[WARN] Failed to download image (status {resp.status_code}): {url[:80]}")
+        return None
+
+    content_type = resp.headers.get("Content-Type", "")
+    if not content_type.startswith("image/"):
+        print(f"[WARN] Non-image content-type for {url[:80]}: {content_type}")
+        return None
+
+    try:
+        img = pil_image_cls.open(io.BytesIO(resp.content))
+        img = img.convert("RGB")
+
+        w, h   = img.size
+        factor = IMAGE_MAX_SIDE / max(w, h)
+        if factor < 1.0:
+            img = img.resize((int(w * factor), int(h * factor)))
+
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{b64}"
+    except Exception as e:
+        print(f"[WARN] Failed to process image {url[:80]}: {e}")
+        return None
 
 
-def filter_available_urls(urls: list[str]) -> list[str]:
-    """Filter URLs to those returning HTTP 200. Logs unavailable ones."""
-    available = []
-    for url in urls:
-        ok, code = check_url_available(url)
-        if ok:
-            available.append(url)
-        else:
-            status_str = str(code) if code is not None else "no response"
-            print(f"[WARN] imageUrl unavailable (status {status_str}): {url[:80]}")
-    return available
+def prepare_images(candidate_urls: list[str],
+                   pil_image_cls) -> tuple[list[str], list[str]]:
+    """Download + encode all candidate URLs.
+
+    Returns (original_urls, data_uris) — parallel lists with only successful downloads.
+    """
+    original_urls: list[str] = []
+    data_uris:     list[str] = []
+    for url in candidate_urls:
+        data_uri = download_as_base64(url, pil_image_cls)
+        if data_uri:
+            original_urls.append(url)
+            data_uris.append(data_uri)
+    return original_urls, data_uris
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +363,7 @@ def build_highlight_result(highlight_id: str, meta: dict, stories: list,
 # ---------------------------------------------------------------------------
 
 def run_dry_run(highlight_ids: list[str], hl_meta: dict, dry_highlight_id: str | None = None):
-    print("[DRY-RUN] No HEAD checks. OpenAI not called. No files will be written.\n")
+    print("[DRY-RUN] No downloads. No resize. OpenAI not called. No files will be written.\n")
 
     targets = [dry_highlight_id] if dry_highlight_id else highlight_ids
     for hid in targets:
@@ -347,7 +383,7 @@ def run_dry_run(highlight_ids: list[str], hl_meta: dict, dry_highlight_id: str |
         print(f"HIGHLIGHT: {title}  (id={hid})")
         print(f"  Position:       {position}")
         print(f"  Stories total:  {stories_total}")
-        print(f"  Images selected (would be sent, before HEAD checks): {len(image_urls)}")
+        print(f"  Images selected (would be downloaded + encoded): {len(image_urls)}")
         for i, url in enumerate(image_urls, 1):
             print(f"    [{i}] {url[:120]}")
         print()
@@ -401,16 +437,13 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load index
+    # Load index (non-blocking — falls back to ID as title/position if missing)
     index_items, err = load_index()
     if err:
-        if args.dry_run:
-            print(f"[DRY-RUN][WARN] {err}")
-            print("[DRY-RUN] Index unavailable — using target IDs without title/position.\n")
-            hl_meta = {}
-        else:
-            print(f"[ERROR] {err}")
-            sys.exit(1)
+        prefix = "[DRY-RUN][WARN]" if args.dry_run else "[WARN]"
+        print(f"{prefix} {err}")
+        print(f"{prefix} Using target IDs without title/position.\n")
+        hl_meta = {}
     else:
         hl_meta = build_highlight_meta(index_items)
 
@@ -421,6 +454,13 @@ def main():
     if args.dry_run:
         run_dry_run(target_ids, hl_meta, dry_highlight_id=args.highlight_id)
         return
+
+    # Pillow check — only in non-dry-run mode
+    try:
+        from PIL import Image as PILImage
+    except ImportError:
+        print("[ERROR] Pillow not installed. Run: pip install Pillow")
+        sys.exit(1)
 
     # Load API key
     try:
@@ -463,23 +503,25 @@ def main():
         candidate_urls = select_image_urls(stories)
         print(f"  Stories total: {len(stories)}, candidate images: {len(candidate_urls)}")
 
-        print("  Checking URL availability...")
-        available_urls = filter_available_urls(candidate_urls)
-        print(f"  Available images: {len(available_urls)}")
+        print("  Downloading and encoding images...")
+        original_urls, data_uris = prepare_images(candidate_urls, PILImage)
+        print(f"  Successfully encoded: {len(data_uris)}/{len(candidate_urls)}")
 
-        if len(available_urls) < MIN_AVAILABLE_IMAGES:
-            print(f"  [SKIP] Only {len(available_urls)} available — need at least {MIN_AVAILABLE_IMAGES}")
+        if len(data_uris) < MIN_DOWNLOADABLE_IMAGES:
+            print(
+                f"  [WARN] Highlight {hid}: insufficient downloadable images, skipping Vision call"
+            )
             results.append(build_highlight_result(
                 hid, meta, stories, candidate_urls,
                 vision_result={},
                 skipped=True,
-                skip_reason="insufficient_available_images",
+                skip_reason="insufficient_downloadable_images",
             ))
             continue
 
-        print(f"  Calling Vision API with {len(available_urls)} images...")
-        vision_result = call_vision(client, hid, title, available_urls, model=args.model)
-        result = build_highlight_result(hid, meta, stories, available_urls, vision_result)
+        print(f"  Calling Vision API with {len(data_uris)} base64 images...")
+        vision_result = call_vision(client, hid, title, data_uris, model=args.model)
+        result = build_highlight_result(hid, meta, stories, original_urls, vision_result)
         results.append(result)
 
         tok = result.get("tokens_used")
