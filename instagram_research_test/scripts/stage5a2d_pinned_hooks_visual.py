@@ -109,17 +109,17 @@ def load_posts() -> tuple[list, str | None]:
 def select_image_info(post: dict) -> dict:
     """Return dict with image_source, displayUrl_used."""
     position   = post.get("position", "?")
-    post_type  = post.get("type", "")
+    post_type  = post.get("media_type", "")
     carousel   = post.get("carousel_items") or []
 
     if post_type == "Sidecar" and carousel:
-        url = carousel[0].get("displayUrl", "")
+        url = carousel[0].get("display_url", "")
         print(f"[INFO] Post {position}: Sidecar — using first carousel item")
         return {"image_source": "carousel_first", "displayUrl_used": url}
 
-    url = post.get("displayUrl", "")
+    url = post.get("display_url", "")
     if post_type == "Video":
-        print(f"[INFO] Post {position}: Video — using thumbnail (displayUrl)")
+        print(f"[INFO] Post {position}: Video — using thumbnail (display_url)")
     return {"image_source": "displayUrl", "displayUrl_used": url}
 
 
@@ -230,7 +230,7 @@ def _call_vision(client, data_uri: str, position: int, post_type: str, model: st
 
 def _process_post(post: dict, client, model: str) -> dict:
     position  = post.get("position", 0)
-    post_type = post.get("type", "")
+    post_type = post.get("media_type", "")
     img_info  = select_image_info(post)
     url       = img_info["displayUrl_used"]
 
@@ -286,7 +286,7 @@ def run_dry_run(position_filter: int | None):
     if target_posts:
         for post in target_posts:
             position  = post.get("position", "?")
-            post_type = post.get("type", "")
+            post_type = post.get("media_type", "")
             img_info  = select_image_info(post)
             print("=" * 60)
             print(f"POST {position}:")
@@ -309,7 +309,7 @@ def run_dry_run(position_filter: int | None):
     if target_posts:
         for post in target_posts:
             position  = post.get("position", "?")
-            post_type = post.get("type", "")
+            post_type = post.get("media_type", "")
             print("=" * 60)
             print(f"USER PROMPT — Post {position} (будет отправлен в OpenAI):")
             print("=" * 60)
