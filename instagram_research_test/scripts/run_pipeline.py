@@ -148,7 +148,7 @@ def run_stage(stage: dict, account: str, dry_run: bool, skip_apify: bool) -> boo
     if stage.get("extra_args"):
         cmd.extend(stage["extra_args"])
 
-    result = subprocess.run(cmd, cwd=str(BASE))
+    result = subprocess.run(cmd, cwd=str(BASE), env=os.environ)
     return result.returncode == 0
 
 
