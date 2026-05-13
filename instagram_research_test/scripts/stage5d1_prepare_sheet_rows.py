@@ -12,6 +12,17 @@ ACCOUNT        = "vlada_kliuiko"
 SPREADSHEET_ID = "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
 START_ROW      = 3
 
+
+def _account_label(sources: dict) -> str:
+    """Return '@username https://www.instagram.com/username/' from profile_summary if available."""
+    ps = sources.get("profile_summary") or {}
+    _raw_url  = ps.get("profile_url", {})
+    _url      = (_raw_url.get("value") if isinstance(_raw_url, dict) else _raw_url) \
+                or f"https://www.instagram.com/{ACCOUNT}/"
+    _raw_user = ps.get("username", {})
+    _user     = (_raw_user.get("value") if isinstance(_raw_user, dict) else _raw_user) or ACCOUNT
+    return f"@{_user} {_url}"
+
 EXPECTED_TOTAL_COLUMNS = 79
 EXCEL_TEMPLATE = BASE / "input/competitor_analysis_template.xlsx"
 
@@ -411,10 +422,11 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
 
 def build_highlights_rows(sources, headers) -> tuple[list, list]:
     """32 rows from highlights_index; semantic fill from stage5c for analyzed highlights."""
-    hi_list  = _highlights_list(sources)
-    sc_index = _stage5c_index(sources)
-    vv_index = _stage5b2v_index(sources)
-    warnings = []
+    hi_list     = _highlights_list(sources)
+    sc_index    = _stage5c_index(sources)
+    vv_index    = _stage5b2v_index(sources)
+    warnings    = []
+    _competitor = _account_label(sources)
 
     if not hi_list:
         return [], ["highlights_index.json missing or empty; no rows created"]
@@ -427,7 +439,7 @@ def build_highlights_rows(sources, headers) -> tuple[list, list]:
         position = item.get("position")
 
         row = {
-            "Конкурент":                      ACCOUNT,
+            "Конкурент":                      _competitor,
             "Название highlight":             title,
             "Порядок (позиция)":             str(position) if position is not None else "",
             "Тема highlight":                 "",
@@ -566,7 +578,8 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
     Returns (rows, warnings, pinned_meta).
     pinned_meta keys: source, rows_count, semantic_fields_filled, hook_field_empty, warnings_count.
     """
-    warnings = []
+    warnings    = []
+    _competitor = _account_label(sources)
     pinned_meta: dict = {
         "source": None,
         "rows_count": 0,
@@ -623,7 +636,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
         position = item.get("position")
 
         row = {
-            "Конкурент":           ACCOUNT,
+            "Конкурент":           _competitor,
             "Ссылка на пост":      url_str,
             "Позиция закрепа":     str(position) if position is not None else "",
             "Тема поста":          "",
@@ -664,7 +677,7 @@ def build_funnel_rows(sources, headers) -> tuple[list, list]:
     first_step = cta_text if cta_text else "Переход по ссылке в bio"
 
     row = {h: "" for h in headers}
-    row["Конкурент"]    = ACCOUNT
+    row["Конкурент"]    = _account_label(sources)
     row["Точка входа"]  = "Instagram-профиль"
     row["Первый шаг"]   = first_step
     row["Куда ведет"]   = _redact_url(url)
@@ -686,7 +699,7 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
         return [], ["No external_url/cta_destination found; no landing row created"]
 
     row = {h: "" for h in headers}
-    row["Конкурент"]     = ACCOUNT
+    row["Конкурент"]     = _account_label(sources)
     row["Ссылка на сайт"] = _redact_url(url)
 
     warnings.append(
