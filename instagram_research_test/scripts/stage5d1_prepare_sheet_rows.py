@@ -84,6 +84,7 @@ SOURCE_FILES = {
     "stage5a2c_rows":       BASE / "data/normalized/stage5a2c_pinned_posts_google_sheet_rows.json",
     "bio_semantic":         BASE / "data/normalized/stage5a2e_bio_semantic.json",
     "highlights_visual":    BASE / "data/normalized/stage5b2v_highlights_visual.json",
+    "pinned_hooks":         BASE / "data/normalized/stage5a2d_pinned_hooks.json",
 }
 
 _SECRET_PATTERNS = [
@@ -299,6 +300,45 @@ def _stage5b2v_index(sources: dict) -> dict:
         hid = str(h.get("highlight_id", "")).strip()
         if hid and not h.get("skipped") and not h.get("parse_error"):
             result[hid] = h.get("fields", {})
+    return result
+
+
+def _pinned_hooks_index(sources: dict) -> dict:
+    """Return {position: hook_value} from stage5a2d_pinned_hooks.json."""
+    raw = sources.get("pinned_hooks")
+    if not raw or not isinstance(raw, dict):
+        return {}
+    result = {}
+    for p in raw.get("posts", []):
+        pos = p.get("position")
+        if pos and not p.get("skipped") and not p.get("parse_error"):
+            hook = p.get("hook", {})
+            if isinstance(hook, dict) and hook.get("data_status") == "ok":
+                val = hook.get("value", "").replace("\n", " ").strip()
+                result[int(pos)] = val
+    return result
+
+
+def _apply_hooks(rows: list, headers: list, hooks_index: dict) -> list:
+    """Fill 'Хук / первый экран' from hooks_index where the cell is currently empty."""
+    if not hooks_index or "Хук / первый экран" not in headers:
+        return rows
+    hook_idx = headers.index("Хук / первый экран")
+    pos_idx  = headers.index("Позиция закрепа") if "Позиция закрепа" in headers else None
+    result = []
+    for i, row in enumerate(rows):
+        r = list(row)
+        pos = None
+        if pos_idx is not None:
+            try:
+                pos = int(r[pos_idx])
+            except (ValueError, TypeError):
+                pos = i + 1
+        else:
+            pos = i + 1
+        if pos in hooks_index and not str(r[hook_idx]).strip():
+            r[hook_idx] = hooks_index[pos]
+        result.append(r)
     return result
 
 
@@ -578,8 +618,9 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
     Returns (rows, warnings, pinned_meta).
     pinned_meta keys: source, rows_count, semantic_fields_filled, hook_field_empty, warnings_count.
     """
-    warnings    = []
-    _competitor = _account_label(sources)
+    warnings     = []
+    _competitor  = _account_label(sources)
+    hooks_index  = _pinned_hooks_index(sources)
     pinned_meta: dict = {
         "source": None,
         "rows_count": 0,
@@ -621,6 +662,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
                 fixed_rows.append(r2)
         else:
             fixed_rows = src_rows
+        fixed_rows = _apply_hooks(fixed_rows, headers, hooks_index)
         return fixed_rows, warnings, pinned_meta
 
     # P3: fallback from pinned_posts_index
@@ -637,7 +679,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
             "rows_count": 0,
             "warnings_count": len(warnings),
         })
-        return [], warnings, pinned_meta
+        return [], warnings, pinned_meta  # no rows to apply hooks to
 
     rows = []
     for item in pi_list:
@@ -672,6 +714,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
         "hook_field_empty":      True,
         "warnings_count":        len(warnings),
     })
+    rows = _apply_hooks(rows, headers, hooks_index)
     return rows, warnings, pinned_meta
 
 
