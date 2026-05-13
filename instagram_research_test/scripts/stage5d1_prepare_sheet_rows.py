@@ -299,9 +299,26 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
     if ps is None and bio is None:
         return [], ["profile_summary.json and bio_analysis.json both missing"]
 
+    # bio_text — с защитой от объектной структуры
+    _raw_bio = ps.get("bio_text", {}) if ps else {}
+    _bio_text = (_raw_bio.get("value") if isinstance(_raw_bio, dict) else _raw_bio) or ""
+    _bio_lines = [l.strip() for l in _bio_text.splitlines() if l.strip()]
+
+    # profile_url — с защитой от объектной структуры
+    _raw_url = ps.get("profile_url", {}) if ps else {}
+    _profile_url_val = (_raw_url.get("value") if isinstance(_raw_url, dict) else _raw_url) or ""
+
     row = {}
-    row["Конкурент"]                  = _fval(ps, "username", "userName") or ACCOUNT
-    row["Ниша / продукт"]             = _fval_str(bio, "niche")
+    _username = _fval(ps, "username", "userName") or ACCOUNT
+    _profile_url = _profile_url_val or f"https://www.instagram.com/{_username}/"
+    row["Конкурент"] = f"@{_username} {_profile_url}"
+
+    _product_keywords = ["курс", "наставничество", "клуб", "консультац", "обучени"]
+    _niche_line = next(
+        (l for l in _bio_lines if any(kw in l.lower() for kw in _product_keywords)),
+        None
+    )
+    row["Ниша / продукт"]             = _niche_line or _fval_str(bio, "niche") or ""
     row["Что вынесено в имя профиля"] = _fval_str(ps,  "full_name", "fullName", "name")
     row["Описание профиля (bio)"]     = _fval_str(ps,  "bio_text", "biography", "bio")
 
@@ -313,7 +330,7 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
 
     # Weak rule-based fields — leave empty
     row["Обещание результата"] = ""
-    row["Позиционирование"]    = ""
+    row["Позиционирование"]    = _bio_lines[0] if _bio_lines else _fval_str(bio, "positioning") or ""
     row["Аргументы доверия"]   = ""
 
     # Социальные доказательства — include if value present and not manual_needed
