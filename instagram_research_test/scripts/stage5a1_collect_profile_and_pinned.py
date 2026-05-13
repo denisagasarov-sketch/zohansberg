@@ -28,11 +28,15 @@ os.environ["PYTHONUTF8"] = "1"
 
 BASE = Path(__file__).parent.parent  # instagram_research_test/
 
-RAW_DIR  = BASE / "data/raw"
-NORM_DIR = BASE / "data/normalized"
+import argparse as _argparse
+_ap = _argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT     = _args.account
+PROFILE_URL = f"https://www.instagram.com/{ACCOUNT}/"
+RAW_DIR     = BASE / "data" / ACCOUNT / "raw"
+NORM_DIR    = BASE / "data" / ACCOUNT / "normalized"
 
-ACCOUNT     = "vlada_kliuiko"
-PROFILE_URL = "https://www.instagram.com/vlada_kliuiko/"
 ACTOR_ID    = "apify/instagram-scraper"
 
 load_dotenv(dotenv_path=BASE / ".env", override=True)
