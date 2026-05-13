@@ -288,7 +288,15 @@ def call_vision(client, highlight_id: str, title: str,
         )
         raw = response.choices[0].message.content or ""
         try:
-            parsed = json.loads(raw)
+            clean = raw.strip()
+            if clean.startswith("```"):
+                clean = clean.split("```", 2)[-1] if clean.count("```") >= 2 else clean
+                if clean.startswith("json"):
+                    clean = clean[4:]
+                if clean.endswith("```"):
+                    clean = clean[:-3]
+                clean = clean.strip()
+            parsed = json.loads(clean)
             return {
                 "status": "ok",
                 "fields": parsed,
