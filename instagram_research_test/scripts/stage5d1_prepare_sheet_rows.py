@@ -610,7 +610,18 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
             "hook_field_empty":      hook_empty,
             "warnings_count":        len(warnings),
         })
-        return src_rows, warnings, pinned_meta
+        # Overwrite "Конкурент" in each row — system field, not semantic
+        src_headers_list = src_headers  # already a list
+        if "Конкурент" in src_headers_list:
+            col_idx = src_headers_list.index("Конкурент")
+            fixed_rows = []
+            for r in src_rows:
+                r2 = list(r)
+                r2[col_idx] = _competitor
+                fixed_rows.append(r2)
+        else:
+            fixed_rows = src_rows
+        return fixed_rows, warnings, pinned_meta
 
     # P3: fallback from pinned_posts_index
     pi_list = _pinned_list(sources)
