@@ -521,6 +521,10 @@ def main():
         "--allow-empty-clear", action="store_true",
         help="Clear row 3+ even for sheets with 0 rows (passed to Apps Script)",
     )
+    parser.add_argument(
+        "--account", default="vlada_kliuiko",
+        help="Instagram account to process",
+    )
 
     args = parser.parse_args()
 
