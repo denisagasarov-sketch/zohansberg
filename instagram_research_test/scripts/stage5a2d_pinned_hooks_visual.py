@@ -269,15 +269,21 @@ def _process_post(post: dict, client, model: str) -> dict:
 # Dry-run
 # ---------------------------------------------------------------------------
 
-def run_dry_run(posts: list, position_filter: int | None):
+def run_dry_run(position_filter: int | None):
     print("[DRY-RUN] No images downloaded. OpenAI not called. No files will be written.\n")
+
+    # Always attempt to load the real input file in dry-run
+    posts, err = load_posts()
+    if err:
+        print(f"[DRY-RUN] Input file not available: {err}")
+        print("[DRY-RUN] Post data cannot be shown — file absent.\n")
+        posts = []
+    else:
+        print(f"[DRY-RUN] Loaded {len(posts)} posts from {INPUT_PATH.relative_to(BASE)}\n")
 
     target_posts = [p for p in posts if position_filter is None or p.get("position") == position_filter]
 
-    if not target_posts:
-        print("[DRY-RUN] No posts loaded from input file (file absent on this server).")
-        print("[DRY-RUN] Showing prompts only.\n")
-    else:
+    if target_posts:
         for post in target_posts:
             position  = post.get("position", "?")
             post_type = post.get("type", "")
@@ -288,6 +294,11 @@ def run_dry_run(posts: list, position_filter: int | None):
             print(f"  image_source:    {img_info['image_source']}")
             print(f"  displayUrl_used: {img_info['displayUrl_used']}")
             print()
+    else:
+        if not posts:
+            print("[DRY-RUN] No posts available — showing example prompts only.\n")
+        else:
+            print(f"[DRY-RUN] No posts match position filter: {position_filter}\n")
 
     print("=" * 60)
     print("SYSTEM PROMPT (будет отправлен в OpenAI):")
@@ -340,19 +351,14 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.dry_run:
+        run_dry_run(args.position)
+        return
+
     posts, err = load_posts()
     if err:
-        if args.dry_run:
-            print(f"[DRY-RUN] {err}")
-            print("[DRY-RUN] No posts loaded — showing prompts only.\n")
-            posts = []
-        else:
-            print(f"[ERROR] {err}")
-            sys.exit(1)
-
-    if args.dry_run:
-        run_dry_run(posts, args.position)
-        return
+        print(f"[ERROR] {err}")
+        sys.exit(1)
 
     # Load API key
     try:
