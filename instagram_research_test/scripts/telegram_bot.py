@@ -71,7 +71,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/analyze username — запустить анализ (без Apify, данные уже собраны)\n"
         "/analyze_full username — полный анализ с Apify (платный)\n"
-        "/estimate username — оценить затраты\n"
         "/status — статус текущего анализа\n"
         "/help — эта справка\n\n"
         "Пример: /analyze vlada_kliuiko"
@@ -156,10 +155,30 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
         if costs_path.exists():
             costs = json.load(open(costs_path))
             total = costs.get("totals", {})
+            apify_text = ""
+            try:
+                from dotenv import dotenv_values
+                vals = dotenv_values(BASE / ".env")
+                token = vals.get("APIFY_TOKEN", "")
+                if token:
+                    async with httpx.AsyncClient(timeout=5) as client:
+                        r = await client.get(
+                            f"https://api.apify.com/v2/users/me/usage/monthly?token={token}"
+                        )
+                        services = r.json()["data"].get("monthlyServiceUsage", {})
+                        used = sum(v.get("amountAfterVolumeDiscountUsd", 0) for v in services.values())
+                        r2 = await client.get(
+                            f"https://api.apify.com/v2/users/me?token={token}"
+                        )
+                        limit = r2.json().get("data", {}).get("plan", {}).get("monthlyUsageCreditsUsd", 5.0)
+                        remaining = float(limit) - used
+                        apify_text = f"\n   Apify: потрачено ${used:.2f}, остаток ${remaining:.2f}"
+            except Exception:
+                apify_text = "\n   Apify: см. console.apify.com"
             costs_text = (
                 f"\n💰 OpenAI: ${total.get('total_cost_usd', 0):.4f} "
                 f"({total.get('total_tokens', 0)} токенов)"
-                f"\n   Apify: см. console.apify.com"
+                f"{apify_text}"
             )
 
         if result.returncode == 0:
@@ -190,148 +209,6 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
         current_job["account"]    = None
         current_job["started_at"] = None
         current_job["chat_id"]    = None
-
-
-async def _get_apify_balance() -> tuple:
-    from dotenv import dotenv_values
-    try:
-        vals = dotenv_values(BASE / ".env")
-        token = vals.get("APIFY_TOKEN", "")
-        if not token:
-            return 0.0, 0.0
-        async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(
-                f"https://api.apify.com/v2/users/me/usage/monthly?token={token}"
-            )
-            d = r.json()["data"]
-            services = d.get("monthlyServiceUsage", {})
-            used = sum(v.get("amountAfterVolumeDiscountUsd", 0) for v in services.values())
-
-            r2 = await client.get(
-                f"https://api.apify.com/v2/users/me?token={token}"
-            )
-            limit = r2.json().get("data", {}).get("plan", {}).get("monthlyUsageCreditsUsd", 5.0)
-            return round(used, 4), float(limit)
-    except Exception as e:
-        logger.warning(f"Apify balance check failed: {e}")
-        return 0.0, 0.0
-
-
-def _get_profile_data(account: str):
-    profile_path    = BASE / "data" / account / "normalized" / "profile_summary.json"
-    highlights_path = BASE / "data" / account / "normalized" / "highlights_index.json"
-    if not profile_path.exists():
-        return None
-    try:
-        profile = json.load(open(profile_path))
-        result = {
-            "followers":       profile.get("followers_count", {}).get("value", 0),
-            "posts":           profile.get("posts_count", {}).get("value", 0),
-            "has_external_url": bool(profile.get("external_url", {}).get("value")),
-            "highlights":      0,
-            "pinned":          3,
-        }
-        if highlights_path.exists():
-            h = json.load(open(highlights_path))
-            result["highlights"] = h.get("highlights_count", len(h.get("highlights", [])))
-        return result
-    except Exception as e:
-        logger.warning(f"Profile data load failed: {e}")
-        return None
-
-
-def _calculate_estimate(profile) -> dict:
-    if profile is None:
-        return {
-            "apify_min":  0.17,
-            "apify_max":  0.80,
-            "openai_min": 0.13,
-            "openai_max": 0.70,
-            "details":    None,
-        }
-    highlights = profile["highlights"]
-    pinned     = profile["pinned"]
-    has_url    = profile["has_external_url"]
-
-    apify_profile           = 0.15
-    apify_highlights        = highlights * 20 * 0.0023
-    openai_pinned           = pinned * 0.003
-    openai_bio              = 0.002
-    openai_url              = 0.001 if has_url else 0
-    openai_landing          = 0.08  if has_url else 0
-    openai_highlights_vision = min(highlights, 5) * 0.005
-
-    return {
-        "apify_min":  round(apify_profile + apify_highlights * 0.7, 2),
-        "apify_max":  round(apify_profile + apify_highlights * 1.3, 2),
-        "openai_min": round(openai_pinned + openai_bio + openai_url + openai_landing + openai_highlights_vision * 0.7, 3),
-        "openai_max": round(openai_pinned + openai_bio + openai_url + openai_landing + openai_highlights_vision * 1.3, 3),
-        "details": {
-            "highlights": highlights,
-            "pinned":     pinned,
-            "has_url":    has_url,
-        },
-    }
-
-
-async def estimate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text(f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}")
-        return
-
-    args = context.args
-    if not args:
-        await update.message.reply_text("❌ Укажите username. Пример: /estimate vlada_kliuiko")
-        return
-
-    username = validate_username(args[0])
-    if not username:
-        await update.message.reply_text("❌ Неверный формат username.")
-        return
-
-    await update.message.reply_text("⏳ Получаю данные...")
-
-    apify_used, apify_limit = await _get_apify_balance()
-    apify_remaining = apify_limit - apify_used
-
-    profile = _get_profile_data(username)
-    est     = _calculate_estimate(profile)
-
-    total_min = est["apify_min"] + est["openai_min"]
-    total_max = est["apify_max"] + est["openai_max"]
-    apify_ok  = apify_remaining >= est["apify_max"]
-
-    if profile and est["details"]:
-        d = est["details"]
-        profile_block = (
-            f"\n📊 Профиль @{username}:\n"
-            f"  Подписчиков: {profile['followers']:,}\n"
-            f"  Хайлайтов: {d['highlights']}\n"
-            f"  Закрепов: {d['pinned']}\n"
-            f"  Bio ссылка: {'есть' if d['has_url'] else 'нет'}\n"
-        )
-    else:
-        profile_block = f"\n📊 Профиль @{username}: данные не собраны (запустите /analyze_full)\n"
-
-    if apify_limit > 0:
-        balance_block = (
-            f"\n💳 Баланс:\n"
-            f"  Apify: ${apify_remaining:.2f} из ${apify_limit:.2f} "
-            f"{'✅' if apify_ok else '⚠️ может не хватить'}\n"
-            f"  OpenAI: platform.openai.com/usage\n"
-        )
-    else:
-        balance_block = "\n💳 Баланс: не удалось получить\n"
-
-    estimate_block = (
-        f"\n💰 Ожидаемые затраты:\n"
-        f"  Apify: ${est['apify_min']:.2f} – ${est['apify_max']:.2f}\n"
-        f"  OpenAI: ${est['openai_min']:.3f} – ${est['openai_max']:.3f}\n"
-        f"  Итого: ~${total_min:.2f} – ${total_max:.2f}\n"
-    )
-
-    text = f"📋 Оценка для @{username}:{profile_block}{balance_block}{estimate_block}"
-    await update.message.reply_text(text)
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -373,7 +250,6 @@ def main():
     app.add_handler(CommandHandler("help",         start))
     app.add_handler(CommandHandler("analyze",      analyze))
     app.add_handler(CommandHandler("analyze_full", analyze_full))
-    app.add_handler(CommandHandler("estimate",     estimate))
     app.add_handler(CommandHandler("status",       status))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown))
 
