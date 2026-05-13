@@ -446,6 +446,10 @@ def main():
         "--model", default=DEFAULT_MODEL,
         help=f"OpenAI model to use (default: {DEFAULT_MODEL})",
     )
+    parser.add_argument(
+        "--account", default="vlada_kliuiko",
+        help="Instagram account to process",
+    )
     args = parser.parse_args()
 
     # Load index (non-blocking — falls back to ID as title/position if missing)
