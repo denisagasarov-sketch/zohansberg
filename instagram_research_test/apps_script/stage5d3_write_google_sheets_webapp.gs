@@ -232,7 +232,7 @@ function doPost(e) {
       for (var wi = 0; wi < targetSheetNames.length; wi++) {
         var sheetName = targetSheetNames[wi];
         var sheetData = sheetsPayload[sheetName];
-        var writeResult = _writeSheet(ss, sheetName, sheetData, allowEmptyClear);
+        var writeResult = _writeSheet(ss, sheetName, sheetData, allowEmptyClear, body.account_label || "");
         // Merge write result into existing validation result
         var existing = response.sheets[sheetName];
         existing.existing_last_row_before_write    = writeResult.existing_last_row_before_write;
@@ -429,7 +429,7 @@ function _validateSheet(ss, sheetName, sheetPayload, allSheetNames) {
 // Sheet writer
 // ---------------------------------------------------------------------------
 
-function _writeSheet(ss, sheetName, sheetData, allowEmptyClear) {
+function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
   var result = {
     existing_last_row_before_write: null,
     existing_last_column_before_write: null,
@@ -463,7 +463,7 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear) {
     return result;
   }
   if (!sheet) {
-    result.errors.push("Sheet '" + sheetName + "' not found; this should have been caught in validation.");
+    result.errors.push("Sheet '" + sheetName + "' not found.");
     return result;
   }
 
@@ -472,33 +472,75 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear) {
   result.existing_last_row_before_write    = lastRow;
   result.existing_last_column_before_write = lastCol;
 
-  // Clear rows 3+ in columns 1..headers.length using clearContent() only
-  if (lastRow >= REQUIRED_START_ROW) {
-    var clearRows  = lastRow - REQUIRED_START_ROW + 1;
-    var clearRange = sheet.getRange(REQUIRED_START_ROW, 1, clearRows, headers.length);
-    clearRange.clearContent();
-    var lastColLetter = _colLetter(headers.length);
-    result.cleared_range = "A" + REQUIRED_START_ROW + ":" + lastColLetter + lastRow;
-    result.cleared_rows  = clearRows;
+  var writeStartRow = REQUIRED_START_ROW;
+  var lastColLetter = _colLetter(headers.length);
+
+  if (accountLabel && accountLabel.trim() !== "" && lastRow >= REQUIRED_START_ROW) {
+    // Scan column A from row 3 to lastRow — find rows matching accountLabel
+    var colARange  = sheet.getRange(REQUIRED_START_ROW, 1, lastRow - REQUIRED_START_ROW + 1, 1);
+    var colAValues = colARange.getValues();
+    var firstMatchRow = -1;
+    var lastMatchRow  = -1;
+
+    for (var ri = 0; ri < colAValues.length; ri++) {
+      var cellVal = String(colAValues[ri][0] || "").trim();
+      if (cellVal === accountLabel.trim()) {
+        if (firstMatchRow === -1) firstMatchRow = REQUIRED_START_ROW + ri;
+        lastMatchRow = REQUIRED_START_ROW + ri;
+      }
+    }
+
+    if (firstMatchRow !== -1) {
+      // Found existing rows for this account — clear them
+      var existingCount = lastMatchRow - firstMatchRow + 1;
+      var clearRange = sheet.getRange(firstMatchRow, 1, existingCount, headers.length);
+      clearRange.clearContent();
+      result.cleared_range = "A" + firstMatchRow + ":" + lastColLetter + lastMatchRow;
+      result.cleared_rows  = existingCount;
+      writeStartRow = firstMatchRow;
+
+      // Warning if row count changed
+      if (rows.length !== existingCount) {
+        result.warnings.push(
+          "Row count changed for '" + accountLabel + "' in sheet '" + sheetName + "': " +
+          "was " + existingCount + ", now " + rows.length + ". " +
+          "Existing rows cleared, new rows written. Check for gaps if count decreased."
+        );
+      }
+    } else {
+      // Not found — append after last data row
+      writeStartRow = lastRow + 1;
+      result.cleared_range = null;
+      result.cleared_rows  = 0;
+    }
+
   } else {
-    result.cleared_range = null;
-    result.cleared_rows  = 0;
+    // No accountLabel — fallback: clear from row 3 (original behavior)
+    if (lastRow >= REQUIRED_START_ROW) {
+      var clearRows  = lastRow - REQUIRED_START_ROW + 1;
+      var clearRange = sheet.getRange(REQUIRED_START_ROW, 1, clearRows, headers.length);
+      clearRange.clearContent();
+      result.cleared_range = "A" + REQUIRED_START_ROW + ":" + lastColLetter + lastRow;
+      result.cleared_rows  = clearRows;
+    } else {
+      result.cleared_range = null;
+      result.cleared_rows  = 0;
+    }
+    writeStartRow = REQUIRED_START_ROW;
   }
 
-  // Write rows starting at row 3
+  // Write rows starting at writeStartRow
   if (rows.length > 0) {
     try {
-      var writeRange = sheet.getRange(REQUIRED_START_ROW, 1, rows.length, headers.length);
+      var writeRange = sheet.getRange(writeStartRow, 1, rows.length, headers.length);
       writeRange.setValues(rows);
-      var lastColLetter  = _colLetter(headers.length);
-      var endRow         = REQUIRED_START_ROW + rows.length - 1;
-      result.written_range = "A" + REQUIRED_START_ROW + ":" + lastColLetter + endRow;
+      var endRow = writeStartRow + rows.length - 1;
+      result.written_range = "A" + writeStartRow + ":" + lastColLetter + endRow;
       result.written_rows  = rows.length;
     } catch (writeErr) {
       result.errors.push("Error writing rows to '" + sheetName + "': " + writeErr.message);
     }
   } else {
-    // allow_empty_clear = true, rows = 0: clear happened, no write
     result.written_range = null;
     result.written_rows  = 0;
   }
