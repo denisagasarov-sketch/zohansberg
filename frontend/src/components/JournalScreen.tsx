@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import type { JournalEntry } from '../types'
 import { playSound } from '../sound'
+import CheckinModal from './modals/CheckinModal'
 
 interface Props {
   onClose: () => void
@@ -33,6 +34,7 @@ export default function JournalScreen({ onClose }: Props) {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [apiKey, setApiKey] = useState('')
+  const [showCheckin, setShowCheckin] = useState(false)
 
   useEffect(() => {
     const k = localStorage.getItem('openai_api_key')
@@ -92,7 +94,23 @@ export default function JournalScreen({ onClose }: Props) {
   const grouped = groupByDay(filtered)
   const sortedKeys = [...grouped.keys()].sort((a, b) => b.localeCompare(a))
 
+  const handleCheckinSave = async (mood: number, goal: string, content: string) => {
+    try {
+      await api.createJournalEntry({ type: 'checkin', mood, goal, content })
+      playSound('checkin_save')
+      setShowCheckin(false)
+      await load()
+    } catch (e) { console.error(e) }
+  }
+
   return (
+    <>
+    {showCheckin && (
+      <CheckinModal
+        onClose={() => setShowCheckin(false)}
+        onSave={handleCheckinSave}
+      />
+    )}
     <div className="h-full flex flex-col bg-[#181818] text-[#f0f0f0]">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-[#252525] shrink-0">
         <button onClick={onClose} className="text-[#666] hover:text-[#f0f0f0] text-sm transition-colors">← Назад</button>
@@ -108,12 +126,18 @@ export default function JournalScreen({ onClose }: Props) {
       <div className="flex-1 flex overflow-hidden">
         {/* Left: entries */}
         <div className="flex-[3] overflow-y-auto px-6 py-4 border-r border-[#252525]">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => setShowThoughtInput(v => !v)}
               className="text-xs px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] rounded transition-colors text-white"
             >
               + Добавить мысль
+            </button>
+            <button
+              onClick={() => setShowCheckin(true)}
+              className="text-xs px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] rounded transition-colors text-[#666]"
+            >
+              ☀ Чек-ин
             </button>
           </div>
 
@@ -203,5 +227,6 @@ export default function JournalScreen({ onClose }: Props) {
         </div>
       </div>
     </div>
+    </>
   )
 }

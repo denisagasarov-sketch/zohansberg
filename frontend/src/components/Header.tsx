@@ -21,7 +21,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
   const [inputValue, setInputValue] = useState('')
   const [pendingText, setPendingText] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
-  const [showNoteTarget, setShowNoteTarget] = useState(false)
+  const [thoughtSaved, setThoughtSaved] = useState(false)
   const [datetime, setDatetime] = useState(formatDateTime())
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -45,12 +45,10 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
     if (e.key === 'Enter' && inputValue.trim()) {
       setPendingText(inputValue.trim())
       setShowTypeDropdown(true)
-      setShowNoteTarget(false)
     }
     if (e.key === 'Escape') {
       setInputValue('')
       setShowTypeDropdown(false)
-      setShowNoteTarget(false)
       inputRef.current?.blur()
     }
   }
@@ -71,6 +69,8 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
   const handleThought = useCallback(async () => {
     try {
       await api.createJournalEntry({ type: 'thought', content: pendingText })
+      setThoughtSaved(true)
+      setTimeout(() => setThoughtSaved(false), 2000)
     } catch (e) {
       console.error(e)
     }
@@ -79,15 +79,9 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
     setPendingText('')
   }, [pendingText])
 
-  const handleNote = useCallback(() => {
-    setShowTypeDropdown(false)
-    setShowNoteTarget(true)
-  }, [])
-
   const cancelAll = useCallback(() => {
     setInputValue('')
     setShowTypeDropdown(false)
-    setShowNoteTarget(false)
     setPendingText('')
   }, [])
 
@@ -103,6 +97,11 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
           placeholder="Быстрый ввод… (⌘N)"
           className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] placeholder-[#383838] focus:outline-none focus:border-[#5060a0] h-7"
         />
+        {thoughtSaved && (
+          <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#5060a0]/50 rounded px-3 py-1.5 text-xs text-[#8090c8] shadow-lg whitespace-nowrap">
+            ✓ Мысль записана
+          </div>
+        )}
         {showTypeDropdown && (
           <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#252525] rounded p-2 w-max text-sm shadow-lg">
             <div className="text-[#666] mb-2 truncate max-w-xs">&ldquo;{pendingText}&rdquo;</div>
@@ -110,18 +109,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
               <span className="text-[#666] text-xs">Это:</span>
               <button onClick={handleTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">📋 Задача</button>
               <button onClick={handleThought} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">💭 Мысль</button>
-              <button onClick={handleNote} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">📝 Заметка</button>
               <span className="text-[#383838] text-xs">Escape — отмена</span>
-            </div>
-          </div>
-        )}
-        {showNoteTarget && (
-          <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#252525] rounded p-2 w-max text-sm shadow-lg">
-            <div className="text-[#666] mb-2">К чему заметка?</div>
-            <div className="flex items-center gap-2">
-              <button className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">К задаче ▾</button>
-              <button className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">К направлению ▾</button>
-              <button onClick={cancelAll} className="text-[#383838] text-xs hover:text-[#666]">отмена</button>
             </div>
           </div>
         )}
