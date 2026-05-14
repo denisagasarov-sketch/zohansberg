@@ -72,7 +72,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
 
-  const activeTasks = tasks.filter(t => !t.done_at && !t.deleted_at && t.slot !== 'someday')
+  const activeTasks = (tasks ?? []).filter(t => !t.done_at && !t.deleted_at && t.slot !== 'someday')
 
   const handleDragStart = (_e: React.DragEvent, taskId: number) => {
     draggingIdRef.current = taskId
@@ -112,11 +112,11 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     setDraggingId(null)
   }
 
-  const somedayTasks = tasks.filter(t => t.slot === 'someday' && !t.done_at && !t.deleted_at)
+  const somedayTasks = (tasks ?? []).filter(t => t.slot === 'someday' && !t.done_at && !t.deleted_at)
   const somedayVisible = somedayTasks.slice(0, 3)
   const somedayRest = somedayTasks.length - somedayVisible.length
 
-  const sortedDirs = [...directions].sort((a, b) => a.order_index - b.order_index)
+  const sortedDirs = [...(directions ?? [])].sort((a, b) => a.order_index - b.order_index)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

@@ -14,7 +14,8 @@ function formatDeadline(d: string | null) {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
-function daysSince(dateStr: string) {
+function daysSince(dateStr: string | null | undefined) {
+  if (!dateStr) return 0
   const diff = Date.now() - new Date(dateStr).getTime()
   return Math.floor(diff / 86400_000)
 }
@@ -22,7 +23,13 @@ function daysSince(dateStr: string) {
 export default function RecBar({ recommendation, onGetNext, onSetNext, onTaskClick }: Props) {
   const [expanded, setExpanded] = useState(false)
 
-  if (!recommendation) return null
+  if (!recommendation?.task) {
+    return (
+      <div className="border-t border-[#252525] pt-3">
+        <div className="text-xs text-[#383838]">Нет задач для рекомендации</div>
+      </div>
+    )
+  }
 
   const { task, reason } = recommendation
 

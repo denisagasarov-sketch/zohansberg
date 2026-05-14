@@ -25,7 +25,7 @@ function priorityLabel(p: string) {
 }
 
 export default function NextBlock({ tasks, onTaskClick, recommendation }: Props) {
-  const nextTasks = tasks.filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 3)
+  const nextTasks = (tasks ?? []).filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 3)
 
   return (
     <div>
