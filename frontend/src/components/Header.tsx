@@ -69,6 +69,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor }: Prop
   const handleThought = useCallback(async () => {
     try {
       await api.createJournalEntry({ type: 'thought', content: pendingText })
+      window.dispatchEvent(new CustomEvent('journal-updated'))
       setThoughtSaved(true)
       setTimeout(() => setThoughtSaved(false), 2000)
     } catch (e) {

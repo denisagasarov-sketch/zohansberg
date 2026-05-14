@@ -51,6 +51,12 @@ export default function JournalScreen({ onClose }: Props) {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    const handler = () => load()
+    window.addEventListener('journal-updated', handler)
+    return () => window.removeEventListener('journal-updated', handler)
+  }, [load])
+
   const handleAddThought = async () => {
     if (!thoughtText.trim()) return
     try {
