@@ -3,7 +3,7 @@ import type { Recommendation, Task } from '../types'
 
 interface Props {
   recommendation: Recommendation | null
-  onGetNext: () => void
+  onGetNext: (skipId?: number) => void
   onSetNext: (taskId: number) => void
   onTaskClick: (task: Task) => void
 }
