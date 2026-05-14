@@ -38,7 +38,7 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
       if (s.timer_sound) setTimerSound(s.timer_sound)
       if (s.sounds_enabled) setSoundsEnabled(s.sounds_enabled !== 'false')
       if (s.sounds_volume) setVolume(parseFloat(s.sounds_volume))
-      if (s.claude_api_key) setApiKey(s.claude_api_key)
+      if (s.openai_api_key) setApiKey(s.openai_api_key)
       if (s.db_path) setDbPath(s.db_path)
     }).catch(() => {})
   }, [])
@@ -90,12 +90,9 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const checkApiKey = async () => {
     setApiStatus('checking')
     try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-20240307', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
-      })
-      setApiStatus(resp.ok || resp.status === 400 ? 'ok' : 'fail')
+      const resp = await fetch('/api/settings/test-key', { method: 'POST' })
+      const data = await resp.json()
+      setApiStatus(data.valid ? 'ok' : 'fail')
     } catch { setApiStatus('fail') }
   }
 
@@ -229,14 +226,14 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
 
         {/* AI */}
         <section>
-          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">AI и дневник</h2>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">OpenAI API</h2>
           <div className="flex gap-2 mb-2">
             <input
               type="password"
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
-              onBlur={() => saveSetting('claude_api_key', apiKey)}
-              placeholder="sk-ant-…"
+              onBlur={() => saveSetting('openai_api_key', apiKey)}
+              placeholder="sk-…"
               className="flex-1 bg-[#1c1c1c] border border-[#252525] rounded px-3 py-1.5 text-sm text-[#f0f0f0] placeholder-[#383838] focus:outline-none focus:border-[#5060a0]"
             />
             <button

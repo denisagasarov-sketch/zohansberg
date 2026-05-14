@@ -35,7 +35,7 @@ export default function JournalScreen({ onClose }: Props) {
   const [apiKey, setApiKey] = useState('')
 
   useEffect(() => {
-    const k = localStorage.getItem('claude_api_key')
+    const k = localStorage.getItem('openai_api_key')
     if (k) setApiKey(k)
   }, [])
 
@@ -70,19 +70,16 @@ export default function JournalScreen({ onClose }: Props) {
       return `[Мысль] ${e.content ?? ''}`
     }).join('\n')
     try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      const resp = await fetch('/api/ai/analyze', {
         method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-20240307',
-          max_tokens: 800,
-          messages: [{ role: 'user', content: `Вот мои записи в дневнике за последнее время:\n\n${text}\n\nПроанализируй: динамику настроения, паттерны, дай краткое резюме недели (3-5 предложений). Отвечай по-русски.` }],
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
       })
       const data = await resp.json()
-      setAnalysis(data.content?.[0]?.text ?? 'Не удалось получить анализ')
+      if (!resp.ok) throw new Error(data.error ?? 'Ошибка сервера')
+      setAnalysis(data.result ?? 'Не удалось получить анализ')
     } catch (e) {
-      setAnalysis('Ошибка при обращении к AI')
+      setAnalysis(e instanceof Error ? e.message : 'Ошибка при обращении к AI')
     } finally {
       setAnalyzing(false)
     }
@@ -189,7 +186,7 @@ export default function JournalScreen({ onClose }: Props) {
             {analyzing ? 'Анализирую…' : 'Анализировать за неделю'}
           </button>
           {!apiKey && (
-            <p className="text-xs text-[#666] mb-3">Добавьте API-ключ Claude в настройках, чтобы использовать анализ</p>
+            <p className="text-xs text-[#666] mb-3">Добавьте OpenAI API-ключ в настройках, чтобы использовать анализ</p>
           )}
           {analyzing && (
             <div className="flex gap-1 mb-3">

@@ -611,6 +611,63 @@ app.get('/api/stats', (req, res) => {
   }
 })
 
+// ─── AI ───────────────────────────────────────────────────────────────────────
+
+function getOpenAiKey() {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = 'openai_api_key'`).get()
+  return row?.value ?? null
+}
+
+// POST /api/settings/test-key — validate stored OpenAI key
+app.post('/api/settings/test-key', async (_req, res) => {
+  const key = getOpenAiKey()
+  if (!key) return res.json({ valid: false, error: 'No key saved' })
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+    })
+    res.json({ valid: r.ok })
+  } catch (err) {
+    res.json({ valid: false, error: err.message })
+  }
+})
+
+// POST /api/ai/analyze — proxy journal text to OpenAI
+app.post('/api/ai/analyze', async (req, res) => {
+  const key = getOpenAiKey()
+  if (!key) return res.status(400).json({ error: 'OpenAI API key not configured' })
+
+  const { text } = req.body
+  if (!text) return res.status(400).json({ error: 'text is required' })
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 800,
+        messages: [
+          {
+            role: 'user',
+            content: `Вот мои записи в дневнике за последнее время:\n\n${text}\n\nПроанализируй: динамику настроения, паттерны, дай краткое резюме недели (3-5 предложений). Отвечай по-русски.`,
+          },
+        ],
+      }),
+    })
+    if (!r.ok) {
+      const errBody = await r.json().catch(() => ({}))
+      return res.status(r.status).json({ error: errBody?.error?.message ?? 'OpenAI request failed' })
+    }
+    const data = await r.json()
+    res.json({ result: data.choices?.[0]?.message?.content ?? '' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
