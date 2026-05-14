@@ -1,8 +1,8 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod db;
 mod commands;
+mod db;
 
 fn main() {
     let db = db::init().expect("failed to init database");

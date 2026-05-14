@@ -1,5 +1,5 @@
-use rusqlite::{Connection, Result};
 use dirs::data_dir;
+use rusqlite::{Connection, Result};
 use std::path::PathBuf;
 
 pub type Db = Connection;
@@ -21,7 +21,8 @@ pub fn init() -> Result<Db> {
 }
 
 pub fn init_schema(conn: &Connection) -> Result<()> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         CREATE TABLE IF NOT EXISTS directions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -71,7 +72,8 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             content TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
-    ")
+    ",
+    )
 }
 
 pub fn cleanup_trash(conn: &Connection) -> Result<()> {
