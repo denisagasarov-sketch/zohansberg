@@ -394,17 +394,11 @@ app.get('/api/sessions/stats', (req, res) => {
 
 // ─── Journal ──────────────────────────────────────────────────────────────────
 
-// GET /api/journal — all entries grouped by day
+// GET /api/journal — all entries as flat array
 app.get('/api/journal', (_req, res) => {
   try {
     const rows = db.prepare(`SELECT * FROM journal_entries ORDER BY created_at DESC`).all()
-    const grouped = {}
-    for (const entry of rows) {
-      const day = entry.created_at.slice(0, 10)
-      if (!grouped[day]) grouped[day] = []
-      grouped[day].push(entry)
-    }
-    res.json(grouped)
+    res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

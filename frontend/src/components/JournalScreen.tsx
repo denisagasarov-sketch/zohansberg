@@ -42,8 +42,8 @@ export default function JournalScreen({ onClose }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await api.getJournal() as JournalEntry[]
-      setEntries(data)
+      const data = await api.getJournal()
+      setEntries(Array.isArray(data) ? data as JournalEntry[] : [])
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [])
 
