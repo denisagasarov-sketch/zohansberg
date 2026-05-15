@@ -11,9 +11,10 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters, ContextTypes
+    Application, CallbackQueryHandler, CommandHandler,
+    MessageHandler, filters, ContextTypes,
 )
 
 logging.basicConfig(
@@ -57,6 +58,16 @@ def validate_username(username: str):
     return username
 
 
+def _main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔍 Новый анализ",    callback_data="new_analysis"),
+            InlineKeyboardButton("⚡ Быстрый анализ", callback_data="quick_analysis"),
+        ],
+        [InlineKeyboardButton("📊 Статус", callback_data="status")],
+    ])
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     if not is_allowed(update):
@@ -68,13 +79,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         "Привет! Я бот для анализа Instagram-конкурентов.\n\n"
-        "Команды:\n"
-        "/analyze username — запустить анализ (без Apify, данные уже собраны)\n"
-        "/analyze_full username — полный анализ с Apify (платный)\n"
-        "/status — статус текущего анализа\n"
-        "/help — эта справка\n\n"
-        "Пример: /analyze vlada_kliuiko"
+        "🔍 Новый анализ — полный запуск с Apify (сбор + OpenAI)\n"
+        "⚡ Быстрый анализ — только OpenAI по уже собранным данным\n\n"
+        "Или используйте команды:\n"
+        "/analyze username — быстрый анализ\n"
+        "/analyze_full username — полный анализ\n"
+        "/status — текущий статус",
+        reply_markup=_main_keyboard(),
     )
+
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if not is_allowed(update):
+        await query.edit_message_text("⛔ Нет доступа.")
+        return
+
+    if query.data == "status":
+        if current_job["running"]:
+            elapsed = int((time.time() - current_job["started_at"]) / 60)
+            await query.edit_message_text(
+                f"⏳ Выполняется анализ @{current_job['account']}\n"
+                f"Запущен: {elapsed} мин назад",
+                reply_markup=_main_keyboard(),
+            )
+        else:
+            await query.edit_message_text("✅ Нет активных анализов", reply_markup=_main_keyboard())
+        return
+
+    if query.data in ("new_analysis", "quick_analysis"):
+        context.user_data["waiting_mode"] = query.data
+        label = "полный (с Apify)" if query.data == "new_analysis" else "быстрый (без Apify)"
+        await query.edit_message_text(
+            f"Режим: {label}\n\n"
+            "Введите username аккаунта Instagram для анализа\n"
+            "(например: kate.jet):"
+        )
 
 
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -92,7 +134,7 @@ async def _start_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE, sk
 
     args = context.args
     if not args:
-        await update.message.reply_text("❌ Укажите username. Пример: /analyze vlada_kliuiko")
+        await update.message.reply_text("❌ Укажите username. Пример: /analyze kate.jet")
         return
 
     username = validate_username(args[0])
@@ -100,6 +142,10 @@ async def _start_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE, sk
         await update.message.reply_text("❌ Неверный формат username. Только латиница, цифры, точки, подчеркивания.")
         return
 
+    await _launch(update, context, username, skip_apify)
+
+
+async def _launch(update: Update, context: ContextTypes.DEFAULT_TYPE, username: str, skip_apify: bool):
     if current_job["running"]:
         await update.message.reply_text(
             f"⏳ Уже выполняется анализ @{current_job['account']}.\n"
@@ -112,7 +158,7 @@ async def _start_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE, sk
     current_job["running"]    = True
     current_job["chat_id"]    = update.effective_chat.id
 
-    mode = "без Apify" if skip_apify else "полный (с Apify)"
+    mode = "быстрый (без Apify)" if skip_apify else "полный (с Apify)"
     await update.message.reply_text(
         f"🚀 Запускаю анализ @{username}...\n"
         f"Режим: {mode}\n"
@@ -225,11 +271,28 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Нет активных анализов")
 
 
-async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if is_allowed(update):
-        await update.message.reply_text("Используйте /analyze username для запуска")
-    else:
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update):
         await update.message.reply_text(f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}")
+        return
+
+    mode = context.user_data.pop("waiting_mode", None)
+    if mode in ("new_analysis", "quick_analysis"):
+        username = validate_username(update.message.text or "")
+        if not username:
+            await update.message.reply_text(
+                "❌ Неверный формат username. Только латиница, цифры, точки, подчеркивания.\n"
+                "Попробуйте ещё раз:"
+            )
+            context.user_data["waiting_mode"] = mode
+            return
+        skip_apify = (mode == "quick_analysis")
+        await _launch(update, context, username, skip_apify)
+    else:
+        await update.message.reply_text(
+            "Используйте /analyze username для запуска",
+            reply_markup=_main_keyboard(),
+        )
 
 
 def main():
@@ -251,7 +314,8 @@ def main():
     app.add_handler(CommandHandler("analyze",      analyze))
     app.add_handler(CommandHandler("analyze_full", analyze_full))
     app.add_handler(CommandHandler("status",       status))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     app.run_polling(drop_pending_updates=True)
 
