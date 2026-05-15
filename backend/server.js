@@ -662,6 +662,68 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 })
 
+// GET /api/sessions/worklog?period=week|month|all
+// Returns heatmap (day→seconds), top tasks, and formatted log text for GPT
+app.get('/api/sessions/worklog', (req, res) => {
+  try {
+    const period = req.query.period || 'week'
+    let dateFilter = ''
+    let periodLabel = ''
+    if (period === 'week') { dateFilter = `AND date(ws.started_at) >= date('now', '-7 days')`; periodLabel = 'последнюю неделю' }
+    else if (period === 'month') { dateFilter = `AND date(ws.started_at) >= date('now', '-30 days')`; periodLabel = 'последний месяц' }
+    else { periodLabel = 'всё время' }
+
+    // Heatmap: seconds per day
+    const heatmap = db.prepare(`
+      SELECT date(ws.started_at) AS day, SUM(ws.duration_actual) AS seconds
+      FROM work_sessions ws
+      WHERE ws.duration_actual IS NOT NULL ${dateFilter}
+      GROUP BY day ORDER BY day ASC
+    `).all()
+
+    // Top tasks by total time worked
+    const topTasks = db.prepare(`
+      SELECT t.id, t.title, COALESCE(d.name, 'Без направления') AS direction_name,
+             SUM(ws.duration_actual) AS total_seconds,
+             MIN(date(ws.started_at)) AS first_day
+      FROM work_sessions ws
+      JOIN tasks t ON ws.task_id = t.id
+      LEFT JOIN directions d ON t.direction_id = d.id
+      WHERE ws.duration_actual IS NOT NULL ${dateFilter}
+      GROUP BY t.id ORDER BY total_seconds DESC LIMIT 10
+    `).all()
+
+    // Detailed session list for GPT prompt (last 100 sessions)
+    const sessions = db.prepare(`
+      SELECT ws.started_at, ws.duration_actual,
+             t.title AS task_title,
+             COALESCE(d.name, 'Без направления') AS direction_name
+      FROM work_sessions ws
+      JOIN tasks t ON ws.task_id = t.id
+      LEFT JOIN directions d ON t.direction_id = d.id
+      WHERE ws.duration_actual IS NOT NULL ${dateFilter}
+      ORDER BY ws.started_at DESC LIMIT 100
+    `).all()
+
+    // Format log text for GPT
+    const days = {}
+    for (const s of sessions) {
+      const day = s.started_at.slice(0, 10)
+      if (!days[day]) days[day] = []
+      const h = (s.duration_actual / 3600).toFixed(1)
+      days[day].push(`  • ${s.task_title} [${s.direction_name}] — ${h}ч`)
+    }
+    const logLines = Object.entries(days)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([day, lines]) => `${day}:\n${lines.join('\n')}`)
+    const logText = `Вот мой рабочий журнал за ${periodLabel}:\n\n${logLines.join('\n\n')}`
+
+    res.json({ heatmap, top_tasks: topTasks, log_text: logText, period_label: periodLabel })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
