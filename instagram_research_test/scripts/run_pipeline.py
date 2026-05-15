@@ -107,7 +107,7 @@ STAGE_ORDER = [
         "requires_apify": False,
         "requires_openai": False,
         "cost_estimate": "$0",
-        "extra_args": ["--write", "--confirm-write"],
+        "extra_args": ["--write", "--confirm-write", "--allow-row-count-drift"],
     },
     {
         "name": "Подсчет затрат",
