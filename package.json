@@ -1,12 +1,40 @@
 {
   "name": "focus-board",
   "version": "0.1.0",
+  "main": "electron/main.js",
   "scripts": {
     "tauri": "tauri",
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder --mac",
     "dev": "tauri dev",
     "build": "tauri build"
   },
+  "build": {
+    "appId": "com.focusboard.app",
+    "productName": "Focus Board",
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!node_modules/.cache"
+        ]
+      }
+    ],
+    "mac": {
+      "icon": "electron/icon.png",
+      "category": "public.app-category.productivity"
+    }
+  },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.0.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "sharp": "^0.33.5"
   }
 }
