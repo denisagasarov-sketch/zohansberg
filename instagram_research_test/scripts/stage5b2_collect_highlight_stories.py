@@ -213,7 +213,7 @@ def blank_highlight_result(h: dict, status: str, errors: list = None) -> dict:
         "has_videoUrl":      False,
         "has_any_media_url": False,
         "sample_values":     {},
-        "raw_path":          f"data/raw/stage5b2_stories_{hid}_raw.json",
+        "raw_path":          f"data/{ACCOUNT}/raw/stage5b2_stories_{hid}_raw.json",
         "errors":            errors or [],
     }
 
@@ -291,7 +291,7 @@ def collect_one(h: dict, client) -> dict:
 
     hid      = h["highlight_id"]
     payload  = {"highlightId": hid}
-    raw_path = BASE / f"data/raw/stage5b2_stories_{hid}_raw.json"
+    raw_path = RAW_DIR / f"stage5b2_stories_{hid}_raw.json"
     result   = blank_highlight_result(h, "FAIL")
     result["raw_path"] = str(raw_path.relative_to(BASE))
 

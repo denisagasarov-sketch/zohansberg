@@ -12,6 +12,7 @@ Stage 5B-2: Create Markdown report from normalized JSON outputs.
 ВАЖНО: report — runtime output. Не коммитить без явного запроса пользователя.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -20,9 +21,14 @@ import os
 os.environ["PYTHONUTF8"] = "1"
 
 BASE       = Path(__file__).parent.parent
-NORM_DIR   = BASE / "data/normalized"
 REPORT_DIR = BASE / "report"
 
+_ap = argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--account", default="vlada_kliuiko")
+_args, _ = _ap.parse_known_args()
+ACCOUNT = _args.account
+
+NORM_DIR         = BASE / "data" / ACCOUNT / "normalized"
 SUMMARY_PATH     = NORM_DIR / "stage5b2_highlights_stories_summary.json"
 STORIES_IDX_PATH = NORM_DIR / "stage5b2_stories_index.json"
 REPORT_PATH      = REPORT_DIR / "stage_5b2_highlights_stories_report.md"

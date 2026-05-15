@@ -162,8 +162,8 @@ def build_highlight_meta(index_items: list) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 
 def load_stories(highlight_id: str) -> tuple[list, str | None]:
-    """Return (stories_list, error_or_None) from stage5b0 raw file."""
-    path = RAW_DIR / f"stage5b0_highlight_{highlight_id}_raw.json"
+    """Return (stories_list, error_or_None) from stage5b2 raw file."""
+    path = RAW_DIR / f"stage5b2_stories_{highlight_id}_raw.json"
     if not path.exists():
         return [], f"{path.relative_to(BASE)} not found"
     try:

@@ -86,6 +86,13 @@ STAGE_ORDER = [
         "cost_estimate": "$0.10–0.50",
     },
     {
+        "name": "5B-2: Сбор сторис хайлайтов",
+        "script": "stage5b2_run_local.py",
+        "requires_apify": True,
+        "requires_openai": False,
+        "cost_estimate": "$0.10–2.00",
+    },
+    {
         "name": "5B-2V: Vision для хайлайтов",
         "script": "stage5b2v_highlights_visual_analyzer.py",
         "requires_apify": False,
@@ -128,7 +135,7 @@ def check_env():
 
 
 def has_stories_data(account: str) -> bool:
-    pattern = str(BASE / "data" / account / "raw" / "stage5b0_highlight_*_raw.json")
+    pattern = str(BASE / "data" / account / "raw" / "stage5b2_stories_*_raw.json")
     return len(glob.glob(pattern)) > 0
 
 
