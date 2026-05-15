@@ -60,6 +60,8 @@ def main():
 
     client = ApifyClient(token)
 
+    payload["username"] = ACCOUNT
+
     print("=== Stage 5B-1: Highlights Index Collector ===")
     summary = collector.collect(client, payload)
 
