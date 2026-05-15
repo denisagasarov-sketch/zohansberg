@@ -181,8 +181,8 @@ def run_from_existing():
 def run_collect_mode(max_posts: int):
     print(f"Mode: --collect --max-posts {max_posts}")
 
-    if max_posts != 3:
-        print(f"[ERROR] --max-posts must be exactly 3, got {max_posts}.")
+    if max_posts < 1:
+        print(f"[ERROR] --max-posts must be at least 1, got {max_posts}.")
         sys.exit(1)
 
     token = os.environ.get("APIFY_TOKEN", "").strip()

@@ -144,8 +144,8 @@ def load_pinned_index() -> tuple[dict, list[str]]:
         return index, errors
     n = index.get("pinned_count", 0)
     warnings = []
-    if n != 3:
-        warnings.append(f"Expected 3 pinned posts, index reports {n}")
+    if n == 0:
+        warnings.append("pinned_count is 0 — no pinned posts found in index")
     for i, p in enumerate(posts):
         has_url  = _fval(p, "url") is not None
         has_sc   = _fval(p, "shortcode") is not None
@@ -695,8 +695,8 @@ def run_from_existing_raw() -> dict:
 
 def run_collect(client, max_posts: int) -> dict:
     """Run Apify and collect full post details. Requires APIFY_TOKEN."""
-    if max_posts != 3:
-        raise ValueError(f"--max-posts must be exactly 3, got {max_posts}")
+    if max_posts < 1:
+        raise ValueError(f"--max-posts must be at least 1, got {max_posts}")
 
     index, errors = load_pinned_index()
     hard_errors = [e for e in errors if not e.startswith("WARNING")]

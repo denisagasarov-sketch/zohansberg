@@ -573,9 +573,9 @@ def _validate_semantic_pinned(label: str, src_headers: list, src_rows: list,
         )
         return False
 
-    if len(src_rows) != 3:
+    if len(src_rows) == 0:
         warnings.append(
-            f"{label}: expected 3 rows, got {len(src_rows)}. Skipping this source."
+            f"{label}: 0 rows found. Skipping this source."
         )
         return False
 
