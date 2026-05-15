@@ -45,7 +45,7 @@ FALLBACK_HEADERS = {
     ],
     "Закрепленные посты": [
         "Конкурент", "Ссылка на пост", "Позиция закрепа", "Тема поста",
-        "Почему закреплен", "Хук / первый экран", "Что в тексте поста",
+        "Почему закреплен", "Первый абзац / заголовок поста", "Что в тексте поста",
         "Ключевые смыслы", "Какой CTA", "Куда ведет CTA", "Роль в воронке",
     ],
     "Воронка": [
@@ -61,7 +61,7 @@ FALLBACK_HEADERS = {
         "Конкурент", "Ссылка на сайт", "Что продают",
         "Структура первых 3х экранов", "Главный заголовок", "Подзаголовок",
         "Для кого", "Обещание результата", "Главный CTA", "Соцдоказательства",
-        "Какие боли раскрывают", "Какие аргументы используют", "Какие блоки есть дальше",
+        "Какие боли раскрывают", "Какие аргументы используют", "Структура лендинга",
     ],
     "Бот  лид-магнит": [
         "Конкурент", "Где нашли лид-магнит", "Название лид-магнита",
@@ -326,10 +326,10 @@ def _pinned_hooks_index(sources: dict) -> dict:
 
 
 def _apply_hooks(rows: list, headers: list, hooks_index: dict) -> list:
-    """Fill 'Хук / первый экран' from hooks_index where the cell is currently empty."""
-    if not hooks_index or "Хук / первый экран" not in headers:
+    """Fill 'Первый абзац / заголовок поста' from stage5a2d hooks_index where cell is empty."""
+    if not hooks_index or "Первый абзац / заголовок поста" not in headers:
         return rows
-    hook_idx = headers.index("Хук / первый экран")
+    hook_idx = headers.index("Первый абзац / заголовок поста")
     pos_idx  = headers.index("Позиция закрепа") if "Позиция закрепа" in headers else None
     result = []
     for i, row in enumerate(rows):
@@ -592,7 +592,7 @@ def _validate_semantic_pinned(label: str, src_headers: list, src_rows: list,
 def _warn_semantic_consistency(label: str, src_headers: list, src_rows: list,
                                 warnings: list) -> tuple[bool, bool]:
     """Emit semantic consistency warnings. Returns (hook_field_empty, semantic_fields_filled)."""
-    hook_idx = src_headers.index("Хук / первый экран") if "Хук / первый экран" in src_headers else None
+    hook_idx = src_headers.index("Первый абзац / заголовок поста") if "Первый абзац / заголовок поста" in src_headers else None
     role_idx = src_headers.index("Роль в воронке")     if "Роль в воронке"     in src_headers else None
     why_idx  = src_headers.index("Почему закреплен")   if "Почему закреплен"   in src_headers else None
 
@@ -610,8 +610,8 @@ def _warn_semantic_consistency(label: str, src_headers: list, src_rows: list,
             hook_val = str(row[hook_idx] or "")
             if hook_val.strip():
                 warnings.append(
-                    f"{label} post {pos}: 'Хук / первый экран' is non-empty "
-                    f"('{hook_val[:60]}'). Expected empty after Stage 5A-2C."
+                    f"{label} post {pos}: 'Первый абзац / заголовок поста' is non-empty "
+                    f"('{hook_val[:60]}') — filled from stage5a2c or stage5a2d."
                 )
                 hook_field_empty = False
 
@@ -723,7 +723,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
             "Позиция закрепа":     str(position) if position is not None else "",
             "Тема поста":          "",
             "Почему закреплен":    "",
-            "Хук / первый экран":  "",
+            "Первый абзац / заголовок поста": "",
             "Что в тексте поста":  caption,
             "Ключевые смыслы":     "",
             "Какой CTA":           "",
@@ -818,7 +818,7 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
     row["Соцдоказательства"]            = lf.get("sots_dokazatelstva", "")
     row["Какие боли раскрывают"]        = lf.get("boli", "")
     row["Какие аргументы используют"]   = lf.get("argumenty", "")
-    row["Какие блоки есть дальше"]      = lf.get("bloki_dalshe", "")
+    row["Структура лендинга"]            = lf.get("bloki_dalshe", "")
 
     if lf:
         warnings.append(

@@ -305,14 +305,13 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
                 pp_issues.append(f"    reason:    {note['reason']}")
 
         # Build fixed semantic post
-        new_gf = {k: v for k, v in fixed_fields.items()
-                  if k in CELL_LIMITS or k == "Хук / первый экран"}
+        new_gf = {k: v for k, v in fixed_fields.items() if k in CELL_LIMITS}
         fixed_sem = dict(sem)
         fixed_sem["google_sheet_fields"]  = {
-            "Тема поста":            fixed_fields.get("Тема поста", ""),
-            "Почему закреплен":      fixed_fields.get("Почему закреплен", ""),
-            "Хук / первый экран":    "",
-            "Что в тексте поста":    fixed_fields.get("Что в тексте поста", ""),
+            "Тема поста":                     fixed_fields.get("Тема поста", ""),
+            "Почему закреплен":               fixed_fields.get("Почему закреплен", ""),
+            "Первый абзац / заголовок поста": fixed_fields.get("Первый абзац / заголовок поста", ""),
+            "Что в тексте поста":             fixed_fields.get("Что в тексте поста", ""),
             "Ключевые смыслы":       fixed_fields.get("Ключевые смыслы", ""),
             "Какой CTA":             fixed_fields.get("Какой CTA", ""),
             "Куда ведет CTA":        fixed_fields.get("Куда ведет CTA", ""),
@@ -337,11 +336,7 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
                 rows_issues.append(
                     f"Row has {len(row)} columns, expected {len(GS_FIELD_ORDER)}"
                 )
-        # Check Хук column
-        hook_idx = GS_FIELD_ORDER.index("Хук / первый экран")
-        for i, row in enumerate(rows):
-            if len(row) > hook_idx and row[hook_idx] != "":
-                rows_issues.append(f"Row {i+1}: 'Хук / первый экран' column is non-empty")
+        # "Первый абзац / заголовок поста" is expected to be populated — no emptiness check needed
 
     # Print validation results
     all_clean = True

@@ -45,7 +45,7 @@ COST_PER_CALL: dict[str, float] = {
 CELL_LIMITS = {
     "Тема поста":            160,
     "Почему закреплен":      250,
-    "Хук / первый экран":    0,    # always empty in this stage
+    "Первый абзац / заголовок поста": 250,
     "Что в тексте поста":    350,
     "Ключевые смыслы":       500,
     "Какой CTA":             180,
@@ -78,7 +78,7 @@ GS_FIELD_ORDER = [
     "Позиция закрепа",
     "Тема поста",
     "Почему закреплен",
-    "Хук / первый экран",
+    "Первый абзац / заголовок поста",
     "Что в тексте поста",
     "Ключевые смыслы",
     "Какой CTA",
@@ -142,6 +142,20 @@ CTA (призыв к действию) — это только явный при
 
 Если явного призыва к действию нет — "Какой CTA" и "Куда ведет CTA" = "".
 
+ВАЖНО: CTA может также находиться в первом закреплённом комментарии автора под постом.
+Если в тексте нет явного CTA, но есть намёк (например, "подробности в комментариях") —
+отметь в evidence.source_notes: "возможно, CTA закреплён в первом комментарии".
+
+━━━ ПРАВИЛА "Ключевые смыслы" ━━━
+Раскладывай по структуре: боль → узнавание → причина → оффер → соцдоки → CTA.
+Пропускай элементы, которых нет в тексте. Каждый элемент — 1 короткая фраза.
+Пример: "боль: нет клиентов; причина: неверный контент; оффер: курс по SMM; CTA: заявка в директ."
+
+━━━ ПРАВИЛА "Первый абзац / заголовок поста" ━━━
+Дословная цитата первой строки или первого абзаца caption — то, что читатель видит до "ещё".
+Включай эмодзи, если с них начинается текст. Макс 250 символов.
+Пример: "🔥 Как я сделал 500 заявок за месяц без бюджета"
+
 ━━━ ПРАВИЛА "Почему закреплен" ━━━
 Обязательно начни с "Вероятно". Будь конкретным — ссылайся на содержание
 caption. Объясни стратегическую задачу закрепа (прогрев, доверие, вход в воронку и т.п.).
@@ -187,14 +201,16 @@ Permalink: {permalink}
 {{
   "Тема поста": "<одна строка, макс 160 символов>",
   "Почему закреплен": "<ОБЯЗАТЕЛЬНО начни с 'Вероятно': конкретный инференс со ссылкой на содержание caption, макс 250 символов>",
+  "Первый абзац / заголовок поста": "<дословная цитата первой строки caption до 'ещё', включая эмодзи, макс 250 символов>",
   "Что в тексте поста": "<краткая структура текста поста, макс 350 символов>",
-  "Ключевые смыслы": "<только смыслы из текста, не придумывать, макс 500 символов>",
+  "Ключевые смыслы": "<структура: боль → узнавание → причина → оффер → соцдоки → CTA; пропусти отсутствующие; макс 500 символов>",
   "Какой CTA": "<ТОЛЬКО явный призыв к действию из текста или '' — НЕ тезис, НЕ спойлер, макс 180 символов>",
   "Куда ведет CTA": "<допустимые атомы: {cta_dest_str}; составной путь: 'директ / комментарии → анкета предзаписи'; '' если CTA нет>",
   "Роль в воронке": "<одно или несколько из: {funnel_roles_str}; несколько через /, напр. 'доверие / прогрев'>",
   "confidence": {{
     "Тема поста": "high | medium | low",
     "Почему закреплен": "high | medium | low",
+    "Первый абзац / заголовок поста": "high | medium | low",
     "Что в тексте поста": "high | medium | low",
     "Ключевые смыслы": "high | medium | low",
     "Какой CTA": "high | medium | low",
@@ -211,6 +227,8 @@ Permalink: {permalink}
 
 ВАЖНО:
 - "Почему закреплен" — всегда инференс, не факт. Начни с "Вероятно". Будь конкретным.
+- "Первый абзац / заголовок поста" — точная цитата из caption, не пересказ.
+- "Ключевые смыслы" — структура боль→узнавание→причина→оффер→соцдоки→CTA.
 - "Роль в воронке" — только из списка: {funnel_roles_str}; составные разрешены
 - "Куда ведет CTA" — только из атомов: {cta_dest_str}; или ""
 - "Какой CTA" — только если есть явный глагол-действие в тексте; иначе ""
@@ -647,18 +665,6 @@ def _validate_and_fix(
     _caption = post.get("full_caption") or post.get("caption_for_analysis") or ""
     _apply_trust_leadgen_rule(fixed, _caption, pp_notes, warns)
 
-    # 5. Хук / первый экран always empty (visual/OCR not done)
-    hook = fixed.get("Хук / первый экран", "")
-    if hook:
-        fixed["Хук / первый экран"] = ""
-        warns.append("Хук / первый экран: cleared — visual/OCR not done in this stage")
-        pp_notes.append({
-            "field": "Хук / первый экран",
-            "original_value": hook,
-            "final_value": "",
-            "reason": "Caption-only stage; visual/OCR not done",
-        })
-
     # 6. Cell length enforcement
     for field, limit in CELL_LIMITS.items():
         if limit == 0:
@@ -682,7 +688,7 @@ def _validate_and_fix(
             warns.append(f"{field}: confidence=low; keeping value but noting uncertainty")
 
     # 8. Ensure required keys present
-    required = [k for k in CELL_LIMITS if k != "Хук / первый экран"]
+    required = list(CELL_LIMITS.keys())
     for k in required:
         if k not in fixed:
             fixed[k] = ""
@@ -692,9 +698,7 @@ def _validate_and_fix(
     if "confidence" not in fixed:
         fixed["confidence"] = {}
     for field in CELL_LIMITS:
-        if field == "Хук / первый экран":
-            fixed["confidence"][field] = "low"
-        elif field not in fixed["confidence"]:
+        if field not in fixed["confidence"]:
             fixed["confidence"][field] = "low"
             warns.append(f"confidence[{field}]: missing; set to low")
 
@@ -814,22 +818,20 @@ def build_semantic_post(post: dict, openai_result: dict) -> dict:
     cache_status = "hit" if from_cache else ("miss" if status == "analyzed" else "failed")
 
     gs_fields = {
-        "Тема поста":            analysis.get("Тема поста", ""),
-        "Почему закреплен":      analysis.get("Почему закреплен", ""),
-        "Хук / первый экран":    "",   # always empty — visual/OCR not done
-        "Что в тексте поста":    analysis.get("Что в тексте поста", ""),
-        "Ключевые смыслы":       analysis.get("Ключевые смыслы", ""),
-        "Какой CTA":             analysis.get("Какой CTA", ""),
-        "Куда ведет CTA":        analysis.get("Куда ведет CTA", ""),
-        "Роль в воронке":        analysis.get("Роль в воронке", ""),
+        "Тема поста":                     analysis.get("Тема поста", ""),
+        "Почему закреплен":               analysis.get("Почему закреплен", ""),
+        "Первый абзац / заголовок поста": analysis.get("Первый абзац / заголовок поста", ""),
+        "Что в тексте поста":             analysis.get("Что в тексте поста", ""),
+        "Ключевые смыслы":                analysis.get("Ключевые смыслы", ""),
+        "Какой CTA":                      analysis.get("Какой CTA", ""),
+        "Куда ведет CTA":                 analysis.get("Куда ведет CTA", ""),
+        "Роль в воронке":                 analysis.get("Роль в воронке", ""),
     }
 
     confidence = analysis.get("confidence", {})
-    confidence["Хук / первый экран"] = "low"
 
     base_limitations = [
         "Caption-only analysis. Cover image, carousel slides, and OCR were not analyzed.",
-        "Хук / первый экран intentionally left empty until Stage 5A-2D visual/OCR stage.",
     ]
     if status != "analyzed":
         base_limitations.append(f"OpenAI call failed: {openai_result.get('error', 'unknown error')}")
@@ -873,10 +875,10 @@ def build_gs_row(
         "Конкурент":          ACCOUNT,
         "Ссылка на пост":     stage5a2b_post.get("permalink") or "",
         "Позиция закрепа":    str(stage5a2b_post.get("position") or ""),
-        "Тема поста":         gf.get("Тема поста") or "",
-        "Почему закреплен":   gf.get("Почему закреплен") or "",
-        "Хук / первый экран": "",   # never filled in this stage
-        "Что в тексте поста": gf.get("Что в тексте поста") or "",
+        "Тема поста":                     gf.get("Тема поста") or "",
+        "Почему закреплен":               gf.get("Почему закреплен") or "",
+        "Первый абзац / заголовок поста": gf.get("Первый абзац / заголовок поста") or "",
+        "Что в тексте поста":             gf.get("Что в тексте поста") or "",
         "Ключевые смыслы":    gf.get("Ключевые смыслы") or "",
         "Какой CTA":          gf.get("Какой CTA") or "",
         "Куда ведет CTA":     gf.get("Куда ведет CTA") or "",
@@ -988,10 +990,6 @@ def validate_output(output: dict) -> list[str]:
                 continue
             if key not in gf:
                 errors.append(f"Post {pos}: missing google_sheet_field '{key}'")
-
-        # Хук always empty
-        if gf.get("Хук / первый экран", "") != "":
-            errors.append(f"Post {pos}: 'Хук / первый экран' must be empty (caption-only stage)")
 
         # No visual/OCR claims
         if sem.get("visual_analyzed") is True:
@@ -1272,12 +1270,11 @@ def run_regression_checks() -> tuple[int, int, list[str]]:
     fc, wc, _ = _validate_and_fix(raw_c, {})
     eq("PP: empty CTA → dest cleared", fc.get("Куда ведет CTA"), "")
 
-    # Хук always empty
-    raw_d = {"Хук / первый экран": "красивый первый кадр"}
+    # Первый абзац — preserved as provided (not cleared)
+    raw_d = {"Первый абзац / заголовок поста": "🔥 Как я заработал 1 млн за 3 месяца"}
     fd, _, nd = _validate_and_fix(raw_d, {})
-    eq("PP: Хук always empty", fd.get("Хук / первый экран"), "")
-    ok("PP: pp_note for Хук clearing",
-       any(n["field"] == "Хук / первый экран" for n in nd))
+    eq("PP: первый абзац preserved",
+       fd.get("Первый абзац / заголовок поста"), "🔥 Как я заработал 1 млн за 3 месяца")
 
     # Вероятно prefix
     raw_e = {"Почему закреплен": "закреплен чтобы привлечь заявки"}
