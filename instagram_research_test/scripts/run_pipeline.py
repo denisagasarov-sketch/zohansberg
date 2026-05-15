@@ -197,8 +197,15 @@ def main():
         else:
             failed += 1
             print(f"[ERROR] Stage завершился с ошибкой: {stage['name']}")
-            print(f"Продолжить? [y/n]: ", end="", flush=True)
-            ans = input().strip().lower()
+            try:
+                import sys as _sys
+                if _sys.stdin.isatty():
+                    print(f"Продолжить? [y/n]: ", end="", flush=True)
+                    ans = input().strip().lower()
+                else:
+                    ans = ""
+            except EOFError:
+                ans = ""
             if ans != "y":
                 print("Pipeline остановлен.")
                 break

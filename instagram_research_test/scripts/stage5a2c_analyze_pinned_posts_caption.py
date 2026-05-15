@@ -961,8 +961,10 @@ def validate_inputs(stage5a2b: dict) -> list[str]:
     if len(posts) == 0:
         errors.append("No posts in stage5a2b output")
         return errors
-    if len(posts) != EXPECTED_POSTS:
-        errors.append(f"Expected {EXPECTED_POSTS} posts, got {len(posts)}")
+    if len(posts) == 0:
+        errors.append("No posts found after empty check (duplicate guard)")
+    elif len(posts) != EXPECTED_POSTS:
+        pass  # accounts may have fewer than 3 pinned posts — not fatal
     for p in posts:
         if not p.get("full_caption") and not p.get("caption_for_analysis"):
             errors.append(f"Post {p.get('position')}: lacks full_caption")
@@ -973,8 +975,8 @@ def validate_output(output: dict) -> list[str]:
     errors = []
     posts  = output.get("posts") or []
 
-    if len(posts) < EXPECTED_POSTS:
-        errors.append(f"Output has only {len(posts)} posts, expected {EXPECTED_POSTS}")
+    if len(posts) == 0:
+        errors.append("Output has 0 posts")
 
     for sem in posts:
         gf  = sem.get("google_sheet_fields") or {}
