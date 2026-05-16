@@ -310,7 +310,7 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
         fixed_sem["google_sheet_fields"]  = {
             "Тема поста":                     fixed_fields.get("Тема поста", ""),
             "Почему закреплен":               fixed_fields.get("Почему закреплен", ""),
-            "Первый абзац / заголовок поста": fixed_fields.get("Первый абзац / заголовок поста", ""),
+            "Хук / первый экран": fixed_fields.get("Хук / первый экран", ""),
             "Что в тексте поста":             fixed_fields.get("Что в тексте поста", ""),
             "Ключевые смыслы":       fixed_fields.get("Ключевые смыслы", ""),
             "Какой CTA":             fixed_fields.get("Какой CTA", ""),
@@ -336,7 +336,7 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
                 rows_issues.append(
                     f"Row has {len(row)} columns, expected {len(GS_FIELD_ORDER)}"
                 )
-        # "Первый абзац / заголовок поста" is expected to be populated — no emptiness check needed
+        # "Хук / первый экран" is expected to be populated — no emptiness check needed
 
     # Print validation results
     all_clean = True

@@ -942,6 +942,99 @@ def build_v2_highlights_rows(sources: dict) -> tuple[list, list, list]:
     return V2_HIGHLIGHTS_HEADERS, rows, warnings
 
 
+# ---------------------------------------------------------------------------
+# v2 landing rows (all 29 fields_new from stage5a2g v3)
+# ---------------------------------------------------------------------------
+
+_V2_LANDING_FIELD_MAP = [
+    # (fields_new key, Russian column header)
+    # G1 — Vision: first screen
+    ("glavnyy_zagolovok",   "Главный заголовок"),
+    ("podzagolovok",        "Подзаголовок"),
+    ("vizualnyy_obraz",     "Визуальный образ"),
+    ("glavnyy_cta",         "Главный CTA"),
+    ("est_dedlayn",         "Есть дедлайн"),
+    # G2 — Text: positioning
+    ("kak_sebya_nazyvayut", "Как себя называют"),
+    ("dlya_kogo",           "Для кого"),
+    ("core_job",            "Core Job"),
+    ("big_job",             "Big Job"),
+    ("unikalnost",          "Уникальность"),
+    # G3 — Text: trust signals
+    ("cifry",               "Цифры"),
+    ("otzyvy_format",       "Формат отзывов"),
+    ("keysy",               "Кейсы"),
+    ("media",               "СМИ"),
+    ("sertifikaty",         "Сертификаты"),
+    # G4 — Text: pains
+    ("boli",                "Боли"),
+    ("vozrazheniya",        "Возражения"),
+    ("est_faq",             "Есть FAQ"),
+    # G5 — Text: product
+    ("nazvanie_produkta",   "Название продукта"),
+    ("format",              "Формат продукта"),
+    ("dlitelnost",          "Длительность"),
+    ("chto_vkhodit",        "Что входит"),
+    ("est_tarify",          "Есть тарифы"),
+    ("est_rassrochka",      "Есть рассрочка"),
+    ("est_garantiya",       "Есть гарантия"),
+    # G6 — Text: sales
+    ("sposob_prodazhi",     "Способ продажи"),
+    ("est_ogranichenie",    "Есть ограничение"),
+    ("est_bonusy",          "Есть бонусы"),
+    ("finalnyy_cta",        "Финальный CTA"),
+]
+
+V2_LANDING_HEADERS = ["Конкурент", "Ссылка на сайт"] + [h for _, h in _V2_LANDING_FIELD_MAP]
+
+
+def build_v2_landing_rows(sources: dict) -> tuple[list, list, list]:
+    """Build rows for 'Лендинг v2' from stage5a2g v3 fields_new (29 fields).
+
+    Returns (headers, rows, warnings).
+    Requires prompt_version=v3 in stage5a2g_landing_analysis.json.
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings    = []
+    _competitor = _account_label(sources)
+    url         = _bio_url(sources)
+
+    raw = sources.get("landing_analysis")
+    if not raw or not isinstance(raw, dict):
+        warnings.append(
+            "stage5a2g_landing_analysis.json not found; 'Лендинг v2' skipped"
+        )
+        return V2_LANDING_HEADERS, [], warnings
+
+    fields_new = raw.get("fields_new")
+    if not fields_new:
+        warnings.append(
+            "fields_new absent in stage5a2g_landing_analysis.json — "
+            "re-run stage5a2g (v3) to generate it; 'Лендинг v2' skipped"
+        )
+        return V2_LANDING_HEADERS, [], warnings
+
+    prompt_version = raw.get("prompt_version", "")
+    if prompt_version and prompt_version != "v3":
+        warnings.append(
+            f"stage5a2g prompt_version={prompt_version!r}; expected v3. "
+            "fields_new may be incomplete."
+        )
+
+    def gv(key: str) -> str:
+        f = fields_new.get(key) or {}
+        return str(f.get("value") or "").strip()
+
+    row: dict = {
+        "Конкурент":      _competitor,
+        "Ссылка на сайт": _redact_url(url) if url else "",
+    }
+    for key, header in _V2_LANDING_FIELD_MAP:
+        row[header] = gv(key)
+
+    return V2_LANDING_HEADERS, [_make_row(V2_LANDING_HEADERS, row)], warnings
+
+
 def build_funnel_rows(sources, headers) -> tuple[list, list]:
     """0 or 1 provisional row if external_url is known."""
     bio      = sources.get("bio_analysis")

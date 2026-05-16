@@ -166,6 +166,7 @@ def build_request(
     mode: str,
     only_sheet: str | None = None,
     allow_empty_clear: bool = False,
+    rename_headers: bool = False,
     write_id: str | None = None,
 ) -> dict:
     sheets_payload = payload.get("sheets", {})
@@ -179,6 +180,7 @@ def build_request(
         "start_row":         REQUIRED_START_ROW,
         "write_id":          write_id,
         "allow_empty_clear": allow_empty_clear,
+        "rename_headers":    rename_headers,
         "only_sheet":        only_sheet,
         "account_label":     _extract_account_label(payload),
         "sheets":            sheets_payload,
@@ -414,6 +416,7 @@ def run_write(
     errors: list[str],
     only_sheet: str | None,
     allow_empty_clear: bool,
+    rename_headers: bool = False,
 ):
     if errors:
         print(f"[ERROR] Local payload validation failed; fix before sending:")
@@ -435,6 +438,7 @@ def run_write(
         payload, sync_secret, "write",
         only_sheet=only_sheet,
         allow_empty_clear=allow_empty_clear,
+        rename_headers=rename_headers,
         write_id=write_id,
     )
 
@@ -540,6 +544,10 @@ def main():
         help="Clear row 3+ even for sheets with 0 rows (passed to Apps Script)",
     )
     parser.add_argument(
+        "--rename-headers", action="store_true",
+        help="Update row 1 header cells in the spreadsheet to match payload headers (write mode only)",
+    )
+    parser.add_argument(
         "--account", default="vlada_kliuiko",
         help="Instagram account to process",
     )
@@ -563,6 +571,7 @@ def main():
             payload, errors,
             only_sheet=args.only_sheet,
             allow_empty_clear=args.allow_empty_clear,
+            rename_headers=args.rename_headers,
         )
     else:
         run_dry_run(

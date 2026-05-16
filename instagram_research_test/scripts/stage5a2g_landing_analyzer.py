@@ -1,12 +1,14 @@
-"""Stage 5A-2G: Landing Page Analyzer v2.
+"""Stage 5A-2G: Landing Page Analyzer v3.
 
-Two-pass analysis via Playwright scroll + OpenAI:
-  Pass 1 (Vision, gpt-4o): up to 3 selected screenshots → visual structure,
-      main heading (largest text), CTA buttons, blocks in order.
-  Pass 2 (Text,   gpt-4o): full page inner_text → all numbers/social proof,
-      audience pains, arguments, block structure detail.
-  Merge: Vision wins on visual-structure fields; Text wins on extraction fields;
-         shared fields prefer whichever has data_status=ok.
+Six focused passes via Playwright scroll + OpenAI:
+  Pass G1 (Vision, first screenshot only): visual structure, heading, CTA, deadline.
+  Pass G2 (Text): positioning — how they describe themselves, audience, core/big job.
+  Pass G3 (Text): trust signals — numbers, reviews, cases, media, certificates.
+  Pass G4 (Text): pains, objections, FAQ.
+  Pass G5 (Text): product description — name, format, duration, contents, pricing options.
+  Pass G6 (Text): sales mechanics — how they sell, scarcity, bonuses, final CTA.
+  Each field returns {value, data_status, confidence}.
+  Legacy fields (11) are synthesized from new fields for backward compat.
 
 Usage:
     python3 scripts/stage5a2g_landing_analyzer.py --dry-run
@@ -35,16 +37,33 @@ STAGE5A2F_PATH = NORM_DIR / "stage5a2f_link_destination.json"
 OUTPUT_PATH    = NORM_DIR / "stage5a2g_landing_analysis.json"
 SCREENSHOT_DIR = BASE / "output" / ACCOUNT / "stage5a2g_screenshots"
 
-STAGE             = "stage5a2g"
-PROMPT_VERSION    = "v2"
-DEFAULT_MODEL     = "gpt-4o"
-MAX_SCREENSHOTS   = 5
-MAX_TEXT_CHARS    = 15000
-MAX_TOKENS_VISION = 1200
-MAX_TOKENS_TEXT   = 1500
+STAGE          = "stage5a2g"
+PROMPT_VERSION = "v3"
+DEFAULT_MODEL  = "gpt-4o"
+MAX_SCREENSHOTS = 5
+MAX_TEXT_CHARS  = 15000
+
+MAX_TOKENS_G1 = 600   # Vision: 5 fields, first screenshot only
+MAX_TOKENS_G2 = 800   # Text: positioning (5 fields)
+MAX_TOKENS_G3 = 1000  # Text: trust signals (5 fields, potentially verbose)
+MAX_TOKENS_G4 = 600   # Text: pains (3 fields)
+MAX_TOKENS_G5 = 800   # Text: product (7 fields)
+MAX_TOKENS_G6 = 600   # Text: sales (4 fields)
 
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 
+# New v3 fields (22 total across 6 groups)
+_FIELDS_G1 = ["glavnyy_zagolovok", "podzagolovok", "vizualnyy_obraz", "glavnyy_cta", "est_dedlayn"]
+_FIELDS_G2 = ["kak_sebya_nazyvayut", "dlya_kogo", "core_job", "big_job", "unikalnost"]
+_FIELDS_G3 = ["cifry", "otzyvy_format", "keysy", "media", "sertifikaty"]
+_FIELDS_G4 = ["boli", "vozrazheniya", "est_faq"]
+_FIELDS_G5 = ["nazvanie_produkta", "format", "dlitelnost", "chto_vkhodit",
+              "est_tarify", "est_rassrochka", "est_garantiya"]
+_FIELDS_G6 = ["sposob_prodazhi", "est_ogranichenie", "est_bonusy", "finalnyy_cta"]
+
+_ALL_NEW_FIELDS = _FIELDS_G1 + _FIELDS_G2 + _FIELDS_G3 + _FIELDS_G4 + _FIELDS_G5 + _FIELDS_G6
+
+# Legacy fields preserved for backward compat with stage5d1
 _ALL_FIELDS = [
     "chto_prodayut",
     "pervye_3_ekrana",
@@ -58,24 +77,6 @@ _ALL_FIELDS = [
     "argumenty",
     "bloki_dalshe",
 ]
-
-# Vision pass: authoritative on visual/positional fields
-_VISION_AUTHORITATIVE = frozenset([
-    "pervye_3_ekrana",
-    "glavnyy_zagolovok",
-    "podzagolovok",
-    "glavnyy_cta",
-])
-
-# Text pass: authoritative on extraction fields
-_TEXT_AUTHORITATIVE = frozenset([
-    "sots_dokazatelstva",
-    "boli",
-    "argumenty",
-])
-
-# Shared fields (not in either authoritative set): prefer ok status, text wins tie
-_SHARED_FIELDS = frozenset(_ALL_FIELDS) - _VISION_AUTHORITATIVE - _TEXT_AUTHORITATIVE
 
 
 # ---------------------------------------------------------------------------
@@ -199,111 +200,236 @@ def fetch_with_playwright(url: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Screenshot selection + encoding
+# Image encoding
 # ---------------------------------------------------------------------------
-
-def _select_screenshots(screenshots: list[Path]) -> list[Path]:
-    """Return up to 3 screenshots: first, middle, last (deduplicated)."""
-    n = len(screenshots)
-    if n == 0:
-        return []
-    if n <= 3:
-        return list(screenshots)
-    candidates = [screenshots[0], screenshots[n // 2], screenshots[-1]]
-    seen, result = set(), []
-    for p in candidates:
-        if p not in seen:
-            result.append(p)
-            seen.add(p)
-    return result
-
 
 def _encode_image(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
 # ---------------------------------------------------------------------------
-# Prompts
+# Prompts — G1 Vision (first screen only)
 # ---------------------------------------------------------------------------
 
-SYSTEM_VISION = """\
-Ты — аналитик маркетинговых лендингов. Перед тобой скриншоты лендинга в порядке прокрутки.
-Анализируй ВИЗУАЛЬНУЮ структуру: что ты ВИДИШЬ — размер текста, расположение элементов, кнопки.
+SYSTEM_G1_VISION = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой скриншот ПЕРВОГО экрана лендинга.
+Анализируй только то что ВИДНО — размер текста, расположение, кнопки, изображения.
 Отвечай строго в JSON, без текста вне JSON.
 
 ПОЛЯ:
 
-chto_prodayut: Что продают — из заголовка, названия, CTA.
-pervye_3_ekrana: Что видит пользователь в первых 3 экранах — перечисли элементы по порядку.
 glavnyy_zagolovok: ТОЧНАЯ ЦИТАТА самого крупного текста на первом экране (hero h1). Дословно, не пересказывай.
-podzagolovok: Текст сразу под главным заголовком — дословно.
-dlya_kogo: Явное указание аудитории. Если не названа явно — пиши "аудитория не названа".
-obeshchanie_rezultata: Что конкретно обещают. Формат: "Core Job: ...; Big Job: ...".
-glavnyy_cta: Точный текст самой крупной или заметной кнопки на странице — вне cookie-баннеров.
+podzagolovok: Текст сразу под главным заголовком — дословно. Если нет — "".
+vizualnyy_obraz: Что ты видишь на первом экране — фото, иллюстрация, видео, цвет фона, стиль. Кратко.
+glavnyy_cta: Точный текст самой заметной кнопки на первом экране — вне cookie-баннеров.
   ИГНОРИРОВАТЬ кнопки cookie-баннеров: "Принять", "Соглашаюсь", "Accept", "OK", "Настроить",
-  "Принять все", "Accept all" и любые аналоги. Эти кнопки — технические, не маркетинговые.
-  Главный CTA — это кнопка которая ведёт к продукту: запись, покупка, регистрация, подписка.
-bloki_dalshe: Все видимые блоки по порядку. Формат: "1. Название — зачем; 2. Название — зачем; ..."
+  "Принять все", "Accept all" и любые аналоги. Если главного CTA нет на первом экране — "".
+est_dedlayn: Есть ли на первом экране таймер, счётчик, дата окончания или фраза о дедлайне.
+  Значение: "да" или "нет".
 
 ПРАВИЛА:
-1. Только то что ВИДНО на скриншотах. Не додумывай.
+1. Только то что ВИДНО на скриншоте. Не додумывай.
 2. Не определяется → data_status "not_found", value "".
 3. Все ответы на русском.
-4. glavnyy_cta: никогда не брать текст из cookie-баннера.
+4. confidence: "high" если явно видно, "medium" если надо интерпретировать, "low" если угадываешь.
 
 ФОРМАТ (строго JSON):
 {
-  "chto_prodayut":         {"value": "...", "data_status": "ok|not_found"},
-  "pervye_3_ekrana":       {"value": "...", "data_status": "ok|not_found"},
-  "glavnyy_zagolovok":     {"value": "...", "data_status": "ok|not_found"},
-  "podzagolovok":          {"value": "...", "data_status": "ok|not_found"},
-  "dlya_kogo":             {"value": "...", "data_status": "ok|not_found"},
-  "obeshchanie_rezultata": {"value": "...", "data_status": "ok|not_found"},
-  "glavnyy_cta":           {"value": "...", "data_status": "ok|not_found"},
-  "bloki_dalshe":          {"value": "...", "data_status": "ok|not_found"}
+  "glavnyy_zagolovok": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "podzagolovok":      {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "vizualnyy_obraz":   {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "glavnyy_cta":       {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_dedlayn":       {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"}
 }"""
 
-SYSTEM_TEXT = """\
+
+# ---------------------------------------------------------------------------
+# Prompts — G2–G6 Text passes
+# ---------------------------------------------------------------------------
+
+SYSTEM_G2_POSITIONING = """\
 Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
-Извлекай из ТЕКСТА: все цифры, все перечисления, все упоминания болей и аргументов.
+Твоя задача — извлечь позиционирование продукта.
 Отвечай строго в JSON, без текста вне JSON.
 
 ПОЛЯ:
 
-chto_prodayut: Что продают.
-dlya_kogo: Явное указание аудитории. Если не названа — "аудитория не названа".
-obeshchanie_rezultata: Обещание результата. Формат: "Core Job: ...; Big Job: ...".
-sots_dokazatelstva: ВСЕ социальные доказательства — любые цифры (N клиентов, N лет, N% результат),
-  отзывы, кейсы, логотипы, сертификаты. Перечисли через «; ». Не пропускай ни одну цифру.
-  Если нет ни одного — пустая строка.
-boli: Боли и проблемы аудитории которые упоминает лендинг. Перечисли через «; ».
-argumenty: Аргументы в пользу продукта (почему выбрать именно их). Перечисли через «; ».
-bloki_dalshe: Все смысловые блоки страницы по порядку.
-  Формат: "1. Блок — зачем; 2. Блок — зачем; ..."
+kak_sebya_nazyvayut: Как они сами называют свой продукт — точная цитата названия или типа продукта.
+dlya_kogo: Явное указание целевой аудитории — цитата из текста.
+  Если не названа — "аудитория не названа".
+core_job: Ключевой конкретный результат который обещают. Пример: "похудеть на 10 кг за 3 месяца".
+  Если не заявлен явно — "".
+big_job: Более широкое жизненное изменение которое несёт продукт. Пример: "стать уверенным в себе".
+  Если не заявлено — "".
+unikalnost: В чём уникальность или отличие от других. Цитата из текста.
+  Если не заявлено — "не заявлено".
 
 ПРАВИЛА:
 1. Только то что явно есть в тексте.
 2. Не определяется → data_status "not_found", value "".
 3. Все ответы на русском.
+4. confidence: "high" если явная цитата, "medium" если вывод, "low" если предположение.
 
 ФОРМАТ (строго JSON):
 {
-  "chto_prodayut":         {"value": "...", "data_status": "ok|not_found"},
-  "dlya_kogo":             {"value": "...", "data_status": "ok|not_found"},
-  "obeshchanie_rezultata": {"value": "...", "data_status": "ok|not_found"},
-  "sots_dokazatelstva":    {"value": "...", "data_status": "ok|not_found"},
-  "boli":                  {"value": "...", "data_status": "ok|not_found"},
-  "argumenty":             {"value": "...", "data_status": "ok|not_found"},
-  "bloki_dalshe":          {"value": "...", "data_status": "ok|not_found"}
+  "kak_sebya_nazyvayut": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "dlya_kogo":           {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "core_job":            {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "big_job":             {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "unikalnost":          {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
 }"""
 
 
-def _user_prompt_vision(url: str, destination_type: str, n_screenshots: int) -> str:
+SYSTEM_G3_TRUST = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
+Твоя задача — извлечь ВСЕ социальные доказательства и доверительные сигналы.
+Отвечай строго в JSON, без текста вне JSON.
+
+ПОЛЯ:
+
+cifry: ВСЕ конкретные цифры на лендинге — количество клиентов, лет работы, % результата, NPS, оценки.
+  Перечисли через «; ». Пример: "1500+ учеников; 7 лет на рынке; 94% завершают курс".
+  НЕ пропускай ни одну цифру. Если нет — "".
+otzyvy_format: Есть ли отзывы и в каком формате — текст, видео, скриншоты переписки, с именами/фото.
+  Если да — кратко опиши формат. Если нет — "".
+keysy: Есть ли кейсы до/после или истории успеха клиентов. Если да — краткое описание 1-2 кейсов.
+  Если нет — "".
+media: Упоминания СМИ, подкастов, конференций, публикаций. Перечисли через «; ».
+  Если нет — "".
+sertifikaty: Сертификаты, дипломы, лицензии, партнёрства с брендами, аккредитации.
+  Перечисли через «; ». Если нет — "".
+
+ПРАВИЛА:
+1. Только то что явно есть в тексте. НЕ пропускай ни одну цифру или знак доверия.
+2. Не определяется → data_status "not_found", value "".
+3. Все ответы на русском.
+4. confidence: "high" если явная цитата, "medium" если вывод, "low" если предположение.
+
+ФОРМАТ (строго JSON):
+{
+  "cifry":         {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "otzyvy_format": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "keysy":         {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "media":         {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "sertifikaty":   {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+}"""
+
+
+SYSTEM_G4_PAINS = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
+Твоя задача — извлечь боли аудитории, обработку возражений и наличие FAQ.
+Отвечай строго в JSON, без текста вне JSON.
+
+ПОЛЯ:
+
+boli: Боли и проблемы аудитории которые упоминает лендинг. Перечисли через «; ».
+  Пример: "нет времени на спорт; не могу похудеть самостоятельно; нет мотивации".
+  Если не упомянуто явно — "".
+vozrazheniya: Возражения которые лендинг явно обрабатывает — с ответом.
+  Формат: "возражение — ответ лендинга". Перечисли через «; ».
+  Пример: "дорого — есть рассрочка; нет времени — занятия 20 мин в день".
+  Если нет — "".
+est_faq: Есть ли блок FAQ или часто задаваемые вопросы на странице. Значение: "да" или "нет".
+
+ПРАВИЛА:
+1. Только то что явно есть в тексте.
+2. Не определяется → data_status "not_found", value "".
+3. Все ответы на русском.
+4. confidence: "high" если явная цитата, "medium" если вывод, "low" если предположение.
+
+ФОРМАТ (строго JSON):
+{
+  "boli":         {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "vozrazheniya": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_faq":      {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+}"""
+
+
+SYSTEM_G5_PRODUCT = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
+Твоя задача — извлечь описание продукта.
+Отвечай строго в JSON, без текста вне JSON.
+
+ПОЛЯ:
+
+nazvanie_produkta: Официальное название продукта, курса или программы. Точная цитата.
+  Если не указано — "".
+format: Формат продукта — онлайн-курс, живой тренинг, марафон, коучинг, подписка, консультация и т.д.
+dlitelnost: Длительность программы — "8 недель", "3 месяца", "1 день".
+  Если не указана — "".
+chto_vkhodit: Что входит в продукт — модули, уроки, воркбуки, живые встречи, бонусы, материалы.
+  Перечисли кратко. Если не раскрыто — "".
+est_tarify: Есть ли несколько тарифов или пакетов. Значение: "да" или "нет".
+est_rassrochka: Есть ли рассрочка или оплата частями. Значение: "да" или "нет".
+est_garantiya: Есть ли гарантия результата или возврата денег. Значение: "да" или "нет".
+
+ПРАВИЛА:
+1. Только то что явно есть в тексте.
+2. Не определяется → data_status "not_found", value "".
+3. Все ответы на русском.
+4. confidence: "high" если явная цитата, "medium" если вывод, "low" если предположение.
+
+ФОРМАТ (строго JSON):
+{
+  "nazvanie_produkta": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "format":            {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "dlitelnost":        {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "chto_vkhodit":      {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_tarify":        {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_rassrochka":    {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_garantiya":     {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+}"""
+
+
+SYSTEM_G6_SALES = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
+Твоя задача — извлечь механику продаж.
+Отвечай строго в JSON, без текста вне JSON.
+
+ПОЛЯ:
+
+sposob_prodazhi: Как продают — прямая продажа на лендинге, запись на консультацию,
+  список ожидания, бесплатный вебинар, пробный период и т.д.
+est_ogranichenie: Есть ли ограничение по количеству мест, времени или цене. Значение: "да" или "нет".
+  Если да — уточни кратко суть ограничения.
+est_bonusy: Есть ли бонусы при покупке. Значение: "да" или "нет".
+  Если да — перечисли бонусы кратко.
+finalnyy_cta: Точный текст последней или финальной кнопки/призыва к действию на странице.
+  Не cookie-баннеры. Если не определяется — "".
+
+ПРАВИЛА:
+1. Только то что явно есть в тексте.
+2. Не определяется → data_status "not_found", value "".
+3. Все ответы на русском.
+4. confidence: "high" если явная цитата, "medium" если вывод, "low" если предположение.
+
+ФОРМАТ (строго JSON):
+{
+  "sposob_prodazhi":  {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_ogranichenie": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "est_bonusy":       {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "finalnyy_cta":     {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+}"""
+
+_ALL_SYSTEMS = [
+    ("G1 Vision", SYSTEM_G1_VISION),
+    ("G2 Text — positioning", SYSTEM_G2_POSITIONING),
+    ("G3 Text — trust", SYSTEM_G3_TRUST),
+    ("G4 Text — pains", SYSTEM_G4_PAINS),
+    ("G5 Text — product", SYSTEM_G5_PRODUCT),
+    ("G6 Text — sales", SYSTEM_G6_SALES),
+]
+
+
+# ---------------------------------------------------------------------------
+# User prompt builders
+# ---------------------------------------------------------------------------
+
+def _user_prompt_vision(url: str, destination_type: str) -> str:
     return (
         f"URL: {url}\n"
-        f"Destination type: {destination_type}\n"
-        f"Скриншоты: {n_screenshots} шт. в порядке прокрутки.\n\n"
-        "Проанализируй визуальную структуру лендинга по скриншотам. Отвечай только JSON."
+        f"Destination type: {destination_type}\n\n"
+        "Проанализируй ПЕРВЫЙ экран лендинга по скриншоту. Отвечай только JSON."
     )
 
 
@@ -338,29 +464,26 @@ def _parse_json(raw: str) -> tuple[dict | None, str | None]:
 
 
 # ---------------------------------------------------------------------------
-# OpenAI calls
+# OpenAI call helpers
 # ---------------------------------------------------------------------------
 
-def _call_vision(client, url: str, destination_type: str,
-                 screenshots: list[Path], model: str) -> dict:
-    """Vision pass: send up to 3 selected screenshots to gpt-4o."""
-    selected = _select_screenshots(screenshots)
-    if not selected:
+def _call_vision_g1(client, url: str, destination_type: str,
+                    screenshots: list[Path], model: str) -> dict:
+    """Vision pass G1: send only the first screenshot."""
+    if not screenshots:
         return {"status": "skipped", "reason": "no screenshots", "fields": {}, "tokens_used": 0}
 
-    text_part   = {"type": "text", "text": _user_prompt_vision(url, destination_type, len(selected))}
-    image_parts = [
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_encode_image(p)}"}}
-        for p in selected
-    ]
+    first      = screenshots[0]
+    text_part  = {"type": "text", "text": _user_prompt_vision(url, destination_type)}
+    image_part = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_encode_image(first)}"}}
 
     try:
         response = client.chat.completions.create(
             model=model,
-            max_tokens=MAX_TOKENS_VISION,
+            max_tokens=MAX_TOKENS_G1,
             messages=[
-                {"role": "system", "content": SYSTEM_VISION},
-                {"role": "user",   "content": [text_part] + image_parts},
+                {"role": "system", "content": SYSTEM_G1_VISION},
+                {"role": "user",   "content": [text_part, image_part]},
             ],
             temperature=0.0,
             response_format={"type": "json_object"},
@@ -374,24 +497,23 @@ def _call_vision(client, url: str, destination_type: str,
             "status":           "ok",
             "fields":           parsed,
             "tokens_used":      tokens,
-            "screenshots_used": [p.name for p in selected],
+            "screenshot_used":  first.name,
         }
     except Exception as e:
         return {"status": "openai_error", "error": str(e), "fields": {}, "tokens_used": 0}
 
 
-def _call_text(client, url: str, destination_type: str,
-               full_text: str, model: str) -> dict:
-    """Text pass: send extracted page text to gpt-4o."""
+def _call_text_pass(client, system_prompt: str, url: str, destination_type: str,
+                    full_text: str, model: str, max_tokens: int) -> dict:
+    """Shared text pass helper — one focused OpenAI call per topic group."""
     if not full_text.strip():
         return {"status": "skipped", "reason": "empty text", "fields": {}, "tokens_used": 0}
-
     try:
         response = client.chat.completions.create(
             model=model,
-            max_tokens=MAX_TOKENS_TEXT,
+            max_tokens=max_tokens,
             messages=[
-                {"role": "system", "content": SYSTEM_TEXT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": _user_prompt_text(url, destination_type, full_text)},
             ],
             temperature=0.0,
@@ -408,48 +530,69 @@ def _call_text(client, url: str, destination_type: str,
 
 
 # ---------------------------------------------------------------------------
-# Field normalization + merge
+# Field normalization
 # ---------------------------------------------------------------------------
 
 def _norm_field(raw: dict, key: str) -> dict:
+    """Normalize a raw field entry to {value, data_status, confidence}."""
     entry = raw.get(key)
     if isinstance(entry, dict):
         return {
             "value":       str(entry.get("value") or ""),
             "data_status": entry.get("data_status") or "not_found",
+            "confidence":  entry.get("confidence") or "low",
         }
-    return {"value": "", "data_status": "not_found"}
+    return {"value": "", "data_status": "not_found", "confidence": "low"}
 
 
-def _empty_fields() -> dict:
-    return {k: {"value": "", "data_status": "not_found"} for k in _ALL_FIELDS}
-
-
-def merge_fields(vision_raw: dict, text_raw: dict) -> dict:
-    """
-    Merge vision and text pass results.
-    - Vision-authoritative: vision wins, text as fallback.
-    - Text-authoritative:   text wins, vision as fallback.
-    - Shared fields:        prefer ok status; text wins tie.
-    """
+def _collect_fields_new(pass_results: list[dict]) -> dict:
+    """Merge all pass results into a single fields_new dict."""
     merged = {}
-    for key in _ALL_FIELDS:
-        v = _norm_field(vision_raw, key)
-        t = _norm_field(text_raw,   key)
-
-        if key in _VISION_AUTHORITATIVE:
-            merged[key] = v if v["data_status"] == "ok" else (t if t["data_status"] == "ok" else v)
-        elif key in _TEXT_AUTHORITATIVE:
-            merged[key] = t if t["data_status"] == "ok" else (v if v["data_status"] == "ok" else t)
-        else:
-            # shared: prefer ok; text wins tie
-            if t["data_status"] == "ok":
-                merged[key] = t
-            elif v["data_status"] == "ok":
-                merged[key] = v
-            else:
-                merged[key] = t
+    for result in pass_results:
+        raw = result.get("fields") or {}
+        for key in _ALL_NEW_FIELDS:
+            if key in raw:
+                merged[key] = _norm_field(raw, key)
+    # Ensure all new fields are present
+    for key in _ALL_NEW_FIELDS:
+        if key not in merged:
+            merged[key] = {"value": "", "data_status": "not_found", "confidence": "low"}
     return merged
+
+
+def _map_to_legacy_fields(fields_new: dict) -> dict:
+    """Synthesize legacy _ALL_FIELDS from new v3 fields for backward compat."""
+    def gv(key: str) -> str:
+        return (fields_new.get(key) or {}).get("value", "") or ""
+
+    def gs(key: str) -> str:
+        return (fields_new.get(key) or {}).get("data_status", "not_found")
+
+    def mf(val: str) -> dict:
+        return {"value": val, "data_status": "ok" if val else "not_found"}
+
+    sots = "; ".join(filter(None, [gv(k) for k in ["cifry", "otzyvy_format", "keysy", "media", "sertifikaty"]]))
+
+    obs_parts = []
+    if gv("core_job"): obs_parts.append(f"Core Job: {gv('core_job')}")
+    if gv("big_job"):  obs_parts.append(f"Big Job: {gv('big_job')}")
+    obs = "; ".join(obs_parts)
+
+    arg = "; ".join(filter(None, [gv("unikalnost"), gv("kak_sebya_nazyvayut")]))
+
+    return {
+        "chto_prodayut":         {"value": gv("nazvanie_produkta"), "data_status": gs("nazvanie_produkta")},
+        "pervye_3_ekrana":       {"value": gv("vizualnyy_obraz"),    "data_status": gs("vizualnyy_obraz")},
+        "glavnyy_zagolovok":     {"value": gv("glavnyy_zagolovok"), "data_status": gs("glavnyy_zagolovok")},
+        "podzagolovok":          {"value": gv("podzagolovok"),       "data_status": gs("podzagolovok")},
+        "dlya_kogo":             {"value": gv("dlya_kogo"),          "data_status": gs("dlya_kogo")},
+        "obeshchanie_rezultata": mf(obs),
+        "glavnyy_cta":           {"value": gv("glavnyy_cta"),        "data_status": gs("glavnyy_cta")},
+        "sots_dokazatelstva":    mf(sots),
+        "boli":                  {"value": gv("boli"),               "data_status": gs("boli")},
+        "argumenty":             mf(arg),
+        "bloki_dalshe":          {"value": gv("vizualnyy_obraz"),    "data_status": gs("vizualnyy_obraz")},
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -485,36 +628,59 @@ def run_dry_run(url: str, destination_type: str):
     print()
 
     print("=" * 60)
-    print("VISION PASS — System prompt (gpt-4o):")
+    print("PASS PLAN (6 passes):")
     print("=" * 60)
-    print(SYSTEM_VISION)
+    print(f"  G1 Vision  — first screenshot only    — max_tokens={MAX_TOKENS_G1}  — {len(_FIELDS_G1)} fields")
+    print(f"  G2 Text    — positioning               — max_tokens={MAX_TOKENS_G2}  — {len(_FIELDS_G2)} fields")
+    print(f"  G3 Text    — trust signals             — max_tokens={MAX_TOKENS_G3} — {len(_FIELDS_G3)} fields")
+    print(f"  G4 Text    — pains / objections / FAQ  — max_tokens={MAX_TOKENS_G4}  — {len(_FIELDS_G4)} fields")
+    print(f"  G5 Text    — product description       — max_tokens={MAX_TOKENS_G5}  — {len(_FIELDS_G5)} fields")
+    print(f"  G6 Text    — sales mechanics           — max_tokens={MAX_TOKENS_G6}  — {len(_FIELDS_G6)} fields")
+    print(f"  TOTAL new fields: {len(_ALL_NEW_FIELDS)}  |  Legacy compat fields: {len(_ALL_FIELDS)}")
     print()
-    print("VISION PASS — User prompt (example, 3 screenshots):")
-    print("-" * 40)
-    print(_user_prompt_vision(url, destination_type, 3))
-    print("[+ 3 base64-encoded PNG images: first, middle, last]")
+
+    for label, system in _ALL_SYSTEMS:
+        print("=" * 60)
+        print(f"SYSTEM PROMPT — {label}:")
+        print("=" * 60)
+        print(system)
+        print()
+
+    print("=" * 60)
+    print("USER PROMPT — G1 Vision (example):")
+    print("=" * 60)
+    print(_user_prompt_vision(url, destination_type))
+    print("[+ 1 base64-encoded PNG: first screenshot only]")
     print()
 
     print("=" * 60)
-    print("TEXT PASS — System prompt (gpt-4o):")
+    print("USER PROMPT — G2–G6 Text (example):")
     print("=" * 60)
-    print(SYSTEM_TEXT)
-    print()
-    print("TEXT PASS — User prompt (example):")
-    print("-" * 40)
     print(_user_prompt_text(url, destination_type, "(полный текст страницы — до 15000 символов)"))
     print()
 
     print("=" * 60)
-    print("MERGE STRATEGY:")
+    print("LEGACY FIELD MAPPING (fields_new → fields):")
     print("=" * 60)
-    print(f"  Vision-authoritative: {sorted(_VISION_AUTHORITATIVE)}")
-    print(f"  Text-authoritative:   {sorted(_TEXT_AUTHORITATIVE)}")
-    print(f"  Shared (prefer ok, text wins tie): {sorted(_SHARED_FIELDS)}")
+    mapping_notes = [
+        ("chto_prodayut",         "← nazvanie_produkta"),
+        ("pervye_3_ekrana",       "← vizualnyy_obraz"),
+        ("glavnyy_zagolovok",     "← glavnyy_zagolovok (direct)"),
+        ("podzagolovok",          "← podzagolovok (direct)"),
+        ("dlya_kogo",             "← dlya_kogo (direct)"),
+        ("obeshchanie_rezultata", "← 'Core Job: {core_job}; Big Job: {big_job}'"),
+        ("glavnyy_cta",           "← glavnyy_cta (direct)"),
+        ("sots_dokazatelstva",    "← join(cifry; otzyvy_format; keysy; media; sertifikaty)"),
+        ("boli",                  "← boli (direct)"),
+        ("argumenty",             "← join(unikalnost; kak_sebya_nazyvayut)"),
+        ("bloki_dalshe",          "← vizualnyy_obraz (reused)"),
+    ]
+    for field, note in mapping_notes:
+        print(f"  {field:<25} {note}")
     print()
 
     print(f"Model:          {DEFAULT_MODEL}")
-    print(f"max_tokens:     vision={MAX_TOKENS_VISION}  text={MAX_TOKENS_TEXT}")
+    print(f"max_tokens:     G1={MAX_TOKENS_G1}  G2={MAX_TOKENS_G2}  G3={MAX_TOKENS_G3}  G4={MAX_TOKENS_G4}  G5={MAX_TOKENS_G5}  G6={MAX_TOKENS_G6}")
     print(f"Prompt version: {PROMPT_VERSION}")
     print(f"Output path:    {OUTPUT_PATH.relative_to(BASE)}")
 
@@ -525,7 +691,7 @@ def run_dry_run(url: str, destination_type: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Stage 5A-2G v2: Landing Analyzer — Playwright scroll + dual-pass OpenAI"
+        description="Stage 5A-2G v3: Landing Analyzer — Playwright scroll + 6-pass OpenAI"
     )
     parser.add_argument("--dry-run", action="store_true",
         help="Show plan and prompts; do NOT launch Playwright or call OpenAI")
@@ -572,8 +738,8 @@ def main():
     if not api_key:
         print("[ERROR] OPENAI_API_KEY not set. Add it to .env or environment.")
         sys.exit(1)
-    if not api_key.startswith("sk-"):
-        print("[ERROR] OPENAI_API_KEY looks invalid (must start with sk-).")
+    if not (api_key.startswith("sk-") or api_key.startswith("sk-proj-")):
+        print("[ERROR] OPENAI_API_KEY looks invalid (must start with sk- or sk-proj-).")
         sys.exit(1)
 
     try:
@@ -598,29 +764,49 @@ def main():
     if not fetch_success:
         print("[WARN] Playwright fetch failed — proceeding with empty content")
 
-    # Vision pass
+    # ---- Pass G1: Vision (first screenshot only) ----
     if screenshots:
-        selected = _select_screenshots(screenshots)
-        print(f"Calling OpenAI Vision ({args.model}) — {len(selected)} screenshot(s)...")
-        vision_result = _call_vision(client, url, destination_type, screenshots, args.model)
-        print(f"  Vision: {vision_result['status']}  tokens: {vision_result.get('tokens_used', 0)}")
+        print(f"G1 Vision ({args.model}) — first screenshot only...")
+        g1 = _call_vision_g1(client, url, destination_type, screenshots, args.model)
+        print(f"  G1: {g1['status']}  tokens: {g1.get('tokens_used', 0)}")
     else:
-        print("[WARN] No screenshots — Vision pass skipped")
-        vision_result = {"status": "skipped", "fields": {}, "tokens_used": 0}
+        print("[WARN] No screenshots — G1 Vision skipped")
+        g1 = {"status": "skipped", "fields": {}, "tokens_used": 0}
 
-    # Text pass
-    if full_text.strip() and not is_spa:
-        print(f"Calling OpenAI Text ({args.model}) — {len(full_text)} chars...")
-        text_result = _call_text(client, url, destination_type, full_text, args.model)
-        print(f"  Text:   {text_result['status']}  tokens: {text_result.get('tokens_used', 0)}")
-    else:
+    # ---- Passes G2–G6: Text (skip if SPA or empty) ----
+    text_ok = bool(full_text.strip()) and not is_spa
+    if not text_ok:
         reason = "SPA page" if is_spa else "empty text"
-        print(f"[WARN] Text pass skipped ({reason}) — Vision-only")
-        text_result = {"status": "skipped", "reason": reason, "fields": {}, "tokens_used": 0}
+        print(f"[WARN] Text passes skipped ({reason}) — Vision-only")
 
-    # Merge
-    fields       = merge_fields(vision_result.get("fields") or {}, text_result.get("fields") or {})
-    total_tokens = (vision_result.get("tokens_used") or 0) + (text_result.get("tokens_used") or 0)
+    def _text_pass(label: str, system: str, max_tokens: int) -> dict:
+        if not text_ok:
+            return {"status": "skipped", "reason": "no text", "fields": {}, "tokens_used": 0}
+        print(f"{label} ({args.model})...")
+        result = _call_text_pass(client, system, url, destination_type, full_text, args.model, max_tokens)
+        print(f"  {label}: {result['status']}  tokens: {result.get('tokens_used', 0)}")
+        return result
+
+    g2 = _text_pass("G2 Text — positioning",      SYSTEM_G2_POSITIONING, MAX_TOKENS_G2)
+    g3 = _text_pass("G3 Text — trust",            SYSTEM_G3_TRUST,       MAX_TOKENS_G3)
+    g4 = _text_pass("G4 Text — pains",            SYSTEM_G4_PAINS,       MAX_TOKENS_G4)
+    g5 = _text_pass("G5 Text — product",          SYSTEM_G5_PRODUCT,     MAX_TOKENS_G5)
+    g6 = _text_pass("G6 Text — sales",            SYSTEM_G6_SALES,       MAX_TOKENS_G6)
+
+    # Collect all passes
+    all_passes   = [g1, g2, g3, g4, g5, g6]
+    fields_new   = _collect_fields_new(all_passes)
+    fields       = _map_to_legacy_fields(fields_new)
+    total_tokens = sum(p.get("tokens_used") or 0 for p in all_passes)
+
+    pass_statuses = {
+        "g1_vision": g1.get("status"),
+        "g2_text_positioning": g2.get("status"),
+        "g3_text_trust":       g3.get("status"),
+        "g4_text_pains":       g4.get("status"),
+        "g5_text_product":     g5.get("status"),
+        "g6_text_sales":       g6.get("status"),
+    }
 
     output = {
         "account":           ACCOUNT,
@@ -634,9 +820,9 @@ def main():
         "is_spa":            is_spa,
         "screenshots_taken": len(screenshots),
         "screenshots_dir":   str(SCREENSHOT_DIR.relative_to(BASE)),
-        "vision_status":     vision_result.get("status"),
-        "text_status":       text_result.get("status"),
+        "pass_statuses":     pass_statuses,
         "tokens_used":       total_tokens,
+        "fields_new":        fields_new,
         "fields":            fields,
     }
     if content.get("fetch_error"):
@@ -646,21 +832,26 @@ def main():
     OUTPUT_PATH.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[OK] Written: {OUTPUT_PATH.relative_to(BASE)}")
 
-    print("\n=== Field Summary ===")
-    labels = {
-        "chto_prodayut":         "Что продают",
-        "glavnyy_zagolovok":     "Главный заголовок",
-        "dlya_kogo":             "Для кого",
-        "obeshchanie_rezultata": "Обещание результата",
-        "glavnyy_cta":           "Главный CTA",
-        "sots_dokazatelstva":    "Соцдоказательства",
-        "boli":                  "Боли",
-        "argumenty":             "Аргументы",
-    }
-    for key, label in labels.items():
-        f   = fields.get(key, {})
+    print(f"\nTotal tokens used: {total_tokens}")
+    print(f"Pass statuses:     {pass_statuses}")
+
+    print("\n=== Key Fields Summary ===")
+    summary_keys = [
+        ("glavnyy_zagolovok",     "Главный заголовок"),
+        ("glavnyy_cta",           "Главный CTA"),
+        ("dlya_kogo",             "Для кого"),
+        ("core_job",              "Core Job"),
+        ("big_job",               "Big Job"),
+        ("cifry",                 "Цифры"),
+        ("boli",                  "Боли"),
+        ("nazvanie_produkta",     "Название продукта"),
+        ("sposob_prodazhi",       "Способ продажи"),
+        ("finalnyy_cta",          "Финальный CTA"),
+    ]
+    for key, label in summary_keys:
+        f   = fields_new.get(key, {})
         val = (f.get("value") or "")[:80] or "(empty)"
-        print(f"  {label:<25}: [{f.get('data_status', '?')}] {val}")
+        print(f"  {label:<25}: [{f.get('data_status', '?')}|{f.get('confidence', '?')}] {val}")
 
 
 if __name__ == "__main__":
