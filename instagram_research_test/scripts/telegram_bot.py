@@ -33,10 +33,11 @@ SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1xXyd9B_OmAD48tTSY3K82
 load_dotenv(BASE / ".env", override=True)
 
 current_job: dict = {
-    "account":    None,
-    "started_at": None,
-    "running":    False,
-    "chat_id":    None,
+    "account":             None,
+    "started_at":          None,
+    "running":             False,
+    "chat_id":             None,
+    "apify_balance_before": None,
 }
 
 
@@ -56,6 +57,157 @@ def validate_username(username: str):
     if not re.match(r'^[a-zA-Z0-9._]{1,30}$', username):
         return None
     return username
+
+
+async def _get_apify_balance() -> float | None:
+    """Return current Apify monthly spend in USD, or None on failure."""
+    try:
+        from dotenv import dotenv_values
+        token = dotenv_values(BASE / ".env").get("APIFY_TOKEN", "")
+        if not token:
+            return None
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(
+                f"https://api.apify.com/v2/users/me/usage/monthly?token={token}"
+            )
+            services = r.json()["data"].get("monthlyServiceUsage", {})
+            return round(sum(v.get("amountAfterVolumeDiscountUsd", 0) for v in services.values()), 4)
+    except Exception:
+        return None
+
+
+def _build_stages_summary(username: str) -> str:
+    """Read normalized/output files and build a numbered per-stage summary string."""
+    norm = BASE / "data" / username / "normalized"
+    out  = BASE / "output" / username
+    lines = []
+
+    def _j(path):
+        try:
+            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        except Exception:
+            return None
+
+    # 1. Профиль и закрепы
+    pi = _j(norm / "pinned_posts_index.json")
+    if pi:
+        n = len(pi.get("pinned_posts") or [])
+        lines.append(f"1. Профиль и закрепы — ✅ {n} закрепа найдено")
+    else:
+        lines.append("1. Профиль и закрепы — ⏭ пропущен")
+
+    # 2. Детали закрепов
+    a2b = _j(norm / "stage5a2b_pinned_posts_details.json")
+    if a2b:
+        posts = a2b.get("posts") or []
+        n_sidecar = sum(1 for p in posts if p.get("media_type") == "Sidecar")
+        detail = f"есть {n_sidecar} карусели" if n_sidecar else "нет каруселей"
+        lines.append(f"2. Детали закрепов — ✅ {len(posts)} поста, {detail}")
+    else:
+        lines.append("2. Детали закрепов — ⏭ пропущен")
+
+    # 3. Семантика закрепов
+    a2c = _j(norm / "stage5a2c_pinned_posts_semantic.json")
+    if a2c:
+        posts = a2c.get("posts") or []
+        n_cta  = sum(1 for p in posts if (p.get("google_sheet_fields") or {}).get("Какой CTA"))
+        n_role = sum(1 for p in posts if (p.get("google_sheet_fields") or {}).get("Роль в воронке"))
+        lines.append(f"3. Семантика закрепов — ✅ {len(posts)} поста, CTA у {n_cta}, роль у {n_role}")
+    else:
+        lines.append("3. Семантика закрепов — ⏭ пропущен")
+
+    # 4. Валидация семантики
+    a2c_fix = _j(norm / "stage5a2c_pinned_posts_semantic_fixed.json")
+    if a2c_fix:
+        n_notes = sum(len(p.get("postprocessing_notes") or []) for p in (a2c_fix.get("posts") or []))
+        if n_notes:
+            lines.append(f"4. Валидация семантики — ⚠️ {n_notes} правки применены")
+        else:
+            lines.append("4. Валидация семантики — ✅ правок не потребовалось")
+    elif a2c:
+        lines.append("4. Валидация семантики — ✅ правок не потребовалось")
+    else:
+        lines.append("4. Валидация семантики — ⏭ пропущен")
+
+    # 5. Хуки с обложек
+    a2d = _j(norm / "stage5a2d_pinned_hooks.json")
+    if a2d:
+        posts = a2d.get("posts") or []
+        n_ok = sum(1 for p in posts if (p.get("hook") or {}).get("data_status") == "ok")
+        lines.append(f"5. Хуки с обложек — ✅ {n_ok}/{len(posts)} хуков извлечено")
+    else:
+        lines.append("5. Хуки с обложек — ⏭ пропущен")
+
+    # 6. Анализ bio
+    a2e = _j(norm / "stage5a2e_bio_semantic.json")
+    if a2e:
+        _ru = {"dlya_kogo": "аудитория", "obeshchanie": "оффер",
+                "trust_arguments": "доверие", "social_proof": "соцдоки", "cta": "CTA"}
+        filled = [_ru.get(k, k) for k, v in (a2e.get("fields") or {}).items()
+                  if isinstance(v, dict) and v.get("data_status") == "ok"]
+        lines.append(f"6. Анализ bio — {'✅ ' + ', '.join(filled) if filled else '⚠️ поля не найдены'}")
+    else:
+        lines.append("6. Анализ bio — ⏭ пропущен")
+
+    # 7. Ссылка из bio
+    a2f = _j(norm / "stage5a2f_link_destination.json")
+    if a2f:
+        dt = (a2f.get("result") or {}).get("destination_type") or "неизвестно"
+        lines.append(f"7. Ссылка из bio — ✅ тип: {dt}")
+    else:
+        lines.append("7. Ссылка из bio — ⏭ пропущен")
+
+    # 8. Анализ лендинга
+    a2g = _j(norm / "stage5a2g_landing_analysis.json")
+    if a2g:
+        fields = a2g.get("fields") or {}
+        n_ok = sum(1 for v in fields.values() if isinstance(v, dict) and v.get("data_status") == "ok")
+        lines.append(f"8. Анализ лендинга — ✅ {n_ok}/{len(fields)} полей заполнено")
+    else:
+        lines.append("8. Анализ лендинга — ⏭ пропущен")
+
+    # 9. Хайлайты
+    hi = _j(norm / "highlights_index.json")
+    if hi:
+        n = len(hi.get("highlights") or [])
+        lines.append(f"9. Хайлайты — ✅ {n} штук, названия и порядок")
+    else:
+        lines.append("9. Хайлайты — ⏭ пропущен")
+
+    # 10. Vision хайлайтов
+    b2v = _j(norm / "stage5b2v_highlights_visual.json")
+    if b2v:
+        analyzed = b2v.get("analyzed_highlights") or []
+        n_ok      = sum(1 for h in analyzed if h.get("fields") and not h.get("skipped"))
+        n_skipped = sum(1 for h in analyzed if h.get("skipped"))
+        if n_ok:
+            lines.append(f"10. Vision хайлайтов — ✅ {n_ok} из {len(analyzed)} проанализировано")
+        elif n_skipped == len(analyzed):
+            lines.append("10. Vision хайлайтов — ⚠️ пропущен, нет данных сторис")
+        else:
+            lines.append(f"10. Vision хайлайтов — ⚠️ {n_ok} OK, {n_skipped} пропущено")
+    else:
+        lines.append("10. Vision хайлайтов — ⏭ пропущен")
+
+    # 11. Сборка данных
+    d1 = _j(out / "stage5d1" / "stage5d1_summary.json")
+    if d1:
+        n_warns = len(d1.get("all_warnings") or [])
+        lines.append(f"11. Сборка данных — ✅ все листы заполнены, {n_warns} предупреждений")
+    else:
+        lines.append("11. Сборка данных — ⏭ пропущен")
+
+    # 12. Запись в таблицу
+    wr = _j(out / "stage5d3_write" / "write_response.json")
+    if wr:
+        if wr.get("ok"):
+            lines.append("12. Запись в таблицу — ✅ данные обновлены")
+        else:
+            lines.append("12. Запись в таблицу — ❌ ошибка записи")
+    else:
+        lines.append("12. Запись в таблицу — ⏭ пропущен")
+
+    return "\n".join(lines)
 
 
 def _main_keyboard() -> InlineKeyboardMarkup:
@@ -153,10 +305,11 @@ async def _launch(update: Update, context: ContextTypes.DEFAULT_TYPE, username: 
         )
         return
 
-    current_job["account"]    = username
-    current_job["started_at"] = time.time()
-    current_job["running"]    = True
-    current_job["chat_id"]    = update.effective_chat.id
+    current_job["account"]             = username
+    current_job["started_at"]          = time.time()
+    current_job["running"]             = True
+    current_job["chat_id"]             = update.effective_chat.id
+    current_job["apify_balance_before"] = await _get_apify_balance()
 
     mode = "быстрый (без Apify)" if skip_apify else "полный (с Apify)"
     await update.message.reply_text(
@@ -196,50 +349,43 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
         minutes = int(elapsed // 60)
         seconds = int(elapsed % 60)
 
-        costs_text = ""
+        # OpenAI costs
+        openai_cost_str = ""
         costs_path = BASE / "output" / username / "costs.json"
         if costs_path.exists():
-            costs = json.load(open(costs_path))
-            total = costs.get("totals", {})
-            apify_text = ""
             try:
-                from dotenv import dotenv_values
-                vals = dotenv_values(BASE / ".env")
-                token = vals.get("APIFY_TOKEN", "")
-                if token:
-                    async with httpx.AsyncClient(timeout=5) as client:
-                        r = await client.get(
-                            f"https://api.apify.com/v2/users/me/usage/monthly?token={token}"
-                        )
-                        services = r.json()["data"].get("monthlyServiceUsage", {})
-                        used = sum(v.get("amountAfterVolumeDiscountUsd", 0) for v in services.values())
-                        r2 = await client.get(
-                            f"https://api.apify.com/v2/users/me?token={token}"
-                        )
-                        limit = r2.json().get("data", {}).get("plan", {}).get("monthlyUsageCreditsUsd", 5.0)
-                        remaining = float(limit) - used
-                        apify_text = f"\n   Apify: потрачено ${used:.2f}, остаток ${remaining:.2f}"
+                total = json.loads(costs_path.read_text()).get("totals", {})
+                openai_cost_str = (
+                    f"OpenAI ${total.get('total_cost_usd', 0):.4f}"
+                    f" ({total.get('total_tokens', 0)} токенов)"
+                )
             except Exception:
-                apify_text = "\n   Apify: см. console.apify.com"
-            costs_text = (
-                f"\n💰 OpenAI: ${total.get('total_cost_usd', 0):.4f} "
-                f"({total.get('total_tokens', 0)} токенов)"
-                f"{apify_text}"
-            )
+                pass
 
-        if result.returncode == 0:
-            text = (
-                f"✅ Анализ @{username} завершен!\n\n"
-                f"⏱ Время: {minutes} мин {seconds} сек{costs_text}\n"
-                f"🔗 Таблица: {SPREADSHEET_URL}"
-            )
+        # Apify delta (balance after − balance before)
+        apify_balance_after  = await _get_apify_balance()
+        apify_balance_before = current_job.get("apify_balance_before")
+        if apify_balance_after is not None and apify_balance_before is not None:
+            apify_delta = round(apify_balance_after - apify_balance_before, 4)
+            apify_cost_str = f"Apify ${apify_delta:.4f}"
         else:
-            text = (
-                f"⚠️ Анализ @{username} завершен с ошибками.\n\n"
-                f"⏱ Время: {minutes} мин {seconds} сек{costs_text}\n"
-                f"📄 Лог: {log_path}\n"
-                f"🔗 Таблица: {SPREADSHEET_URL}"
-            )
+            apify_cost_str = "Apify см. console.apify.com"
+
+        # Per-stage summary
+        stages_text = _build_stages_summary(username)
+        costs_line  = f"13. Затраты — ✅ {openai_cost_str}, {apify_cost_str}"
+
+        header = "✅ Анализ @{u} завершен!" if result.returncode == 0 else "⚠️ Анализ @{u} завершен с ошибками."
+        header = header.format(u=username)
+
+        text = (
+            f"{header}\n\n"
+            f"⏱ Время: {minutes} мин {seconds} сек\n\n"
+            f"📋 Стадии:\n{stages_text}\n{costs_line}\n\n"
+            f"🔗 Таблица: {SPREADSHEET_URL}"
+        )
+        if result.returncode != 0:
+            text += f"\n📄 Лог: {log_path}"
 
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         logger.info(f"Pipeline for @{username} finished, returncode={result.returncode}")
@@ -251,10 +397,11 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
             text=f"❌ Ошибка при анализе @{username}: {str(e)[:200]}"
         )
     finally:
-        current_job["running"]    = False
-        current_job["account"]    = None
-        current_job["started_at"] = None
-        current_job["chat_id"]    = None
+        current_job["running"]             = False
+        current_job["account"]             = None
+        current_job["started_at"]          = None
+        current_job["chat_id"]             = None
+        current_job["apify_balance_before"] = None
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
