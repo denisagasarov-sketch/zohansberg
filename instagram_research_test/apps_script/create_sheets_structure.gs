@@ -1,17 +1,12 @@
 /**
  * create_sheets_structure.gs
  *
- * Создаёт 8 новых листов с заголовками (строка 1) и подсказками (строка 2).
- * Данные пишутся с строки 3 — этот скрипт их не трогает.
+ * createSheetsStructure()  — создаёт отсутствующие листы; существующие пропускает.
+ * updateSheetHeaders()     — обновляет строки 1-2 во всех существующих листах;
+ *                            строка 3+ с данными не трогается.
  *
  * КАК ЗАПУСТИТЬ:
- *   1. Открыть Extensions → Apps Script в нужной таблице
- *   2. Вставить этот файл (или скопировать содержимое)
- *   3. Выбрать функцию createSheetsStructure в выпадающем списке
- *   4. Нажать Run (▶)
- *   5. Скрипт создаст только отсутствующие листы; существующие пропустит.
- *
- * ПОВТОРНЫЙ ЗАПУСК безопасен: если лист уже есть — пропускается.
+ *   Extensions → Apps Script → выбрать функцию → Run ▶
  */
 
 var SHEETS_CONFIG = [
@@ -84,29 +79,24 @@ var SHEETS_CONFIG = [
     headers: [
       "Конкурент",
       "Ссылка на сайт",
-      // G1 — Vision: первый экран
       "Главный заголовок",
       "Подзаголовок",
       "Визуальный образ",
       "Главный CTA",
       "Есть дедлайн",
-      // G2 — Text: позиционирование
       "Как себя называют",
       "Для кого",
       "Core Job",
       "Big Job",
       "Уникальность",
-      // G3 — Text: доверие
       "Цифры",
       "Формат отзывов",
       "Кейсы",
       "СМИ",
       "Сертификаты",
-      // G4 — Text: боли
       "Боли",
       "Возражения",
       "Есть FAQ",
-      // G5 — Text: продукт
       "Название продукта",
       "Формат продукта",
       "Длительность",
@@ -114,7 +104,6 @@ var SHEETS_CONFIG = [
       "Есть тарифы",
       "Есть рассрочка",
       "Есть гарантия",
-      // G6 — Text: механика продаж
       "Способ продажи",
       "Есть ограничение",
       "Есть бонусы",
@@ -123,29 +112,24 @@ var SHEETS_CONFIG = [
     hints: [
       "username конкурента",
       "URL лендинга (из stage5a2f)",
-      // G1
       "дословный H1 первого экрана",
       "текст сразу под заголовком",
       "фото / видео / иллюстрация / цвет фона — что видит пользователь",
       "текст самой заметной кнопки на первом экране",
       "да / нет — есть ли таймер, счётчик, дата окончания",
-      // G2
       "как они называют свой продукт: курс / программа / интенсив / мастермайнд",
       "кому: маркетологам / мамам в декрете / предпринимателям и т.п.",
       "конкретный измеримый результат: похудеть на 10 кг за 3 мес",
       "жизненная трансформация: стать уверенным / уйти из найма и т.п.",
       "в чём отличие от других: метод / формат / опыт эксперта",
-      // G3
       "все цифры с лендинга через ; — 1500+ учеников; 7 лет; 94% завершают",
       "есть ли отзывы и формат: текст / видео / скриншоты переписки",
       "кейсы до/после или истории успеха клиентов",
       "упоминания СМИ / подкастов / конференций",
       "сертификаты / дипломы / лицензии / партнёрства",
-      // G4
       "боли ЦА упомянутые на лендинге через ;",
       "возражения и ответы: дорого — рассрочка; нет времени — 20 мин в день",
       "да / нет — есть ли блок FAQ",
-      // G5
       "официальное название продукта / курса / программы",
       "онлайн-курс / коучинг / марафон / живой тренинг / подписка",
       "8 недель / 3 месяца / 1 день",
@@ -153,7 +137,6 @@ var SHEETS_CONFIG = [
       "да / нет — несколько тарифов или пакетов",
       "да / нет — рассрочка или оплата частями",
       "да / нет — гарантия результата или возврата денег",
-      // G6
       "прямая продажа / предзапись / консультация / вебинар / список ожидания",
       "да + суть ограничения / нет",
       "да + список бонусов / нет",
@@ -264,73 +247,79 @@ var SHEETS_CONFIG = [
 ];
 
 
-/**
- * Главная функция. Запускать из Apps Script Editor.
- */
+// ---------------------------------------------------------------------------
+// Вспомогательная функция: записать заголовки и подсказки в лист
+// ---------------------------------------------------------------------------
+
+function _writeHeadersToSheet(sheet, headers, hints) {
+  var n = headers.length;
+  var maxCols = sheet.getMaxColumns();
+
+  // Расширить лист если колонок не хватает
+  if (maxCols < n) {
+    sheet.insertColumnsAfter(maxCols, n - maxCols);
+  }
+
+  // Полностью очистить строки 1-2 (контент + форматирование)
+  sheet.getRange(1, 1, 2, sheet.getMaxColumns()).clearContent();
+  sheet.getRange(1, 1, 2, sheet.getMaxColumns()).clearFormat();
+
+  // Строка 1: заголовки
+  var r1 = sheet.getRange(1, 1, 1, n);
+  r1.setValues([headers]);
+  r1.setFontWeight("bold");
+  r1.setBackground("#1a1a1a");
+  r1.setFontColor("#ffffff");
+  r1.setWrap(true);
+
+  // Строка 2: подсказки
+  var r2 = sheet.getRange(2, 1, 1, n);
+  r2.setValues([hints]);
+  r2.setFontStyle("italic");
+  r2.setFontColor("#888888");
+  r2.setBackground("#f5f5f5");
+  r2.setWrap(true);
+
+  sheet.setFrozenRows(2);
+  sheet.autoResizeColumns(1, n);
+  sheet.setRowHeight(2, 40);
+}
+
+
+// ---------------------------------------------------------------------------
+// createSheetsStructure — создаёт только отсутствующие листы
+// ---------------------------------------------------------------------------
+
 function createSheetsStructure() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var created = [];
+  var skipped = [];
 
   SHEETS_CONFIG.forEach(function(cfg) {
     var sheet = ss.getSheetByName(cfg.name);
-
     if (sheet) {
-      Logger.log("SKIP (already exists): " + cfg.name);
+      skipped.push(cfg.name);
+      Logger.log("SKIP: " + cfg.name);
       return;
     }
-
     sheet = ss.insertSheet(cfg.name);
+    _writeHeadersToSheet(sheet, cfg.headers, cfg.hints);
+    created.push(cfg.name + " (" + cfg.headers.length + " колонок)");
     Logger.log("CREATED: " + cfg.name);
-
-    var numCols = cfg.headers.length;
-
-    // Строка 1: заголовки колонок
-    var headerRange = sheet.getRange(1, 1, 1, numCols);
-    headerRange.setValues([cfg.headers]);
-    headerRange.setFontWeight("bold");
-    headerRange.setBackground("#1a1a1a");
-    headerRange.setFontColor("#ffffff");
-    headerRange.setWrap(true);
-
-    // Строка 2: подсказки
-    var hintRange = sheet.getRange(2, 1, 1, numCols);
-    hintRange.setValues([cfg.hints]);
-    hintRange.setFontStyle("italic");
-    hintRange.setFontColor("#888888");
-    hintRange.setBackground("#f5f5f5");
-    hintRange.setWrap(true);
-
-    // Зафиксировать строки 1-2
-    sheet.setFrozenRows(2);
-
-    // Авторазмер колонок
-    sheet.autoResizeColumns(1, numCols);
-
-    // Минимальная высота строки подсказок
-    sheet.setRowHeight(2, 40);
   });
 
-  var created = SHEETS_CONFIG.filter(function(cfg) {
-    return ss.getSheetByName(cfg.name) !== null;
-  }).length;
-
   SpreadsheetApp.getUi().alert(
-    "Готово!\n\nЛистов проверено: " + SHEETS_CONFIG.length +
-    "\nВсего листов в таблице: " + ss.getSheets().length +
-    "\n\nДанные пишутся с строки 3."
+    "Создано: " + created.length + "\n" + created.join("\n") +
+    (skipped.length ? "\n\nПропущено (уже есть):\n" + skipped.join("\n") : "")
   );
 }
 
 
-/**
- * Обновляет строки 1 (заголовки) и 2 (подсказки) существующего листа
- * на основе SHEETS_CONFIG. Строка 3+ с данными не трогается.
- *
- * КАК ЗАПУСТИТЬ:
- *   1. Extensions → Apps Script
- *   2. Выбрать функцию updateSheetHeaders в выпадающем списке
- *   3. Нажать Run (▶)
- *   Скрипт обновит строки 1-2 во всех листах из SHEETS_CONFIG которые уже существуют.
- */
+// ---------------------------------------------------------------------------
+// updateSheetHeaders — обновляет строки 1-2 существующих листов
+// Строка 3+ с данными не трогается.
+// ---------------------------------------------------------------------------
+
 function updateSheetHeaders() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var updated = [];
@@ -340,44 +329,17 @@ function updateSheetHeaders() {
     var sheet = ss.getSheetByName(cfg.name);
     if (!sheet) {
       skipped.push(cfg.name + " (не найден)");
+      Logger.log("NOT FOUND: " + cfg.name);
       return;
     }
-
-    var numCols = cfg.headers.length;
-
-    // Очистить строки 1-2 целиком (на случай если было больше колонок)
-    var oldLastCol = sheet.getLastColumn();
-    if (oldLastCol > numCols) {
-      sheet.getRange(1, numCols + 1, 2, oldLastCol - numCols).clearContent();
-    }
-
-    // Строка 1: заголовки
-    var headerRange = sheet.getRange(1, 1, 1, numCols);
-    headerRange.setValues([cfg.headers]);
-    headerRange.setFontWeight("bold");
-    headerRange.setBackground("#1a1a1a");
-    headerRange.setFontColor("#ffffff");
-    headerRange.setWrap(true);
-
-    // Строка 2: подсказки
-    var hintRange = sheet.getRange(2, 1, 1, numCols);
-    hintRange.setValues([cfg.hints]);
-    hintRange.setFontStyle("italic");
-    hintRange.setFontColor("#888888");
-    hintRange.setBackground("#f5f5f5");
-    hintRange.setWrap(true);
-
-    sheet.setFrozenRows(2);
-    sheet.autoResizeColumns(1, numCols);
-    sheet.setRowHeight(2, 40);
-
-    updated.push(cfg.name + " (" + numCols + " колонок)");
-    Logger.log("UPDATED: " + cfg.name + " → " + numCols + " cols");
+    _writeHeadersToSheet(sheet, cfg.headers, cfg.hints);
+    updated.push(cfg.name + " (" + cfg.headers.length + " колонок)");
+    Logger.log("UPDATED: " + cfg.name + " → " + cfg.headers.length + " cols");
   });
 
   SpreadsheetApp.getUi().alert(
     "Обновлено: " + updated.length + " листов\n\n" +
     updated.join("\n") +
-    (skipped.length ? "\n\nПропущено (не найдены):\n" + skipped.join("\n") : "")
+    (skipped.length ? "\n\nПропущено:\n" + skipped.join("\n") : "")
   );
 }
