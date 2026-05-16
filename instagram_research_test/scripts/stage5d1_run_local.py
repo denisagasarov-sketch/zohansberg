@@ -25,6 +25,7 @@ from stage5d1_prepare_sheet_rows import (
     build_v2_pinned_rows,
     build_v2_highlights_rows,
     build_v2_landing_rows,
+    build_v2_profile_rows,
     _redact_url,
 )
 
@@ -274,6 +275,23 @@ def main():
     except Exception as _v2h_err:
         print(f"  [WARN] build_v2_highlights_rows failed (non-fatal): {_v2h_err}")
         warnings_all.append(f"[Анализ хайлайтс v2] build failed: {_v2h_err}")
+
+    # Build v2 profile rows and inject into payload (errors are non-fatal)
+    try:
+        v2p_headers, v2p_rows, v2p_warnings = build_v2_profile_rows(sources)
+        if v2p_rows:
+            payload["sheets"]["Описание профиля v2"] = {
+                "headers": v2p_headers,
+                "rows":    v2p_rows,
+            }
+            print(f"  v2 profile rows: {len(v2p_rows)} row(s) added to payload")
+        else:
+            print(f"  v2 profile rows: skipped — {v2p_warnings[0] if v2p_warnings else 'no data'}")
+        if v2p_warnings:
+            warnings_all.extend(f"[Описание профиля v2] {w}" for w in v2p_warnings)
+    except Exception as _v2p_err:
+        print(f"  [WARN] build_v2_profile_rows failed (non-fatal): {_v2p_err}")
+        warnings_all.append(f"[Описание профиля v2] build failed: {_v2p_err}")
 
     # Build v2 landing rows and inject into payload (errors are non-fatal)
     try:

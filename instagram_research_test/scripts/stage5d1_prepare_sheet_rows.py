@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -1048,6 +1049,152 @@ def build_v2_landing_rows(sources: dict) -> tuple[list, list, list]:
         row[header] = gv(key)
 
     return V2_LANDING_HEADERS, [_make_row(V2_LANDING_HEADERS, row)], warnings
+
+
+# ---------------------------------------------------------------------------
+# Posting frequency helper
+# ---------------------------------------------------------------------------
+
+_RU_DAYS_ACCUSATIVE = [
+    "понедельник", "вторник", "среду", "четверг",
+    "пятницу", "субботу", "воскресенье",
+]
+
+
+def compute_posting_frequency(account: str) -> str:
+    """Read stage5a1_posts_for_pinned_raw.json and return human-readable posting stats."""
+    raw_path = BASE / "data" / account / "raw" / "stage5a1_posts_for_pinned_raw.json"
+    if not raw_path.exists():
+        return "не найдено"
+    try:
+        raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    except Exception:
+        return "не найдено"
+
+    posts = raw if isinstance(raw, list) else (raw.get("posts") or raw.get("items") or [])
+    dates = []
+    for post in posts:
+        ts = post.get("timestamp") or post.get("taken_at")
+        if not ts:
+            continue
+        try:
+            if isinstance(ts, (int, float)):
+                dt = datetime.utcfromtimestamp(float(ts))
+            else:
+                dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                dt = dt.replace(tzinfo=None)   # normalise to naive UTC
+            dates.append(dt)
+        except Exception:
+            continue
+
+    if not dates:
+        return "не найдено"
+
+    dates.sort()
+    first, last = dates[0], dates[-1]
+    span_days   = max((last - first).days, 1)
+    per_week    = round(len(dates) / (span_days / 7), 1)
+
+    top_day     = _RU_DAYS_ACCUSATIVE[Counter(d.weekday() for d in dates).most_common(1)[0][0]]
+    days_ago    = (datetime.utcnow() - last).days
+    period      = f"{first.strftime('%d.%m.%Y')}–{last.strftime('%d.%m.%Y')}"
+
+    return (
+        f"{per_week} пост/нед, активнее в {top_day}, "
+        f"последний {days_ago} дн. назад "
+        f"(выборка: {len(dates)} постов, {period})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# v2 profile rows
+# ---------------------------------------------------------------------------
+
+V2_PROFILE_HEADERS = [
+    "Конкурент", "Ниша", "Описание bio", "Для кого",
+    "Обещание результата", "Позиционирование",
+    "Соцдоказательства", "Аргументы доверия",
+    "Главный CTA", "Куда ведет CTA",
+    "Частота постинга", "Последний пост",
+]
+
+
+def build_v2_profile_rows(sources: dict) -> tuple[list, list, list]:
+    """Build 1 row for 'Описание профиля v2' from profile_summary + bio_semantic + bio_analysis.
+
+    Returns (headers, rows, warnings).
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings    = []
+    _competitor = _account_label(sources)
+
+    ps  = sources.get("profile_summary") or {}
+    bio = sources.get("bio_analysis")     or {}
+    sem = sources.get("bio_semantic")
+    _sem_fields = sem.get("fields", {}) if isinstance(sem, dict) else {}
+
+    def _nf(val: str) -> str:
+        return val.strip() if val and val.strip() else "не найдено"
+
+    def _sem_or_bio(sem_key: str, *bio_keys) -> str:
+        f = _sem_fields.get(sem_key) or {}
+        if isinstance(f, dict) and f.get("data_status") == "ok":
+            v = str(f.get("value") or "").strip()
+            if v:
+                return v
+        return _nf(_fval_str(bio, *bio_keys) if bio_keys else "")
+
+    # bio_text from profile_summary
+    _raw_bio = ps.get("bio_text") or {}
+    bio_text = str(_raw_bio.get("value") if isinstance(_raw_bio, dict) else _raw_bio).strip()
+
+    # CTA destination: bio_analysis.cta_destination first, then _bio_url
+    cta_dest = _fval_str(bio, "cta_destination") or ""
+    if not cta_dest:
+        url = _bio_url(sources)
+        cta_dest = _redact_url(url) if url else ""
+
+    # Last post date from raw
+    last_post_str = "не найдено"
+    raw_path = BASE / "data" / ACCOUNT / "raw" / "stage5a1_posts_for_pinned_raw.json"
+    if raw_path.exists():
+        try:
+            _raw = json.loads(raw_path.read_text(encoding="utf-8"))
+            _posts = _raw if isinstance(_raw, list) else (_raw.get("posts") or _raw.get("items") or [])
+            _dts = []
+            for _p in _posts:
+                _ts = _p.get("timestamp") or _p.get("taken_at")
+                if _ts:
+                    try:
+                        if isinstance(_ts, (int, float)):
+                            _dt = datetime.utcfromtimestamp(float(_ts))
+                        else:
+                            _dt = datetime.fromisoformat(str(_ts).replace("Z", "+00:00"))
+                            _dt = _dt.replace(tzinfo=None)
+                        _dts.append(_dt)
+                    except Exception:
+                        pass
+            if _dts:
+                last_post_str = max(_dts).strftime("%d.%m.%Y")
+        except Exception:
+            pass
+
+    row = {
+        "Конкурент":          _competitor,
+        "Ниша":               _nf(_fval_str(bio, "niche")),
+        "Описание bio":       _nf(bio_text),
+        "Для кого":           _sem_or_bio("target_audience", "target_audience"),
+        "Обещание результата": _sem_or_bio("result_promise",  "result_promise"),
+        "Позиционирование":   _nf(_fval_str(bio, "positioning")),
+        "Соцдоказательства":  _sem_or_bio("social_proof",    "social_proof"),
+        "Аргументы доверия":  _sem_or_bio("trust_arguments", "trust_arguments"),
+        "Главный CTA":        _nf(_fval_str(bio, "cta_text")),
+        "Куда ведет CTA":     _nf(cta_dest),
+        "Частота постинга":   compute_posting_frequency(ACCOUNT),
+        "Последний пост":     last_post_str,
+    }
+
+    return V2_PROFILE_HEADERS, [_make_row(V2_PROFILE_HEADERS, row)], warnings
 
 
 def build_funnel_rows(sources, headers) -> tuple[list, list]:

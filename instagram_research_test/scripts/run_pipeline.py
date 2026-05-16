@@ -3,6 +3,7 @@
 import argparse
 import glob
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -185,6 +186,17 @@ def main():
         if ans != "y":
             print("Отменено.")
             sys.exit(0)
+
+    # Snapshot current profile/pinned/highlights state before running stages
+    _norm = BASE / "data" / account / "normalized"
+    for _src_name, _dst_name in [
+        ("profile_summary.json",     "previous_profile_snapshot.json"),
+        ("pinned_posts_index.json",   "previous_pinned_snapshot.json"),
+        ("highlights_index.json",     "previous_highlights_snapshot.json"),
+    ]:
+        _src = _norm / _src_name
+        if _src.exists():
+            shutil.copy2(str(_src), str(_norm / _dst_name))
 
     total      = len(STAGE_ORDER)
     completed  = 0

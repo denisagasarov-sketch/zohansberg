@@ -210,6 +210,61 @@ def _build_stages_summary(username: str) -> str:
     return "\n".join(lines)
 
 
+def _build_changes_summary(username: str) -> str | None:
+    """Compare current vs previous profile snapshot; return change description or None."""
+    norm = BASE / "data" / username / "normalized"
+
+    def _j(path):
+        try:
+            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        except Exception:
+            return None
+
+    current  = _j(norm / "profile_summary.json")
+    previous = _j(norm / "previous_profile_snapshot.json")
+
+    if previous is None or current is None:
+        return None
+
+    def _val(d: dict, key: str) -> str:
+        v = (d or {}).get(key)
+        return str(v.get("value", "") if isinstance(v, dict) else (v or "")).strip()
+
+    changes = []
+
+    if _val(current, "bio_text") != _val(previous, "bio_text"):
+        changes.append("bio изменился")
+
+    cur_url  = _val(current,  "external_url")
+    prev_url = _val(previous, "external_url")
+    if cur_url != prev_url:
+        changes.append(f"ссылка в bio: {prev_url or '—'} → {cur_url or '—'}")
+
+    # pinned count
+    cur_pi  = _j(norm / "pinned_posts_index.json")
+    prev_pi = _j(norm / "previous_pinned_snapshot.json")
+    if cur_pi is not None and prev_pi is not None:
+        cur_n  = len(cur_pi.get("pinned_posts") or [])
+        prev_n = len(prev_pi.get("pinned_posts") or [])
+        if cur_n != prev_n:
+            changes.append(f"закрепов: было {prev_n} → стало {cur_n}")
+
+    # highlights count
+    cur_hi  = _j(norm / "highlights_index.json")
+    prev_hi = _j(norm / "previous_highlights_snapshot.json")
+    if cur_hi is not None and prev_hi is not None:
+        cur_n  = len(cur_hi.get("highlights") or [])
+        prev_n = len(prev_hi.get("highlights") or [])
+        if cur_n != prev_n:
+            changes.append(f"хайлайтов: было {prev_n} → стало {cur_n}")
+
+    if not changes:
+        return None
+
+    lines = ["🔄 Изменения с прошлого запуска:"] + [f"- {c}" for c in changes]
+    return "\n".join(lines)
+
+
 def _main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
@@ -391,8 +446,9 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
                 apify_cost_str = "Apify см. console.apify.com"
 
         # Per-stage summary
-        stages_text = _build_stages_summary(username)
-        costs_line  = f"13. Затраты — ✅ {openai_cost_str}, {apify_cost_str}"
+        stages_text   = _build_stages_summary(username)
+        costs_line    = f"13. Затраты — ✅ {openai_cost_str}, {apify_cost_str}"
+        changes_block = _build_changes_summary(username)
 
         header = "✅ Анализ @{u} завершен!" if result.returncode == 0 else "⚠️ Анализ @{u} завершен с ошибками."
         header = header.format(u=username)
@@ -401,7 +457,8 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
             f"{header}\n\n"
             f"⏱ Время: {minutes} мин {seconds} сек\n\n"
             f"📋 Стадии:\n{stages_text}\n{costs_line}\n\n"
-            f"🔗 Таблица: {SPREADSHEET_URL}"
+            + (f"{changes_block}\n\n" if changes_block else "")
+            + f"🔗 Таблица: {SPREADSHEET_URL}"
         )
         if result.returncode != 0:
             text += f"\n📄 Лог: {log_path}"
