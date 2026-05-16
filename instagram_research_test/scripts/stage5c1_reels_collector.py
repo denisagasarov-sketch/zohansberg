@@ -23,16 +23,16 @@ STAGE      = "stage5c1"
 MAX_SELECTED = 10   # max reels in normalized output
 
 # Fields to carry into normalized output (with fallback aliases)
+# Real actor schema (confirmed 2026-05-16): displayUrl (not thumbnailUrl), videoPlayCount (not viewCount), no transcript
 _FIELD_MAP = [
     ("reel_id",       ["id", "shortCode"]),
     ("url",           ["url", "shortCode"]),     # post-processed below
     ("video_url",     ["videoUrl"]),
-    ("thumbnail_url", ["thumbnailUrl"]),
-    ("view_count",    ["viewCount", "videoPlayCount"]),
+    ("thumbnail_url", ["displayUrl"]),
+    ("view_count",    ["videoPlayCount", "videoViewCount"]),
     ("likes_count",   ["likesCount"]),
     ("comments_count",["commentsCount"]),
-    ("caption",       ["caption", "text"]),
-    ("transcript",    ["transcript"]),
+    ("caption",       ["caption"]),
     ("timestamp",     ["timestamp"]),
     ("is_pinned",     ["isPinned"]),
 ]
@@ -51,10 +51,14 @@ def _pick(item: dict, aliases: list):
 
 
 def _build_reel_url(item: dict) -> str:
+    # Actor returns full URL like https://www.instagram.com/p/<shortCode>/
+    url = item.get("url") or ""
+    if url.startswith("http"):
+        return url
     short = item.get("shortCode") or item.get("id") or ""
-    if short and not short.startswith("http"):
-        return f"https://www.instagram.com/reel/{short}/"
-    return item.get("url") or ""
+    if short:
+        return f"https://www.instagram.com/p/{short}/"
+    return ""
 
 
 def _extract_reel(item: dict, position: int) -> dict:
@@ -107,7 +111,7 @@ def run_dry_run(account: str, limit: int):
     print(f"max_selected:   {MAX_SELECTED}")
     print()
     print("Input payload that WOULD be sent:")
-    print(json.dumps({"username": account, "resultsLimit": limit}, indent=2))
+    print(json.dumps({"username": [account], "resultsLimit": limit}, indent=2))
     print()
 
     raw_dir  = BASE / "data" / account / "raw"
@@ -162,7 +166,7 @@ def main():
         raise SystemExit("apify-client not installed — run: pip install apify-client")
 
     client     = ApifyClient(token)
-    run_input  = {"username": account, "resultsLimit": limit}
+    run_input  = {"username": [account], "resultsLimit": limit}
 
     print(f"=== Stage 5C-1: Reels Collector ===")
     print(f"Actor:   {ACTOR_ID}")

@@ -140,41 +140,82 @@
     },
     "apify/instagram-reel-scraper": {
       "purpose": "collect Reels for an Instagram account",
-      "status": "planned",
-      "confidence": "medium",
+      "status": "confirmed",
+      "confidence": "high",
       "last_verified": "2026-05-16",
       "notes": [
         "Price: $0.0026 per reel.",
-        "Input: username (string) + resultsLimit (int).",
-        "Returns video metadata including transcript if available."
+        "Input: username (ARRAY) + resultsLimit (int).",
+        "Does NOT return transcript — field absent from output.",
+        "Uses displayUrl for thumbnail (not thumbnailUrl).",
+        "videoPlayCount = total plays, videoViewCount = unique views."
       ],
       "confirmed_actions": {
         "reels": {
-          "tested": false,
-          "input_schema_source": "actor_documentation",
+          "tested": true,
+          "input_schema_source": "confirmed_real_apify_run_2026-05-16",
           "safe_input_payload_example": {
-            "username": "vlada_kliuiko",
+            "username": ["vlada_kliuiko"],
             "resultsLimit": 10
           },
+          "input_field_notes": [
+            "Field 'username' is an ARRAY, not a string — confirmed by actor validation error in prod."
+          ],
           "confirmed_output_fields": [
+            "id",
+            "shortCode",
+            "url",
             "videoUrl",
-            "thumbnailUrl",
-            "viewCount",
+            "displayUrl",
+            "audioUrl",
             "caption",
-            "transcript",
             "likesCount",
             "commentsCount",
+            "videoPlayCount",
+            "videoViewCount",
+            "videoDuration",
             "timestamp",
-            "isPinned"
+            "isPinned",
+            "type",
+            "productType",
+            "ownerUsername",
+            "ownerId",
+            "ownerFullName",
+            "images",
+            "childPosts",
+            "hashtags",
+            "mentions",
+            "musicInfo",
+            "firstComment",
+            "latestComments",
+            "dimensionsHeight",
+            "dimensionsWidth",
+            "isCommentsDisabled",
+            "inputUrl",
+            "alt"
           ],
+          "schema_notes": [
+            "thumbnailUrl: ABSENT — use displayUrl instead.",
+            "viewCount: ABSENT — use videoPlayCount (total plays) or videoViewCount (unique views).",
+            "transcript: ABSENT — actor does not return captions/transcripts.",
+            "url field: full Instagram URL in /p/<shortCode>/ format (not /reel/).",
+            "images[]: array of image variants; use displayUrl for the primary thumbnail."
+          ],
+          "confirmed_test": {
+            "apify_run_id": "confirmed_2026-05-16",
+            "account_tested": "vlada_kliuiko",
+            "resultsLimit_used": 3,
+            "items_returned": 3,
+            "cost_usd": 0.0078
+          },
           "pricing": {
             "per_reel_usd": 0.0026,
             "example_10_reels_usd": 0.026
           },
           "limitations": [
-            "Not yet tested in production — schema may differ from documentation.",
-            "transcript availability depends on the reel having auto-generated captions.",
-            "isPinned may be absent if actor version does not support it."
+            "transcript not available — actor doesn't return it.",
+            "displayUrl CDN URLs may go stale (same issue as highlight stories).",
+            "isPinned present in output — confirmed for vlada_kliuiko test."
           ]
         }
       }
