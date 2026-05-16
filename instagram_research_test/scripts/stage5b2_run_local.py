@@ -95,7 +95,7 @@ def main():
     print(f"highlights valid:    {valid_count}")
     print(f"highlights invalid:  {invalid_count}")
     print(f"limit:               {LIMIT if LIMIT else 'none (all valid)'}")
-    print(f"planned_apify_calls: 1  (single batch, maxHighlights={to_process_count})")
+    print(f"planned_apify_calls: 1  (single batch, usernames=[{ACCOUNT!r}], maxHighlights={to_process_count})")
 
     summary = collector.collect(client, highlights, LIMIT)
 

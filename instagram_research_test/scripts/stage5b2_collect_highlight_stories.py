@@ -44,13 +44,21 @@ HIGHLIGHTS_INDEX_PATH = NORM_DIR / "highlights_index.json"
 SUMMARY_PATH          = NORM_DIR / "stage5b2_highlights_stories_summary.json"
 STORIES_INDEX_PATH    = NORM_DIR / "stage5b2_stories_index.json"
 
-ACTOR_ID = "automation-lab/instagram-stories-scraper"
+ACTOR_ID          = "automation-lab/instagram-stories-scraper"
+ACTOR_ID_FALLBACK = "igview-owner/instagram-highlights-stories-viewer"
 
 # Fields to probe in story items (automation-lab confirmed output)
 STORY_PROBE_FIELDS = [
     "id", "type", "timestamp",
     "imageUrl", "videoUrl",
     "highlightId", "highlightTitle",
+]
+
+# igview-owner has different field names (used only in fallback path)
+STORY_PROBE_FIELDS_FALLBACK = [
+    "storyNumber", "storyId", "storyType",
+    "imageUrl", "videoUrl",
+    "takenAt", "duration",
 ]
 
 load_dotenv(dotenv_path=BASE / ".env", override=True)
@@ -168,11 +176,13 @@ def safe_item(item: dict) -> dict:
 # Probe story items
 # ---------------------------------------------------------------------------
 
-def probe_stories(items: list) -> dict:
+def probe_stories(items: list, fields: list = None) -> dict:
+    if fields is None:
+        fields = STORY_PROBE_FIELDS
     if not items:
         return {
             "fields_found":      [],
-            "fields_missing":    list(STORY_PROBE_FIELDS),
+            "fields_missing":    list(fields),
             "has_imageUrl":      False,
             "has_videoUrl":      False,
             "has_any_media_url": False,
@@ -181,7 +191,7 @@ def probe_stories(items: list) -> dict:
     found_set = set()
     samples   = {}
     for item in items:
-        for f in STORY_PROBE_FIELDS:
+        for f in fields:
             if f in item and item[f] is not None and f not in found_set:
                 found_set.add(f)
                 samples[f] = safe_sample(item[f])
@@ -189,8 +199,8 @@ def probe_stories(items: list) -> dict:
     has_img = any(item.get("imageUrl") for item in items)
     has_vid = any(item.get("videoUrl") for item in items)
     return {
-        "fields_found":      [f for f in STORY_PROBE_FIELDS if f in found_set],
-        "fields_missing":    [f for f in STORY_PROBE_FIELDS if f not in found_set],
+        "fields_found":      [f for f in fields if f in found_set],
+        "fields_missing":    [f for f in fields if f not in found_set],
         "has_imageUrl":      has_img,
         "has_videoUrl":      has_vid,
         "has_any_media_url": has_img or has_vid,
@@ -257,7 +267,7 @@ def run_dry_run(highlights: list, limit: int):
             print(f"{label}: found, format OK (not printed)")
     print()
 
-    print(f"Payload: username={ACCOUNT!r}  maxHighlights={len(to_process)}")
+    print(f"Payload: usernames=[{ACCOUNT!r}]  maxHighlights={len(to_process)}")
     print()
     print("Highlights to process:")
     for i, h in enumerate(to_process):
@@ -289,6 +299,59 @@ def run_dry_run(highlights: list, limit: int):
     sys.exit(0)
 
 # ---------------------------------------------------------------------------
+# Fallback: igview-owner — one call per highlight
+# ---------------------------------------------------------------------------
+
+def collect_one_igview(h: dict, client) -> dict:
+    """Fallback per-highlight call using igview-owner (deprecated primary, now fallback)."""
+    if not h["id_valid"]:
+        return blank_highlight_result(
+            h, "INVALID_ID",
+            errors=[f"highlight_id '{h['raw_id']}' is not numeric"],
+        )
+
+    hid     = h["highlight_id"]
+    payload = {"highlightId": hid}
+    result  = blank_highlight_result(h, "FAIL")
+
+    print(f"  [{h['position']:2}] {hid}  \"{h['title']}\" [igview-owner fallback] ...")
+
+    try:
+        run   = client.actor(ACTOR_ID_FALLBACK).call(run_input=payload)
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        result["apify_run_id"] = run.get("id")
+
+        if not items:
+            result["status"] = "EMPTY_OR_INACCESSIBLE"
+            result["errors"].append("igview-owner returned 0 stories")
+        else:
+            probe = probe_stories(items, fields=STORY_PROBE_FIELDS_FALLBACK)
+            result["status"]            = "OK"
+            result["stories_count"]     = len(items)
+            result["fields_found"]      = probe["fields_found"]
+            result["fields_missing"]    = probe["fields_missing"]
+            result["has_imageUrl"]      = probe["has_imageUrl"]
+            result["has_videoUrl"]      = probe["has_videoUrl"]
+            result["has_any_media_url"] = probe["has_any_media_url"]
+            result["sample_values"]     = probe["sample_values"]
+
+            raw_path = RAW_DIR / f"stage5b2_stories_{hid}_raw.json"
+            RAW_DIR.mkdir(parents=True, exist_ok=True)
+            raw_path.write_text(
+                json.dumps([safe_item(i) for i in items], ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            print(f"       OK — {len(items)} stories  "
+                  f"imageUrl={probe['has_imageUrl']}  videoUrl={probe['has_videoUrl']}")
+
+    except Exception as exc:
+        result["errors"].append(str(exc))
+        print(f"       FAIL: {exc}")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Real collect: single batch call → split by highlight_id
 # ---------------------------------------------------------------------------
 
@@ -298,10 +361,13 @@ def collect_batch(client, to_process: list, cookie: str) -> tuple[dict, str | No
     items_by_hid: {bare_highlight_id: [items]}
     """
     max_h   = len(to_process)
+    # Actor input schema uses "usernames" (array), not "username" (string).
+    # "includeHighlights" defaults to false — must be set explicitly.
     payload = {
-        "username":      ACCOUNT,
-        "maxHighlights": max_h,
-        "sessionCookie": cookie,
+        "usernames":        [ACCOUNT],
+        "maxHighlights":    max_h,
+        "sessionCookie":    cookie,
+        "includeHighlights": True,
     }
 
     print(f"  Calling {ACTOR_ID}")
@@ -345,23 +411,33 @@ def collect(client, highlights: list, limit: int) -> dict:
             print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(1)
 
-    results  = []
-    run_id   = None
-    actual   = 0
+    results    = []
+    run_id     = None
+    actual     = 0
+    actor_used = ACTOR_ID
+    using_fallback = False
 
     try:
         by_hid, run_id = collect_batch(client, to_process, cookie)
         actual = 1
     except Exception as exc:
-        print(f"[ERROR] Batch call failed: {exc}", file=sys.stderr)
-        # Mark all as FAIL
+        print(f"[WARN] automation-lab batch call failed: {exc}", file=sys.stderr)
+        print(f"[WARN] Switching to fallback: {ACTOR_ID_FALLBACK} (per-highlight calls)",
+              file=sys.stderr)
+        using_fallback = True
+        actor_used     = ACTOR_ID_FALLBACK
+
         for h in highlights:
-            results.append(blank_highlight_result(
-                h, "FAIL" if h["id_valid"] else "INVALID_ID",
-                errors=[str(exc)]
-            ))
-        run_meta = {"planned": 1, "actual": 0, "run_ids": []}
-        summary, stories_index = build_outputs(results, highlights, run_ts, run_meta)
+            result = collect_one_igview(h, client)
+            results.append(result)
+
+        run_meta = {
+            "planned": len(to_process),
+            "actual":  sum(1 for r in results if r.get("apify_run_id")),
+            "run_ids": [r["apify_run_id"] for r in results if r.get("apify_run_id")],
+        }
+        summary, stories_index = build_outputs(results, highlights, run_ts, run_meta,
+                                               actor_used=actor_used)
         _save_outputs(summary, stories_index)
         return summary
 
@@ -414,7 +490,8 @@ def collect(client, highlights: list, limit: int) -> dict:
         "run_ids": [run_id] if run_id else [],
     }
 
-    summary, stories_index = build_outputs(results, highlights, run_ts, run_meta)
+    summary, stories_index = build_outputs(results, highlights, run_ts, run_meta,
+                                           actor_used=actor_used)
     _save_outputs(summary, stories_index)
     return summary
 
@@ -441,7 +518,8 @@ def _save_outputs(summary: dict, stories_index: dict):
 # Build normalized outputs
 # ---------------------------------------------------------------------------
 
-def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict) -> tuple:
+def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict,
+                  actor_used: str = None) -> tuple:
     ok_count      = sum(1 for r in results if r["status"] == "OK")
     empty_count   = sum(1 for r in results if r["status"] == "EMPTY_OR_INACCESSIBLE")
     fail_count    = sum(1 for r in results if r["status"] == "FAIL")
@@ -466,7 +544,7 @@ def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict) 
     summary = {
         "stage":                  "stage5b2",
         "account":                ACCOUNT,
-        "actor":                  ACTOR_ID,
+        "actor":                  actor_used or ACTOR_ID,
         "run_timestamp":          run_ts,
         "planned_apify_calls":    run_meta["planned"],
         "actual_apify_calls":     run_meta["actual"],

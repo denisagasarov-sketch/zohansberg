@@ -17,10 +17,17 @@
           "tested": true,
           "input_schema_source": "manual_input_from_successful_apify_run",
           "safe_input_payload_example": {
-            "username": "vlada_kliuiko",
+            "usernames": ["vlada_kliuiko"],
             "maxHighlights": 3,
-            "sessionCookie": "<from INSTAGRAM_SESSION_COOKIE env var>"
+            "sessionCookie": "<from INSTAGRAM_SESSION_COOKIE env var>",
+            "includeHighlights": true,
+            "includeProfile": true
           },
+          "input_field_notes": [
+            "Field is 'usernames' (array), NOT 'username' (string) — confirmed by actor error in prod.",
+            "'includeHighlights' defaults to false — MUST be set to true, otherwise only active stories are collected.",
+            "'includeProfile' defaults to true — controls whether profile metadata is included."
+          ],
           "confirmed_test": {
             "apify_run_id": "AkB2EgsysgjG0bG5l",
             "dataset_id": "ltyH9V6TKBst54G1e",
