@@ -7,6 +7,7 @@ Six focused passes via Playwright scroll + OpenAI:
   Pass G4 (Text): pains, objections, FAQ.
   Pass G5 (Text): product description — name, format, duration, contents, pricing options.
   Pass G6 (Text): sales mechanics — how they sell, scarcity, bonuses, final CTA.
+  Pass G7 (Text): creative analysis — non-standard elements, unusual naming, formats.
   Each field returns {value, data_status, confidence}.
   Legacy fields (11) are synthesized from new fields for backward compat.
 
@@ -40,7 +41,7 @@ SCREENSHOT_DIR = BASE / "output" / ACCOUNT / "stage5a2g_screenshots"
 STAGE          = "stage5a2g"
 PROMPT_VERSION = "v3"
 DEFAULT_MODEL  = "gpt-4o"
-MAX_SCREENSHOTS = 5
+MAX_SCROLL_SCREENSHOTS = 10   # absolute safety cap (unique screenshots)
 MAX_TEXT_CHARS  = 15000
 
 MAX_TOKENS_G1 = 600   # Vision: 5 fields, first screenshot only
@@ -49,6 +50,7 @@ MAX_TOKENS_G3 = 1000  # Text: trust signals (5 fields, potentially verbose)
 MAX_TOKENS_G4 = 600   # Text: pains (3 fields)
 MAX_TOKENS_G5 = 800   # Text: product (7 fields)
 MAX_TOKENS_G6 = 600   # Text: sales (4 fields)
+MAX_TOKENS_G7 = 600   # Text: creative analysis (1 field)
 
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 
@@ -60,8 +62,9 @@ _FIELDS_G4 = ["boli", "vozrazheniya", "est_faq"]
 _FIELDS_G5 = ["nazvanie_produkta", "format", "dlitelnost", "chto_vkhodit",
               "est_tarify", "est_rassrochka", "est_garantiya"]
 _FIELDS_G6 = ["sposob_prodazhi", "est_ogranichenie", "est_bonusy", "finalnyy_cta"]
+_FIELDS_G7 = ["neobychnye_resheniya"]
 
-_ALL_NEW_FIELDS = _FIELDS_G1 + _FIELDS_G2 + _FIELDS_G3 + _FIELDS_G4 + _FIELDS_G5 + _FIELDS_G6
+_ALL_NEW_FIELDS = _FIELDS_G1 + _FIELDS_G2 + _FIELDS_G3 + _FIELDS_G4 + _FIELDS_G5 + _FIELDS_G6 + _FIELDS_G7
 
 # Legacy fields preserved for backward compat with stage5d1
 _ALL_FIELDS = [
@@ -111,7 +114,7 @@ def fetch_with_playwright(url: str) -> dict:
     """
     Fetch page via Playwright headless Chromium.
     Scrolls one viewport at a time, takes screenshot at each position.
-    Stops when: MAX_SCREENSHOTS reached, hash unchanged, or scroll stuck.
+    Stops when: 2 consecutive identical hashes, absolute cap of MAX_SCROLL_SCREENSHOTS, or scroll stuck.
     Returns content dict with screenshots list and full_text.
     """
     try:
@@ -138,26 +141,41 @@ def fetch_with_playwright(url: str) -> dict:
             page.goto(url, wait_until="networkidle", timeout=30000)
             page.wait_for_timeout(2000)
 
-            SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-            screenshots = []
-            prev_hash   = None
+            # Dismiss cookie banners before scrolling
+            for _banner_text in ["Принять все", "Принять", "Accept all", "Accept", "OK"]:
+                try:
+                    _btn = page.get_by_text(_banner_text, exact=True)
+                    if _btn.count() > 0:
+                        _btn.first.click()
+                        page.wait_for_timeout(500)
+                        break
+                except Exception:
+                    pass
 
-            for i in range(MAX_SCREENSHOTS):
-                path = SCREENSHOT_DIR / f"screen_{i + 1}.png"
+            SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            screenshots      = []
+            prev_hash        = None
+            identical_streak = 0
+            attempt          = 0
+
+            while len(screenshots) < MAX_SCROLL_SCREENSHOTS:
+                attempt += 1
+                path = SCREENSHOT_DIR / f"screen_{attempt}.png"
                 page.screenshot(path=str(path), full_page=False)
 
                 h = _screenshot_hash(path)
                 if h == prev_hash:
                     path.unlink(missing_ok=True)
-                    print(f"  [scroll] Screen {i + 1}: identical to previous — stopping")
-                    break
-
-                screenshots.append(path)
-                prev_hash = h
-                print(f"  [scroll] Screen {i + 1} saved: {path.name}")
-
-                if i + 1 == MAX_SCREENSHOTS:
-                    break
+                    identical_streak += 1
+                    if identical_streak >= 2:
+                        print(f"  [scroll] Screen {attempt}: identical x2 — stopping")
+                        break
+                    print(f"  [scroll] Screen {attempt}: identical (1/2) — skipping, continuing")
+                else:
+                    screenshots.append(path)
+                    prev_hash        = h
+                    identical_streak = 0
+                    print(f"  [scroll] Screen {len(screenshots)} saved: {path.name}")
 
                 scroll_before = page.evaluate("window.scrollY")
                 page.evaluate("window.scrollBy(0, window.innerHeight)")
@@ -168,8 +186,21 @@ def fetch_with_playwright(url: str) -> dict:
 
                 scroll_after = page.evaluate("window.scrollY")
                 if scroll_after == scroll_before:
-                    print(f"  [scroll] Scroll {i + 1}: no progress — stopping")
+                    print(f"  [scroll] Attempt {attempt}: no scroll progress — stopping")
                     break
+
+            # Final screenshot: bottom of page
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(1000)
+            bottom_path = SCREENSHOT_DIR / "screen_bottom.png"
+            page.screenshot(path=str(bottom_path), full_page=False)
+            h_bottom = _screenshot_hash(bottom_path)
+            if h_bottom != prev_hash:
+                screenshots.append(bottom_path)
+                print(f"  [scroll] Bottom screenshot saved: {bottom_path.name}")
+            else:
+                bottom_path.unlink(missing_ok=True)
+                print(f"  [scroll] Bottom screenshot: identical to last — skipped")
 
             # Extract text after scrolling (inner_text is position-independent)
             full_text = page.inner_text("body")[:MAX_TEXT_CHARS]
@@ -220,12 +251,21 @@ SYSTEM_G1_VISION = """\
 
 glavnyy_zagolovok: ТОЧНАЯ ЦИТАТА самого крупного текста на первом экране (hero h1). Дословно, не пересказывай.
 podzagolovok: Текст сразу под главным заголовком — дословно. Если нет — "".
-vizualnyy_obraz: Что ты видишь на первом экране — фото, иллюстрация, видео, цвет фона, стиль. Кратко.
+vizualnyy_obraz: Строго в формате "[что изображено], [цвет фона], [главный элемент]".
+  Максимум 60 символов. Пример: "две женщины, тёмно-красный фон, шестерёнки".
+  Только визуальные факты — не пересказывай текст заголовков.
 glavnyy_cta: Точный текст самой заметной кнопки на первом экране — вне cookie-баннеров.
   ИГНОРИРОВАТЬ кнопки cookie-баннеров: "Принять", "Соглашаюсь", "Accept", "OK", "Настроить",
   "Принять все", "Accept all" и любые аналоги. Если главного CTA нет на первом экране — "".
 est_dedlayn: Есть ли на первом экране таймер, счётчик, дата окончания или фраза о дедлайне.
   Значение: "да" или "нет".
+otzyvy_format: Видны ли на скриншоте блоки с отзывами клиентов. Признаки:
+  — фотографии людей с текстом похожим на отзыв или результат
+  — карточки с именами, фото, описанием "до/после"
+  — видео с кнопкой play на фоне портрета или логотипа
+  — скриншоты переписки (мессенджер, email)
+  Если блок отзывов виден — укажи формат через «; »: "текст", "видео", "карточки до-после",
+  "скриншоты переписки". Если отзывов не видно — data_status "not_found", value "".
 
 ПРАВИЛА:
 1. Только то что ВИДНО на скриншоте. Не додумывай.
@@ -239,7 +279,8 @@ est_dedlayn: Есть ли на первом экране таймер, счёт
   "podzagolovok":      {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
   "vizualnyy_obraz":   {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
   "glavnyy_cta":       {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
-  "est_dedlayn":       {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+  "est_dedlayn":       {"value": "да|нет", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "otzyvy_format":     {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
 }"""
 
 
@@ -263,6 +304,11 @@ big_job: Более широкое жизненное изменение кот�
   Если не заявлено — "".
 unikalnost: В чём уникальность или отличие от других. Цитата из текста.
   Если не заявлено — "не заявлено".
+glavnyy_cta: РЕЗЕРВНОЕ ПОЛЕ — заполнять только если визуальный анализ первого экрана не определил CTA.
+  Найди самую заметную кнопку призыва к действию в тексте страницы.
+  ИГНОРИРОВАТЬ кнопки cookie-баннеров: "Принять", "Соглашаюсь", "Accept", "OK", "Настроить",
+  "Принять все", "Accept all" и любые аналоги.
+  Если главного CTA нет — data_status "not_found", value "".
 
 ПРАВИЛА:
 1. Только то что явно есть в тексте.
@@ -276,7 +322,8 @@ unikalnost: В чём уникальность или отличие от дру
   "dlya_kogo":           {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
   "core_job":            {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
   "big_job":             {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
-  "unikalnost":          {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+  "unikalnost":          {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"},
+  "glavnyy_cta":         {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
 }"""
 
 
@@ -290,10 +337,12 @@ SYSTEM_G3_TRUST = """\
 cifry: ВСЕ конкретные цифры на лендинге — количество клиентов, лет работы, % результата, NPS, оценки.
   Перечисли через «; ». Пример: "1500+ учеников; 7 лет на рынке; 94% завершают курс".
   НЕ пропускай ни одну цифру. Если нет — "".
-otzyvy_format: Есть ли отзывы и в каком формате — текст, видео, скриншоты переписки, с именами/фото.
-  Если да — кратко опиши формат. Если нет — "".
+otzyvy_format: Есть ли блок отзывов на странице. Если да — опиши формат: текст, видео, скриншоты переписки,
+  с именами/фото. Если блок отзывов отсутствует явно — data_status "not_found", value "".
+  НЕ оставляй value пустым — либо описание формата, либо not_found.
 keysy: Есть ли кейсы до/после или истории успеха клиентов. Если да — краткое описание 1-2 кейсов.
-  Если нет — "".
+  Если кейсов нет явно — data_status "not_found", value "".
+  НЕ оставляй value пустым — либо описание кейсов, либо not_found.
 media: Упоминания СМИ, подкастов, конференций, публикаций. Перечисли через «; ».
   Если нет — "".
 sertifikaty: Сертификаты, дипломы, лицензии, партнёрства с брендами, аккредитации.
@@ -352,8 +401,11 @@ SYSTEM_G5_PRODUCT = """\
 
 ПОЛЯ:
 
-nazvanie_produkta: Официальное название продукта, курса или программы. Точная цитата.
-  Если не указано — "".
+nazvanie_produkta: Официальное название продукта, курса или программы — точная цитата из текста.
+  Ищи рядом со словами "курс", "программа", "интенсив", "марафон", "тренинг", "мастермайнд".
+  Пример: если написано "программа «Сильное тело»" — вернуть "Сильное тело".
+  Если явного названия нет — data_status "not_found", value "".
+  НЕ подставляй главный заголовок страницы вместо названия продукта.
 format: Формат продукта — онлайн-курс, живой тренинг, марафон, коучинг, подписка, консультация и т.д.
 dlitelnost: Длительность программы — "8 недель", "3 месяца", "1 день".
   Если не указана — "".
@@ -392,8 +444,10 @@ sposob_prodazhi: Как продают — прямая продажа на ле
   список ожидания, бесплатный вебинар, пробный период и т.д.
 est_ogranichenie: Есть ли ограничение по количеству мест, времени или цене. Значение: "да" или "нет".
   Если да — уточни кратко суть ограничения.
-est_bonusy: Есть ли бонусы при покупке. Значение: "да" или "нет".
-  Если да — перечисли бонусы кратко.
+est_bonusy: Есть ли бонусы при покупке.
+  Если да — перечисли КОНКРЕТНО что входит в бонусы (названия, описания).
+  Если написано просто "бонусы" без расшифровки — вернуть "бонусы без расшифровки на странице".
+  НЕ придумывай содержимое бонусов. Если бонусов нет — value "нет".
 finalnyy_cta: Точный текст последней или финальной кнопки/призыва к действию на странице.
   Не cookie-баннеры. Если не определяется — "".
 
@@ -411,6 +465,37 @@ finalnyy_cta: Точный текст последней или финально
   "finalnyy_cta":     {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
 }"""
 
+SYSTEM_G7_CREATIVE = """\
+Ты — аналитик маркетинговых лендингов. Перед тобой текст лендинга (browser inner_text).
+Твоя задача — найти нестандартные, интересные или креативные решения.
+Отвечай строго в JSON, без текста вне JSON.
+
+ПОЛЕ:
+
+neobychnye_resheniya: Что на этом лендинге сделано интересно, нестандартно или круто
+  по сравнению с типичными лендингами онлайн-курсов.
+  Искать:
+  — нестандартный нейминг блоков (FAQ называется «Мы читаем мысли», поддержка — «Отдел заботы»)
+  — юмор и неожиданные формулировки в заголовках и тексте
+  — необычный формат отзывов (видео прямо на странице, карточки до/после с конкретными цифрами)
+  — нестандартные элементы доверия (публичные провалы, антикейсы, честность о недостатках)
+  — интерактивные или редкие технические решения
+  — необычная структура или логика подачи материала
+  Перечисляй найденное через «; ».
+  Если ничего нестандартного нет — data_status "not_found", value "".
+
+ПРАВИЛА:
+1. Только то что явно есть в тексте. НЕ додумывай.
+2. Не определяется / ничего нестандартного — data_status "not_found", value "".
+3. Все ответы на русском.
+4. confidence: "high" если явный факт из текста, "medium" если вывод, "low" если предположение.
+
+ФОРМАТ (строго JSON):
+{
+  "neobychnye_resheniya": {"value": "...", "data_status": "ok|not_found", "confidence": "high|medium|low"}
+}"""
+
+
 _ALL_SYSTEMS = [
     ("G1 Vision", SYSTEM_G1_VISION),
     ("G2 Text — positioning", SYSTEM_G2_POSITIONING),
@@ -418,6 +503,7 @@ _ALL_SYSTEMS = [
     ("G4 Text — pains", SYSTEM_G4_PAINS),
     ("G5 Text — product", SYSTEM_G5_PRODUCT),
     ("G6 Text — sales", SYSTEM_G6_SALES),
+    ("G7 Text — creative", SYSTEM_G7_CREATIVE),
 ]
 
 
@@ -546,7 +632,12 @@ def _norm_field(raw: dict, key: str) -> dict:
 
 
 def _collect_fields_new(pass_results: list[dict]) -> dict:
-    """Merge all pass results into a single fields_new dict."""
+    """Merge all pass results into a single fields_new dict.
+    Later passes override earlier ones. Exception: glavnyy_cta uses G1 as
+    primary source; G2 is fallback only when G1 returned empty."""
+    # Save G1 raw fields for glavnyy_cta priority logic
+    g1_raw = (pass_results[0].get("fields") or {}) if pass_results else {}
+
     merged = {}
     for result in pass_results:
         raw = result.get("fields") or {}
@@ -557,6 +648,19 @@ def _collect_fields_new(pass_results: list[dict]) -> dict:
     for key in _ALL_NEW_FIELDS:
         if key not in merged:
             merged[key] = {"value": "", "data_status": "not_found", "confidence": "low"}
+
+    # G1 priority fields: Vision output wins over text passes when non-empty.
+    # glavnyy_cta: G1 visual > G2 text fallback
+    if "glavnyy_cta" in g1_raw:
+        g1_cta = _norm_field(g1_raw, "glavnyy_cta")
+        if g1_cta["value"]:
+            merged["glavnyy_cta"] = g1_cta
+    # otzyvy_format: G1 visual detection wins over G3 text (text can't see popups/visuals)
+    if "otzyvy_format" in g1_raw:
+        g1_otzyvy = _norm_field(g1_raw, "otzyvy_format")
+        if g1_otzyvy["value"]:
+            merged["otzyvy_format"] = g1_otzyvy
+
     return merged
 
 
@@ -607,7 +711,7 @@ def run_dry_run(url: str, destination_type: str):
     print("=" * 60)
     print(f"  url:              {url}")
     print(f"  destination_type: {destination_type}")
-    print(f"  max_screenshots:  {MAX_SCREENSHOTS}")
+    print(f"  max_screenshots:  {MAX_SCROLL_SCREENSHOTS} (unique; stops on 2x identical hash or no scroll progress)")
     print(f"  text_chars_limit: {MAX_TEXT_CHARS}")
     print(f"  screenshot_dir:   {SCREENSHOT_DIR.relative_to(BASE)}")
     print()
@@ -636,6 +740,7 @@ def run_dry_run(url: str, destination_type: str):
     print(f"  G4 Text    — pains / objections / FAQ  — max_tokens={MAX_TOKENS_G4}  — {len(_FIELDS_G4)} fields")
     print(f"  G5 Text    — product description       — max_tokens={MAX_TOKENS_G5}  — {len(_FIELDS_G5)} fields")
     print(f"  G6 Text    — sales mechanics           — max_tokens={MAX_TOKENS_G6}  — {len(_FIELDS_G6)} fields")
+    print(f"  G7 Text    — creative analysis         — max_tokens={MAX_TOKENS_G7}  — {len(_FIELDS_G7)} fields")
     print(f"  TOTAL new fields: {len(_ALL_NEW_FIELDS)}  |  Legacy compat fields: {len(_ALL_FIELDS)}")
     print()
 
@@ -654,7 +759,7 @@ def run_dry_run(url: str, destination_type: str):
     print()
 
     print("=" * 60)
-    print("USER PROMPT — G2–G6 Text (example):")
+    print("USER PROMPT — G2–G7 Text (example):")
     print("=" * 60)
     print(_user_prompt_text(url, destination_type, "(полный текст страницы — до 15000 символов)"))
     print()
@@ -680,7 +785,7 @@ def run_dry_run(url: str, destination_type: str):
     print()
 
     print(f"Model:          {DEFAULT_MODEL}")
-    print(f"max_tokens:     G1={MAX_TOKENS_G1}  G2={MAX_TOKENS_G2}  G3={MAX_TOKENS_G3}  G4={MAX_TOKENS_G4}  G5={MAX_TOKENS_G5}  G6={MAX_TOKENS_G6}")
+    print(f"max_tokens:     G1={MAX_TOKENS_G1}  G2={MAX_TOKENS_G2}  G3={MAX_TOKENS_G3}  G4={MAX_TOKENS_G4}  G5={MAX_TOKENS_G5}  G6={MAX_TOKENS_G6}  G7={MAX_TOKENS_G7}")
     print(f"Prompt version: {PROMPT_VERSION}")
     print(f"Output path:    {OUTPUT_PATH.relative_to(BASE)}")
 
@@ -773,7 +878,7 @@ def main():
         print("[WARN] No screenshots — G1 Vision skipped")
         g1 = {"status": "skipped", "fields": {}, "tokens_used": 0}
 
-    # ---- Passes G2–G6: Text (skip if SPA or empty) ----
+    # ---- Passes G2–G7: Text (skip if SPA or empty) ----
     text_ok = bool(full_text.strip()) and not is_spa
     if not text_ok:
         reason = "SPA page" if is_spa else "empty text"
@@ -792,20 +897,22 @@ def main():
     g4 = _text_pass("G4 Text — pains",            SYSTEM_G4_PAINS,       MAX_TOKENS_G4)
     g5 = _text_pass("G5 Text — product",          SYSTEM_G5_PRODUCT,     MAX_TOKENS_G5)
     g6 = _text_pass("G6 Text — sales",            SYSTEM_G6_SALES,       MAX_TOKENS_G6)
+    g7 = _text_pass("G7 Text — creative",         SYSTEM_G7_CREATIVE,    MAX_TOKENS_G7)
 
     # Collect all passes
-    all_passes   = [g1, g2, g3, g4, g5, g6]
+    all_passes   = [g1, g2, g3, g4, g5, g6, g7]
     fields_new   = _collect_fields_new(all_passes)
     fields       = _map_to_legacy_fields(fields_new)
     total_tokens = sum(p.get("tokens_used") or 0 for p in all_passes)
 
     pass_statuses = {
-        "g1_vision": g1.get("status"),
-        "g2_text_positioning": g2.get("status"),
-        "g3_text_trust":       g3.get("status"),
-        "g4_text_pains":       g4.get("status"),
-        "g5_text_product":     g5.get("status"),
-        "g6_text_sales":       g6.get("status"),
+        "g1_vision":            g1.get("status"),
+        "g2_text_positioning":  g2.get("status"),
+        "g3_text_trust":        g3.get("status"),
+        "g4_text_pains":        g4.get("status"),
+        "g5_text_product":      g5.get("status"),
+        "g6_text_sales":        g6.get("status"),
+        "g7_text_creative":     g7.get("status"),
     }
 
     output = {

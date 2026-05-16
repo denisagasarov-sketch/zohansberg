@@ -824,6 +824,9 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
         i = src_idx.get(field)
         return str(row[i] or "") if (i is not None and i < len(row)) else ""
 
+    def _nf(val: str) -> str:
+        return val if val else "не найдено"
+
     rows = []
     for row in src_rows:
         position_str = _get(row, "Позиция закрепа")
@@ -837,18 +840,18 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
 
         v2_fields = {
             "Конкурент":            _competitor,
-            "Ссылка на пост":       _get(row, "Ссылка на пост"),
-            "Позиция закрепа":      position_str,
-            "Тема поста":           _get(row, "Тема поста"),
-            "Почему закреплен":     _get(row, "Почему закреплен"),
-            "Хук / первый экран":   _get(row, "Хук / первый экран"),
-            "Хук обложки (визуал)": hooks_index.get(pos, "") if pos else "",
-            "Что в тексте поста":   _get(row, "Что в тексте поста"),
-            "Ключевые смыслы":      _get(row, "Ключевые смыслы"),
-            "Какой CTA":            cta,
-            "Куда ведет CTA":       _get(row, "Куда ведет CTA"),
-            "Роль в воронке":       role,
-            "Слайды карусели":      carousel_index.get(pos, "") if pos else "",
+            "Ссылка на пост":       _nf(_get(row, "Ссылка на пост")),
+            "Позиция закрепа":      _nf(position_str),
+            "Тема поста":           _nf(_get(row, "Тема поста")),
+            "Почему закреплен":     _nf(_get(row, "Почему закреплен")),
+            "Хук / первый экран":   _nf(_get(row, "Хук / первый экран")),
+            "Хук обложки (визуал)": _nf(hooks_index.get(pos, "") if pos else ""),
+            "Что в тексте поста":   _nf(_get(row, "Что в тексте поста")),
+            "Ключевые смыслы":      _nf(_get(row, "Ключевые смыслы")),
+            "Какой CTA":            _nf(cta),
+            "Куда ведет CTA":       _nf(_get(row, "Куда ведет CTA")),
+            "Роль в воронке":       _nf(role),
+            "Слайды карусели":      _nf(carousel_index.get(pos, "") if pos else ""),
             "Противоречия":         _contradiction_check(role, cta),
         }
         rows.append(_make_row(V2_PINNED_HEADERS, v2_fields))
@@ -904,8 +907,12 @@ def build_v2_highlights_rows(sources: dict) -> tuple[list, list, list]:
     stories_count_idx = _stories_count_index()
 
     def _field_val(h: dict, key: str) -> str:
-        f = h.get("fields", {}).get(key) or {}
-        return str(f.get("value") or "")
+        f      = h.get("fields", {}).get(key) or {}
+        status = f.get("data_status", "not_found")
+        value  = str(f.get("value") or "")
+        if not value or status == "not_found":
+            return "не найдено"
+        return value
 
     rows = []
     for h in analyzed:
@@ -979,10 +986,12 @@ _V2_LANDING_FIELD_MAP = [
     ("est_rassrochka",      "Есть рассрочка"),
     ("est_garantiya",       "Есть гарантия"),
     # G6 — Text: sales
-    ("sposob_prodazhi",     "Способ продажи"),
-    ("est_ogranichenie",    "Есть ограничение"),
-    ("est_bonusy",          "Есть бонусы"),
-    ("finalnyy_cta",        "Финальный CTA"),
+    ("sposob_prodazhi",       "Способ продажи"),
+    ("est_ogranichenie",      "Есть ограничение"),
+    ("est_bonusy",            "Есть бонусы"),
+    ("finalnyy_cta",          "Финальный CTA"),
+    # G7 — Text: creative analysis
+    ("neobychnye_resheniya",  "Нестандартные решения"),
 ]
 
 V2_LANDING_HEADERS = ["Конкурент", "Ссылка на сайт"] + [h for _, h in _V2_LANDING_FIELD_MAP]
@@ -1022,8 +1031,14 @@ def build_v2_landing_rows(sources: dict) -> tuple[list, list, list]:
         )
 
     def gv(key: str) -> str:
-        f = fields_new.get(key) or {}
-        return str(f.get("value") or "").strip()
+        f      = fields_new.get(key) or {}
+        status = f.get("data_status", "not_found")
+        value  = str(f.get("value") or "").strip()
+        if not value or status == "not_found":
+            if key == "otzyvy_format":
+                return "не удалось извлечь (графический блок)"
+            return "не найдено"
+        return value
 
     row: dict = {
         "Конкурент":      _competitor,
