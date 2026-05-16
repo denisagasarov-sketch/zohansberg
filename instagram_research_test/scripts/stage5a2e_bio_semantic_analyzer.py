@@ -247,6 +247,9 @@ def main():
             print(f"[DRY-RUN] {err}")
             print("[DRY-RUN] Using documented example bio for prompt preview.\n")
         else:
+            if OUTPUT_PATH.exists():
+                print(f"[INFO] {err} — reusing existing {OUTPUT_PATH.name}")
+                sys.exit(0)
             print(f"[ERROR] {err}")
             sys.exit(1)
 

@@ -184,7 +184,7 @@ boli (Какие боли раскрывают):
 argumenty (Какие аргументы используют):
   Почему выбрать именно их. 1-3 пункта кратко.
 
-bloki_dalshe (Структура лендинга):
+bloki_dalshe (Какие блоки есть дальше):
   Все блоки страницы по порядку, с пояснением зачем каждый.
   Формат: "1. Заголовок — захват внимания; 2. Для кого — сегментация; 3. Программа — контент оффера; ..."
   Перечисли каждый смысловой блок, не пропускай.
@@ -385,6 +385,9 @@ def main():
                 url              = "(URL not available — stage5a2f absent)"
                 destination_type = "неизвестно"
             else:
+                if OUTPUT_PATH.exists():
+                    print(f"[INFO] {err} — reusing existing {OUTPUT_PATH.name}")
+                    sys.exit(0)
                 print(f"[ERROR] {err}")
                 sys.exit(1)
 

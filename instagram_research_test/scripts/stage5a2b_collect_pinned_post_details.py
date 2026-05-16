@@ -677,10 +677,20 @@ def collect_from_apify(client, pinned_refs: list[dict]) -> tuple[list[dict], dic
 # ── Main entry points ─────────────────────────────────────────────────────
 
 def run_from_existing_raw() -> dict:
-    """Normalize from existing Stage 5A-1 raw output. No Apify call."""
+    """Normalize from existing Stage 5A-1 raw output. No Apify call.
+
+    If pinned_posts_index.json has 0 posts but the normalized output already
+    exists (e.g. from a previous Apify run), reuse it without re-running.
+    """
     index, errors = load_pinned_index()
     hard_errors = [e for e in errors if not e.startswith("WARNING")]
     if hard_errors:
+        if NORM_OUTPUT_PATH.exists():
+            print(
+                f"  [INFO] pinned_posts_index has 0 posts but "
+                f"{NORM_OUTPUT_PATH.name} already exists — reusing."
+            )
+            return json.loads(NORM_OUTPUT_PATH.read_text(encoding="utf-8"))
         raise ValueError("\n".join(hard_errors))
 
     pinned_refs = extract_pinned_refs(index)
