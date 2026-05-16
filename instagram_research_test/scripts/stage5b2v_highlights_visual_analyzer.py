@@ -33,7 +33,7 @@ NORM_DIR = BASE / "data" / ACCOUNT / "normalized"
 INDEX_RAW_PATH = RAW_DIR / "stage5b1_highlights_index_raw.json"
 OUTPUT_PATH    = NORM_DIR / "stage5b2v_highlights_visual.json"
 STAGE          = "stage5b2v"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 DEFAULT_MODEL  = "gpt-4o"
 
 STORIES_PER_HIGHLIGHT    = 5   # max stories to select per highlight
@@ -41,12 +41,12 @@ MIN_DOWNLOADABLE_IMAGES  = 2   # skip Vision if fewer images downloaded successf
 IMAGE_DETAIL             = "low"
 IMAGE_MAX_SIDE           = 512  # resize long side to this before base64
 MAX_TOKENS             = 500
+MAX_TOKENS_TARGETED    = 200   # cover + CTA targeted prompts
 
 # IDs requested for analysis
-TARGET_HIGHLIGHT_IDS = [
-    "17874797856565339",  # отзывы курс (57 stories)
-    "18110898391654002",  # GEO (17 stories)
-]
+# Leave empty to process all highlights from stage5b1 index (default for pipeline).
+# Populate to restrict to specific IDs for one-off runs.
+TARGET_HIGHLIGHT_IDS: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +321,75 @@ def call_vision(client, highlight_id: str, title: str,
 
 
 # ---------------------------------------------------------------------------
+# Targeted cover + CTA prompts
+# ---------------------------------------------------------------------------
+
+def cta_frame_count(n_images: int) -> int:
+    """How many trailing frames to send to the CTA prompt."""
+    if n_images < 3:
+        return 1
+    elif n_images <= 5:
+        return 2
+    else:
+        return 3
+
+
+def call_cover_vision(client, data_uri: str, model: str) -> dict:
+    """Single-frame cover analysis. Returns {status, text, tokens_used}."""
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": data_uri, "detail": IMAGE_DETAIL}},
+                    {"type": "text",
+                     "text": "Это обложка хайлайта. Что является хуком — заголовок, визуал, текст который цепляет взгляд первым?"},
+                ],
+            }],
+            max_tokens=MAX_TOKENS_TARGETED,
+            temperature=0.0,
+        )
+        return {
+            "status":      "ok",
+            "text":        (response.choices[0].message.content or "").strip(),
+            "tokens_used": response.usage.total_tokens,
+        }
+    except Exception as e:
+        return {"status": "error", "text": "", "tokens_used": 0, "error": str(e)}
+
+
+def call_cta_vision(client, cta_uris: list, model: str) -> dict:
+    """Last-N frames CTA analysis. Returns {status, text, tokens_used}."""
+    image_content = [
+        {"type": "image_url", "image_url": {"url": u, "detail": IMAGE_DETAIL}}
+        for u in cta_uris
+    ]
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    *image_content,
+                    {"type": "text",
+                     "text": "Это финальные кадры хайлайта. Найди CTA — призыв написать в директ, перейти по ссылке, записаться, купить. Если есть — куда ведёт и дословная формулировка?"},
+                ],
+            }],
+            max_tokens=MAX_TOKENS_TARGETED,
+            temperature=0.0,
+        )
+        return {
+            "status":      "ok",
+            "text":        (response.choices[0].message.content or "").strip(),
+            "tokens_used": response.usage.total_tokens,
+            "frames_used": len(cta_uris),
+        }
+    except Exception as e:
+        return {"status": "error", "text": "", "tokens_used": 0, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
 # Result builder
 # ---------------------------------------------------------------------------
 
@@ -329,6 +398,8 @@ _FIELD_KEYS = ("tema", "zadacha", "chto_vnutri", "mekhanika", "cta")
 
 def build_highlight_result(highlight_id: str, meta: dict, stories: list,
                            image_urls: list[str], vision_result: dict,
+                           cover_result: dict = None,
+                           cta_result: dict = None,
                            skipped: bool = False, skip_reason: str = "") -> dict:
     base = {
         "highlight_id":     highlight_id,
@@ -367,8 +438,25 @@ def build_highlight_result(highlight_id: str, meta: dict, stories: list,
         else:
             fields[key] = {"value": str(raw), "data_status": "ok", "notes": ""}
 
+    tokens_general = vision_result.get("tokens_used") or 0
+    tokens_cover   = (cover_result or {}).get("tokens_used") or 0
+    tokens_cta     = (cta_result or {}).get("tokens_used") or 0
+
     base["fields"]      = fields
-    base["tokens_used"] = vision_result.get("tokens_used")
+    base["tokens_used"] = tokens_general + tokens_cover + tokens_cta
+
+    if cover_result is not None:
+        base["cover_hook"] = {
+            "status": cover_result.get("status"),
+            "text":   cover_result.get("text", ""),
+        }
+    if cta_result is not None:
+        base["cta_targeted"] = {
+            "status":      cta_result.get("status"),
+            "text":        cta_result.get("text", ""),
+            "frames_used": cta_result.get("frames_used", 0),
+        }
+
     return base
 
 
@@ -465,9 +553,12 @@ def main():
     else:
         hl_meta = build_highlight_meta(index_items)
 
-    target_ids = TARGET_HIGHLIGHT_IDS
     if args.highlight_id:
         target_ids = [args.highlight_id]
+    elif TARGET_HIGHLIGHT_IDS:
+        target_ids = TARGET_HIGHLIGHT_IDS
+    else:
+        target_ids = list(hl_meta.keys())
 
     if args.dry_run:
         run_dry_run(target_ids, hl_meta, dry_highlight_id=args.highlight_id)
@@ -539,7 +630,26 @@ def main():
 
         print(f"  Calling Vision API with {len(data_uris)} base64 images...")
         vision_result = call_vision(client, hid, title, data_uris, model=args.model)
-        result = build_highlight_result(hid, meta, stories, original_urls, vision_result)
+
+        # Cover (first frame) → hook analysis
+        cover_result = None
+        if data_uris:
+            print(f"  Calling cover prompt (1 frame)...")
+            cover_result = call_cover_vision(client, data_uris[0], model=args.model)
+
+        # CTA (last N frames) → CTA analysis
+        cta_result = None
+        if data_uris:
+            n_cta = cta_frame_count(len(data_uris))
+            cta_uris = data_uris[-n_cta:]
+            print(f"  Calling CTA prompt ({n_cta} frame(s))...")
+            cta_result = call_cta_vision(client, cta_uris, model=args.model)
+
+        result = build_highlight_result(
+            hid, meta, stories, original_urls, vision_result,
+            cover_result=cover_result,
+            cta_result=cta_result,
+        )
         results.append(result)
 
         tok = result.get("tokens_used")

@@ -45,7 +45,7 @@ FALLBACK_HEADERS = {
     ],
     "Закрепленные посты": [
         "Конкурент", "Ссылка на пост", "Позиция закрепа", "Тема поста",
-        "Почему закреплен", "Первый абзац / заголовок поста", "Что в тексте поста",
+        "Почему закреплен", "Хук / первый экран", "Что в тексте поста",
         "Ключевые смыслы", "Какой CTA", "Куда ведет CTA", "Роль в воронке",
     ],
     "Воронка": [
@@ -61,7 +61,7 @@ FALLBACK_HEADERS = {
         "Конкурент", "Ссылка на сайт", "Что продают",
         "Структура первых 3х экранов", "Главный заголовок", "Подзаголовок",
         "Для кого", "Обещание результата", "Главный CTA", "Соцдоказательства",
-        "Какие боли раскрывают", "Какие аргументы используют", "Структура лендинга",
+        "Какие боли раскрывают", "Какие аргументы используют", "Какие блоки есть дальше",
     ],
     "Бот  лид-магнит": [
         "Конкурент", "Где нашли лид-магнит", "Название лид-магнита",
@@ -326,10 +326,10 @@ def _pinned_hooks_index(sources: dict) -> dict:
 
 
 def _apply_hooks(rows: list, headers: list, hooks_index: dict) -> list:
-    """Fill 'Первый абзац / заголовок поста' from stage5a2d hooks_index where cell is empty."""
-    if not hooks_index or "Первый абзац / заголовок поста" not in headers:
+    """Fill 'Хук / первый экран' from stage5a2d hooks_index where cell is empty."""
+    if not hooks_index or "Хук / первый экран" not in headers:
         return rows
-    hook_idx = headers.index("Первый абзац / заголовок поста")
+    hook_idx = headers.index("Хук / первый экран")
     pos_idx  = headers.index("Позиция закрепа") if "Позиция закрепа" in headers else None
     result = []
     for i, row in enumerate(rows):
@@ -592,7 +592,7 @@ def _validate_semantic_pinned(label: str, src_headers: list, src_rows: list,
 def _warn_semantic_consistency(label: str, src_headers: list, src_rows: list,
                                 warnings: list) -> tuple[bool, bool]:
     """Emit semantic consistency warnings. Returns (hook_field_empty, semantic_fields_filled)."""
-    hook_idx = src_headers.index("Первый абзац / заголовок поста") if "Первый абзац / заголовок поста" in src_headers else None
+    hook_idx = src_headers.index("Хук / первый экран") if "Хук / первый экран" in src_headers else None
     role_idx = src_headers.index("Роль в воронке")     if "Роль в воронке"     in src_headers else None
     why_idx  = src_headers.index("Почему закреплен")   if "Почему закреплен"   in src_headers else None
 
@@ -610,7 +610,7 @@ def _warn_semantic_consistency(label: str, src_headers: list, src_rows: list,
             hook_val = str(row[hook_idx] or "")
             if hook_val.strip():
                 warnings.append(
-                    f"{label} post {pos}: 'Первый абзац / заголовок поста' is non-empty "
+                    f"{label} post {pos}: 'Хук / первый экран' is non-empty "
                     f"('{hook_val[:60]}') — filled from stage5a2c or stage5a2d."
                 )
                 hook_field_empty = False
@@ -723,7 +723,7 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
             "Позиция закрепа":     str(position) if position is not None else "",
             "Тема поста":          "",
             "Почему закреплен":    "",
-            "Первый абзац / заголовок поста": "",
+            "Хук / первый экран": "",
             "Что в тексте поста":  caption,
             "Ключевые смыслы":     "",
             "Какой CTA":           "",
@@ -745,6 +745,115 @@ def build_pinned_rows(sources, headers) -> tuple[list, list, dict]:
     })
     rows = _apply_hooks(rows, headers, hooks_index)
     return rows, warnings, pinned_meta
+
+
+# ---------------------------------------------------------------------------
+# v2 pinned rows
+# ---------------------------------------------------------------------------
+
+V2_PINNED_HEADERS = [
+    "Конкурент", "Ссылка на пост", "Позиция закрепа", "Тема поста",
+    "Почему закреплен", "Хук / первый экран", "Хук обложки (визуал)",
+    "Что в тексте поста", "Ключевые смыслы", "Какой CTA",
+    "Куда ведет CTA", "Роль в воронке", "Слайды карусели", "Противоречия",
+]
+
+
+def _carousel_count_index() -> dict:
+    """Return {position: slide_count_str} from stage5a2b_pinned_posts_details.json."""
+    path = BASE / "data" / ACCOUNT / "normalized" / "stage5a2b_pinned_posts_details.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    result = {}
+    for p in data.get("posts", []):
+        pos = p.get("position")
+        if pos is None:
+            continue
+        carousel = p.get("carousel_items") or []
+        count = len(carousel) if isinstance(carousel, list) else int(carousel or 0)
+        if count > 0:
+            result[int(pos)] = str(count)
+    return result
+
+
+def _contradiction_check(role: str, cta: str) -> str:
+    """'Роль продажа/лидогенерация но CTA не найден' when applicable, else ''."""
+    atoms = {t.strip().lower() for t in re.split(r"[/,]", role) if t.strip()}
+    if atoms & {"продажа", "лидогенерация"} and not cta.strip():
+        return "Роль продажа/лидогенерация но CTA не найден"
+    return ""
+
+
+def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
+    """Build rows for 'Закрепленные посты v2'.
+
+    Returns (headers, rows, warnings).
+    Uses stage5a2c semantic rows as base; adds hook cover, carousel count, contradiction.
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings       = []
+    hooks_index    = _pinned_hooks_index(sources)
+    carousel_index = _carousel_count_index()
+    _competitor    = _account_label(sources)
+
+    # Find source rows — same priority as build_pinned_rows
+    src_headers = None
+    src_rows    = None
+    for label in ("stage5a2c_fixed_rows", "stage5a2c_rows"):
+        data = sources.get(label)
+        if data is None:
+            continue
+        h = data.get("headers") or []
+        r = data.get("rows") or []
+        if h and r:
+            src_headers = h
+            src_rows    = r
+            break
+
+    if src_rows is None:
+        warnings.append("No stage5a2c rows found; 'Закрепленные посты v2' skipped")
+        return V2_PINNED_HEADERS, [], warnings
+
+    src_idx = {h: i for i, h in enumerate(src_headers)}
+
+    def _get(row, field):
+        i = src_idx.get(field)
+        return str(row[i] or "") if (i is not None and i < len(row)) else ""
+
+    rows = []
+    for row in src_rows:
+        position_str = _get(row, "Позиция закрепа")
+        try:
+            pos = int(position_str)
+        except (ValueError, TypeError):
+            pos = None
+
+        cta  = _get(row, "Какой CTA")
+        role = _get(row, "Роль в воронке")
+
+        v2_fields = {
+            "Конкурент":            _competitor,
+            "Ссылка на пост":       _get(row, "Ссылка на пост"),
+            "Позиция закрепа":      position_str,
+            "Тема поста":           _get(row, "Тема поста"),
+            "Почему закреплен":     _get(row, "Почему закреплен"),
+            "Хук / первый экран":   _get(row, "Хук / первый экран"),
+            "Хук обложки (визуал)": hooks_index.get(pos, "") if pos else "",
+            "Что в тексте поста":   _get(row, "Что в тексте поста"),
+            "Ключевые смыслы":      _get(row, "Ключевые смыслы"),
+            "Какой CTA":            cta,
+            "Куда ведет CTA":       _get(row, "Куда ведет CTA"),
+            "Роль в воронке":       role,
+            "Слайды карусели":      carousel_index.get(pos, "") if pos else "",
+            "Противоречия":         _contradiction_check(role, cta),
+        }
+        rows.append(_make_row(V2_PINNED_HEADERS, v2_fields))
+
+    return V2_PINNED_HEADERS, rows, warnings
 
 
 def build_funnel_rows(sources, headers) -> tuple[list, list]:
@@ -818,7 +927,7 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
     row["Соцдоказательства"]            = lf.get("sots_dokazatelstva", "")
     row["Какие боли раскрывают"]        = lf.get("boli", "")
     row["Какие аргументы используют"]   = lf.get("argumenty", "")
-    row["Структура лендинга"]            = lf.get("bloki_dalshe", "")
+    row["Какие блоки есть дальше"]            = lf.get("bloki_dalshe", "")
 
     if lf:
         warnings.append(

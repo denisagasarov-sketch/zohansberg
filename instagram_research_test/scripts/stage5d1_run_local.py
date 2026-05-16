@@ -22,6 +22,8 @@ from stage5d1_prepare_sheet_rows import (
     build_all_rows,
     validate_sheet_data,
     build_payload,
+    build_v2_pinned_rows,
+    _redact_url,
 )
 
 
@@ -232,6 +234,27 @@ def main():
     except ValueError as e:
         print(f"[ERROR] Payload build failed: {e}")
         sys.exit(1)
+
+    # Build v2 pinned rows and inject into payload (errors are non-fatal)
+    try:
+        v2_headers, v2_rows, v2_warnings = build_v2_pinned_rows(sources)
+        if v2_rows:
+            clean_v2 = [
+                [_redact_url(cell, payload_mode=True) for cell in row]
+                for row in v2_rows
+            ]
+            payload["sheets"]["Закрепленные посты v2"] = {
+                "headers": v2_headers,
+                "rows":    clean_v2,
+            }
+            print(f"  v2 pinned rows: {len(v2_rows)} row(s) added to payload")
+        else:
+            print(f"  v2 pinned rows: skipped — {v2_warnings[0] if v2_warnings else 'no data'}")
+        if v2_warnings:
+            warnings_all.extend(f"[Закрепленные посты v2] {w}" for w in v2_warnings)
+    except Exception as _v2_err:
+        print(f"  [WARN] build_v2_pinned_rows failed (non-fatal): {_v2_err}")
+        warnings_all.append(f"[Закрепленные посты v2] build failed: {_v2_err}")
 
     # Extract pinned rows metadata
     pinned_data = sheet_data.get("Закрепленные посты", {})

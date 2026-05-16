@@ -349,27 +349,46 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
         minutes = int(elapsed // 60)
         seconds = int(elapsed % 60)
 
-        # OpenAI costs
+        # OpenAI + Apify costs from costs.json (written by collect_costs stage)
         openai_cost_str = ""
+        apify_cost_str  = ""
         costs_path = BASE / "output" / username / "costs.json"
         if costs_path.exists():
             try:
-                total = json.loads(costs_path.read_text()).get("totals", {})
+                costs_data   = json.loads(costs_path.read_text())
+                totals       = costs_data.get("totals", {})
+                apify_stages = costs_data.get("apify_stages") or {}
+
                 openai_cost_str = (
-                    f"OpenAI ${total.get('total_cost_usd', 0):.4f}"
-                    f" ({total.get('total_tokens', 0)} токенов)"
+                    f"OpenAI ${totals.get('total_cost_usd', 0):.4f}"
+                    f" ({totals.get('total_tokens', 0)} токенов)"
                 )
+
+                apify_total = totals.get("apify_total_usd")
+                if apify_stages:
+                    parts = []
+                    for s, v in apify_stages.items():
+                        label = f"{s} ${v['cost_usd']:.4f}"
+                        if v.get("detail"):
+                            label += f" ({v['detail']})"
+                        parts.append(label)
+                    breakdown = ", ".join(parts)
+                    if apify_total is not None:
+                        apify_cost_str = f"Apify ${apify_total:.4f}: {breakdown}"
+                    else:
+                        apify_cost_str = f"Apify {breakdown}"
             except Exception:
                 pass
 
-        # Apify delta (balance after − balance before)
-        apify_balance_after  = await _get_apify_balance()
-        apify_balance_before = current_job.get("apify_balance_before")
-        if apify_balance_after is not None and apify_balance_before is not None:
-            apify_delta = round(apify_balance_after - apify_balance_before, 4)
-            apify_cost_str = f"Apify ${apify_delta:.4f}"
-        else:
-            apify_cost_str = "Apify см. console.apify.com"
+        # Fallback: Apify balance delta if costs.json had no apify data
+        if not apify_cost_str:
+            apify_balance_after  = await _get_apify_balance()
+            apify_balance_before = current_job.get("apify_balance_before")
+            if apify_balance_after is not None and apify_balance_before is not None:
+                apify_delta = round(apify_balance_after - apify_balance_before, 4)
+                apify_cost_str = f"Apify ${apify_delta:.4f}"
+            else:
+                apify_cost_str = "Apify см. console.apify.com"
 
         # Per-stage summary
         stages_text = _build_stages_summary(username)

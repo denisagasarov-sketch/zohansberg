@@ -252,6 +252,7 @@ def build_outputs(
     unique_raw, dupes_count = deduplicate(highlights_raw)
 
     normalized = [normalize_highlight(item, pos + 1) for pos, item in enumerate(unique_raw)]
+    normalized.sort(key=lambda h: h["position"])
 
     # Quality counters
     with_id    = sum(1 for h in normalized if h["highlight_id"]["data_status"] == "ok")

@@ -3,8 +3,8 @@
 Stage 5B-2: Highlight Stories Collector
 
 Читает highlight IDs из data/normalized/highlights_index.json,
-вызывает igview-owner/instagram-highlights-stories-viewer для каждого
-валидного ID и сохраняет raw + normalized outputs.
+делает ОДИН вызов automation-lab/instagram-stories-scraper для всех хайлайтов,
+затем разбивает ответ по highlight_id и сохраняет raw + normalized outputs.
 
 Создаёт:
   data/raw/stage5b2_stories_{id}_raw.json           (на каждый highlight)
@@ -44,19 +44,19 @@ HIGHLIGHTS_INDEX_PATH = NORM_DIR / "highlights_index.json"
 SUMMARY_PATH          = NORM_DIR / "stage5b2_highlights_stories_summary.json"
 STORIES_INDEX_PATH    = NORM_DIR / "stage5b2_stories_index.json"
 
-ACTOR_ID = "igview-owner/instagram-highlights-stories-viewer"
+ACTOR_ID = "automation-lab/instagram-stories-scraper"
 
-# Fields to probe in story items (from igview-owner confirmed output)
+# Fields to probe in story items (automation-lab confirmed output)
 STORY_PROBE_FIELDS = [
-    "storyNumber", "storyId", "storyType",
+    "id", "type", "timestamp",
     "imageUrl", "videoUrl",
-    "takenAt", "duration", "rawStoryData",
+    "highlightId", "highlightTitle",
 ]
 
 load_dotenv(dotenv_path=BASE / ".env", override=True)
 
 # ---------------------------------------------------------------------------
-# Token validation
+# Token / cookie validation
 # ---------------------------------------------------------------------------
 
 def validate_token(token: str) -> list:
@@ -72,16 +72,20 @@ def validate_token(token: str) -> list:
         errors.append("APIFY_TOKEN contains whitespace")
     return errors
 
+
+def validate_cookie(cookie: str) -> list:
+    errors = []
+    if not cookie:
+        errors.append("INSTAGRAM_SESSION_COOKIE missing or empty in .env")
+    elif any(c in cookie for c in ("\n", "\r")):
+        errors.append("INSTAGRAM_SESSION_COOKIE contains newlines — likely corrupted")
+    return errors
+
 # ---------------------------------------------------------------------------
 # Load and validate highlights_index.json
 # ---------------------------------------------------------------------------
 
 def load_highlights_index() -> list:
-    """
-    Load highlights from data/normalized/highlights_index.json.
-    Returns list of dicts with keys: position, highlight_id_value, title_value, raw_id.
-    Raises SystemExit if file not found.
-    """
     if not HIGHLIGHTS_INDEX_PATH.exists():
         raise SystemExit(
             f"[ERROR] highlights_index.json not found at "
@@ -92,18 +96,18 @@ def load_highlights_index() -> list:
     highlights_raw = raw.get("highlights", [])
     result = []
     for h in highlights_raw:
-        hid_field  = h.get("highlight_id", {})
+        hid_field   = h.get("highlight_id", {})
         title_field = h.get("title", {})
         hid_val    = hid_field.get("value") if isinstance(hid_field, dict) else None
         title_val  = title_field.get("value") if isinstance(title_field, dict) else None
         hid_status = hid_field.get("data_status") if isinstance(hid_field, dict) else None
         result.append({
-            "position":       h.get("position", 0),
-            "raw_id":         str(hid_val) if hid_val is not None else None,
-            "highlight_id":   None,   # normalized (no "highlight:" prefix), filled below
-            "id_valid":       False,
-            "title":          title_val or "—",
-            "id_status":      hid_status,
+            "position":     h.get("position", 0),
+            "raw_id":       str(hid_val) if hid_val is not None else None,
+            "highlight_id": None,
+            "id_valid":     False,
+            "title":        title_val or "—",
+            "id_status":    hid_status,
         })
     return result
 
@@ -112,7 +116,7 @@ def load_highlights_index() -> list:
 # ---------------------------------------------------------------------------
 
 def normalize_id(raw_id: str) -> tuple:
-    """Returns (normalized_id, is_valid)."""
+    """Returns (normalized_id, is_valid). Strips 'highlight:' prefix if present."""
     if not raw_id:
         return None, False
     stripped = raw_id.strip()
@@ -215,6 +219,7 @@ def blank_highlight_result(h: dict, status: str, errors: list = None) -> dict:
         "sample_values":     {},
         "raw_path":          f"data/{ACCOUNT}/raw/stage5b2_stories_{hid}_raw.json",
         "errors":            errors or [],
+        "apify_run_id":      None,
     }
 
 # ---------------------------------------------------------------------------
@@ -231,24 +236,30 @@ def run_dry_run(highlights: list, limit: int):
     print(f"Account: {ACCOUNT}")
     print(f"Source:  {HIGHLIGHTS_INDEX_PATH.relative_to(BASE)}")
     print()
-    print(f"highlights total:   {len(highlights)}")
-    print(f"highlights valid:   {len(valid_highlights)}")
-    print(f"highlights invalid: {invalid_count}")
-    print(f"limit:              {limit if limit else 'none (all valid)'}")
-    print(f"planned_apify_calls: {len(to_process)}")
+    print(f"highlights total:    {len(highlights)}")
+    print(f"highlights valid:    {len(valid_highlights)}")
+    print(f"highlights invalid:  {invalid_count}")
+    print(f"limit:               {limit if limit else 'none (all valid)'}")
+    print(f"planned_apify_calls: 1  (single batch call, maxHighlights={len(to_process)})")
     print()
 
-    token = os.environ.get("APIFY_TOKEN", "")
-    token_errors = validate_token(token)
-    if token_errors:
-        print("APIFY_TOKEN: INVALID")
-        for e in token_errors:
-            print(f"  [ERROR] {e}")
-    else:
-        print("APIFY_TOKEN: found, format OK (not printed)")
+    token  = os.environ.get("APIFY_TOKEN", "")
+    cookie = os.environ.get("INSTAGRAM_SESSION_COOKIE", "")
+    for label, val, errs in [
+        ("APIFY_TOKEN", token, validate_token(token)),
+        ("INSTAGRAM_SESSION_COOKIE", cookie, validate_cookie(cookie)),
+    ]:
+        if errs:
+            print(f"{label}: INVALID")
+            for e in errs:
+                print(f"  [ERROR] {e}")
+        else:
+            print(f"{label}: found, format OK (not printed)")
     print()
 
-    print("Planned calls (highlight_id → title):")
+    print(f"Payload: username={ACCOUNT!r}  maxHighlights={len(to_process)}")
+    print()
+    print("Highlights to process:")
     for i, h in enumerate(to_process):
         print(f"  [{i+1:2}] {h['highlight_id']:20}  {h['title']}")
     if invalid_count:
@@ -257,21 +268,20 @@ def run_dry_run(highlights: list, limit: int):
     print()
     print("DRY RUN complete — Apify was NOT called.")
 
-    # Save dry-run summary
     run_ts = datetime.now(timezone.utc).isoformat()
     dry_summary = {
-        "stage":                 "stage5b2",
-        "dry_run":               True,
-        "actor":                 ACTOR_ID,
-        "account":               ACCOUNT,
-        "run_timestamp":         run_ts,
-        "highlights_total":      len(highlights),
-        "highlights_valid":      len(valid_highlights),
-        "highlights_invalid":    invalid_count,
-        "limit":                 limit,
-        "planned_apify_calls":   len(to_process),
-        "actual_apify_calls":    0,
-        "status":                "DRY_RUN",
+        "stage":               "stage5b2",
+        "dry_run":             True,
+        "actor":               ACTOR_ID,
+        "account":             ACCOUNT,
+        "run_timestamp":       run_ts,
+        "highlights_total":    len(highlights),
+        "highlights_valid":    len(valid_highlights),
+        "highlights_invalid":  invalid_count,
+        "limit":               limit,
+        "planned_apify_calls": 1,
+        "actual_apify_calls":  0,
+        "status":              "DRY_RUN",
     }
     NORM_DIR.mkdir(parents=True, exist_ok=True)
     SUMMARY_PATH.write_text(json.dumps(dry_summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -279,56 +289,153 @@ def run_dry_run(highlights: list, limit: int):
     sys.exit(0)
 
 # ---------------------------------------------------------------------------
-# Real collect: one highlight
+# Real collect: single batch call → split by highlight_id
 # ---------------------------------------------------------------------------
 
-def collect_one(h: dict, client) -> dict:
-    if not h["id_valid"]:
-        return blank_highlight_result(
-            h, "INVALID_ID",
-            errors=[f"highlight_id '{h['raw_id']}' is not numeric after normalization"]
-        )
+def collect_batch(client, to_process: list, cookie: str) -> tuple[dict, str | None]:
+    """
+    One Apify call for all highlights. Returns (items_by_hid, run_id).
+    items_by_hid: {bare_highlight_id: [items]}
+    """
+    max_h   = len(to_process)
+    payload = {
+        "username":      ACCOUNT,
+        "maxHighlights": max_h,
+        "sessionCookie": cookie,
+    }
 
-    hid      = h["highlight_id"]
-    payload  = {"highlightId": hid}
-    raw_path = RAW_DIR / f"stage5b2_stories_{hid}_raw.json"
-    result   = blank_highlight_result(h, "FAIL")
-    result["raw_path"] = str(raw_path.relative_to(BASE))
+    print(f"  Calling {ACTOR_ID}")
+    print(f"  Payload: username={ACCOUNT!r}  maxHighlights={max_h}")
 
-    print(f"  [{h['position']:2}] {hid}  \"{h['title']}\" ...")
+    run   = client.actor(ACTOR_ID).call(run_input=payload)
+    run_id = run.get("id")
+    all_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+    print(f"  Run {run_id}: {len(all_items)} total items returned")
+
+    # Split by highlightId; skip active stories (no highlightId)
+    by_hid: dict[str, list] = {}
+    skipped_active = 0
+    for item in all_items:
+        raw_hid = item.get("highlightId") or ""
+        if not raw_hid:
+            skipped_active += 1
+            continue
+        # Strip "highlight:" prefix
+        hid = str(raw_hid).removeprefix("highlight:")
+        by_hid.setdefault(hid, []).append(item)
+
+    if skipped_active:
+        print(f"  Skipped {skipped_active} active story items (no highlightId)")
+
+    return by_hid, run_id
+
+
+def collect(client, highlights: list, limit: int) -> dict:
+    run_ts = datetime.now(timezone.utc).isoformat()
+
+    valid_highlights = [h for h in highlights if h["id_valid"]]
+    to_process       = valid_highlights[:limit] if limit else valid_highlights
+
+    print(f"\n[Stage 5B-2] {len(to_process)} highlights → 1 batch Apify call\n")
+
+    cookie = os.environ.get("INSTAGRAM_SESSION_COOKIE", "").strip()
+    cookie_errors = validate_cookie(cookie)
+    if cookie_errors:
+        for e in cookie_errors:
+            print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(1)
+
+    results  = []
+    run_id   = None
+    actual   = 0
 
     try:
-        run   = client.actor(ACTOR_ID).call(run_input=payload)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-        result["stories_count"] = len(items)
+        by_hid, run_id = collect_batch(client, to_process, cookie)
+        actual = 1
+    except Exception as exc:
+        print(f"[ERROR] Batch call failed: {exc}", file=sys.stderr)
+        # Mark all as FAIL
+        for h in highlights:
+            results.append(blank_highlight_result(
+                h, "FAIL" if h["id_valid"] else "INVALID_ID",
+                errors=[str(exc)]
+            ))
+        run_meta = {"planned": 1, "actual": 0, "run_ids": []}
+        summary, stories_index = build_outputs(results, highlights, run_ts, run_meta)
+        _save_outputs(summary, stories_index)
+        return summary
+
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+    for h in highlights:
+        if not h["id_valid"]:
+            results.append(blank_highlight_result(
+                h, "INVALID_ID",
+                errors=[f"highlight_id '{h['raw_id']}' is not numeric"]
+            ))
+            continue
+
+        hid    = h["highlight_id"]
+        result = blank_highlight_result(h, "FAIL")
+        result["apify_run_id"] = run_id
+
+        if h not in to_process:
+            # limit-excluded — don't add to results (counted in skipped_count)
+            continue
+
+        items = by_hid.get(hid, [])
+        print(f"  [{h['position']:2}] {hid}  \"{h['title']}\" — {len(items)} stories")
 
         if not items:
             result["status"] = "EMPTY_OR_INACCESSIBLE"
-            result["errors"].append("Actor returned 0 stories — highlight may be empty or inaccessible")
-            print(f"       EMPTY_OR_INACCESSIBLE — 0 stories")
+            result["errors"].append("No stories returned for this highlight")
         else:
             probe = probe_stories(items)
-            result["status"]           = "OK"
-            result["fields_found"]     = probe["fields_found"]
-            result["fields_missing"]   = probe["fields_missing"]
-            result["has_imageUrl"]     = probe["has_imageUrl"]
-            result["has_videoUrl"]     = probe["has_videoUrl"]
+            result["status"]            = "OK"
+            result["stories_count"]     = len(items)
+            result["fields_found"]      = probe["fields_found"]
+            result["fields_missing"]    = probe["fields_missing"]
+            result["has_imageUrl"]      = probe["has_imageUrl"]
+            result["has_videoUrl"]      = probe["has_videoUrl"]
             result["has_any_media_url"] = probe["has_any_media_url"]
-            result["sample_values"]    = probe["sample_values"]
-            print(f"       OK — {len(items)} stories  "
-                  f"imageUrl={probe['has_imageUrl']}  videoUrl={probe['has_videoUrl']}")
+            result["sample_values"]     = probe["sample_values"]
 
-        # Save raw
-        RAW_DIR.mkdir(parents=True, exist_ok=True)
-        safe_items = [safe_item(i) for i in items]
-        raw_path.write_text(json.dumps(safe_items, ensure_ascii=False, indent=2), encoding="utf-8")
+            raw_path = RAW_DIR / f"stage5b2_stories_{hid}_raw.json"
+            raw_path.write_text(
+                json.dumps([safe_item(i) for i in items], ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
 
-    except Exception as exc:
-        result["status"] = "FAIL"
-        result["errors"].append(str(exc))
-        print(f"       FAIL: {exc}")
+        results.append(result)
 
-    return result
+    run_meta = {
+        "planned": 1,
+        "actual":  actual,
+        "run_ids": [run_id] if run_id else [],
+    }
+
+    summary, stories_index = build_outputs(results, highlights, run_ts, run_meta)
+    _save_outputs(summary, stories_index)
+    return summary
+
+
+def _save_outputs(summary: dict, stories_index: dict):
+    NORM_DIR.mkdir(parents=True, exist_ok=True)
+    SUMMARY_PATH.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    STORIES_INDEX_PATH.write_text(json.dumps(stories_index, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print(f"\n[Normalized outputs saved]")
+    print(f"  {SUMMARY_PATH.relative_to(BASE)}")
+    print(f"  {STORIES_INDEX_PATH.relative_to(BASE)}")
+
+    print(f"\nSUMMARY")
+    print(f"  processed:    {summary['highlights_processed']}")
+    print(f"  OK:           {summary['highlights_ok']}")
+    print(f"  empty:        {summary['highlights_empty']}")
+    print(f"  fail:         {summary['highlights_fail']}")
+    print(f"  total_stories:{summary['total_stories_count']}")
+    print(f"  with_media:   {summary['highlights_with_media']}")
+    print(f"  can_analyze:  {summary['can_analyze_highlights']}")
 
 # ---------------------------------------------------------------------------
 # Build normalized outputs
@@ -341,7 +448,7 @@ def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict) 
     invalid_count = sum(1 for r in results if r["status"] == "INVALID_ID")
     skipped_count = len(highlights) - len(results)
 
-    total_stories = sum(r.get("stories_count", 0) for r in results)
+    total_stories         = sum(r.get("stories_count", 0) for r in results)
     highlights_with_media = sum(1 for r in results if r.get("has_any_media_url"))
 
     can_analyze = ok_count > 0
@@ -350,36 +457,35 @@ def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict) 
     if empty_count:
         warnings.append(f"{empty_count} highlights returned 0 stories (EMPTY_OR_INACCESSIBLE)")
     if fail_count:
-        blockers.append(f"{fail_count} highlights FAIL — check actor/token")
+        blockers.append(f"{fail_count} highlights FAIL — check actor/token/cookie")
     if invalid_count:
         warnings.append(f"{invalid_count} highlights skipped — invalid ID format")
     if skipped_count:
         warnings.append(f"{skipped_count} highlights not processed (limit applied)")
 
     summary = {
-        "stage":                 "stage5b2",
-        "account":               ACCOUNT,
-        "actor":                 ACTOR_ID,
-        "run_timestamp":         run_ts,
-        "planned_apify_calls":   run_meta["planned"],
-        "actual_apify_calls":    run_meta["actual"],
-        "apify_run_ids":         run_meta["run_ids"],
-        "highlights_total":      len(highlights),
-        "highlights_processed":  len(results),
-        "highlights_ok":         ok_count,
-        "highlights_empty":      empty_count,
-        "highlights_fail":       fail_count,
-        "highlights_invalid":    invalid_count,
-        "highlights_skipped":    skipped_count,
-        "total_stories_count":   total_stories,
-        "highlights_with_media": highlights_with_media,
+        "stage":                  "stage5b2",
+        "account":                ACCOUNT,
+        "actor":                  ACTOR_ID,
+        "run_timestamp":          run_ts,
+        "planned_apify_calls":    run_meta["planned"],
+        "actual_apify_calls":     run_meta["actual"],
+        "apify_run_ids":          run_meta["run_ids"],
+        "highlights_total":       len(highlights),
+        "highlights_processed":   len(results),
+        "highlights_ok":          ok_count,
+        "highlights_empty":       empty_count,
+        "highlights_fail":        fail_count,
+        "highlights_invalid":     invalid_count,
+        "highlights_skipped":     skipped_count,
+        "total_stories_count":    total_stories,
+        "highlights_with_media":  highlights_with_media,
         "can_analyze_highlights": can_analyze,
-        "blockers":              blockers,
-        "warnings":              warnings,
-        "results":               results,
+        "blockers":               blockers,
+        "warnings":               warnings,
+        "results":                results,
     }
 
-    # Lightweight stories index (position, id, title, status, count, raw_path)
     stories_index = {
         "stage":         "stage5b2",
         "account":       ACCOUNT,
@@ -400,63 +506,3 @@ def build_outputs(results: list, highlights: list, run_ts: str, run_meta: dict) 
     }
 
     return summary, stories_index
-
-# ---------------------------------------------------------------------------
-# Real collect: all highlights
-# ---------------------------------------------------------------------------
-
-def collect(client, highlights: list, limit: int) -> dict:
-    run_ts  = datetime.now(timezone.utc).isoformat()
-    run_ids = []
-    actual  = 0
-
-    valid_highlights = [h for h in highlights if h["id_valid"]]
-    to_process       = valid_highlights[:limit] if limit else valid_highlights
-
-    print(f"\n[Stage 5B-2] Processing {len(to_process)} highlights ...")
-    print(f"  (total valid: {len(valid_highlights)}, limit: {limit if limit else 'none'})\n")
-
-    results = []
-    for h in highlights:
-        if h not in to_process:
-            # Record skipped invalid or limit-excluded
-            if not h["id_valid"]:
-                results.append(blank_highlight_result(
-                    h, "INVALID_ID",
-                    errors=[f"highlight_id '{h['raw_id']}' is not numeric"]
-                ))
-            # limit-excluded: not added to results, counted in skipped_count
-            continue
-
-        result = collect_one(h, client)
-        if result["status"] not in ("INVALID_ID", "FAIL"):
-            actual += 1
-        results.append(result)
-
-    run_meta = {
-        "planned": len(to_process),
-        "actual":  actual,
-        "run_ids": run_ids,
-    }
-
-    NORM_DIR.mkdir(parents=True, exist_ok=True)
-
-    summary, stories_index = build_outputs(results, highlights, run_ts, run_meta)
-
-    SUMMARY_PATH.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    STORIES_INDEX_PATH.write_text(json.dumps(stories_index, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    print(f"\n[Normalized outputs saved]")
-    print(f"  {SUMMARY_PATH.relative_to(BASE)}")
-    print(f"  {STORIES_INDEX_PATH.relative_to(BASE)}")
-
-    print(f"\nSUMMARY")
-    print(f"  processed:    {summary['highlights_processed']}")
-    print(f"  OK:           {summary['highlights_ok']}")
-    print(f"  empty:        {summary['highlights_empty']}")
-    print(f"  fail:         {summary['highlights_fail']}")
-    print(f"  total_stories:{summary['total_stories_count']}")
-    print(f"  with_media:   {summary['highlights_with_media']}")
-    print(f"  can_analyze:  {summary['can_analyze_highlights']}")
-
-    return summary

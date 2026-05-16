@@ -114,9 +114,11 @@ function doPost(e) {
     var writeId        = body.write_id        || null;
     var allowEmptyClear = body.allow_empty_clear === true ? true : false;
     var onlySheet      = body.only_sheet       || null;
+    var renameHeaders  = body.rename_headers   === true ? true : false;
     response.write_id        = writeId;
     response.allow_empty_clear = allowEmptyClear;
     response.only_sheet      = onlySheet;
+    response.rename_headers  = renameHeaders;
 
     // Validate sheets payload
     var sheetsPayload = body.sheets;
@@ -196,6 +198,29 @@ function doPost(e) {
       response.ok        = response.validated;
       response.written   = false;
       return _jsonResponse(response);
+    }
+
+    // -----------------------------------------------------------------------
+    // Write mode — optionally rename headers before validation
+    // -----------------------------------------------------------------------
+    if (renameHeaders) {
+      for (var ri = 0; ri < targetSheetNames.length; ri++) {
+        var rSheetName = targetSheetNames[ri];
+        var rPayload   = sheetsPayload[rSheetName];
+        var rHeaders   = (rPayload && rPayload.headers) ? rPayload.headers : [];
+        if (rHeaders.length === 0) continue;
+        var rSheet = ss.getSheetByName(rSheetName);
+        if (!rSheet) continue;
+        try {
+          rSheet.getRange(1, 1, 1, rHeaders.length).setValues([rHeaders]);
+          response.warnings.push("rename_headers: updated row 1 headers in '" + rSheetName + "'.");
+        } catch (renameErr) {
+          response.errors.push("rename_headers: failed to update '" + rSheetName + "': " + renameErr.message);
+        }
+      }
+      if (response.errors.length > 0) {
+        return _jsonResponse(response);
+      }
     }
 
     // -----------------------------------------------------------------------
