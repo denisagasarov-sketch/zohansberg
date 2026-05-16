@@ -184,10 +184,18 @@ def load_stories(highlight_id: str) -> tuple[list, str | None]:
 
 
 def select_image_urls(stories: list, max_n: int = STORIES_PER_HIGHLIGHT) -> list[str]:
-    """Pick up to max_n imageUrls from stories, skipping items without one."""
+    """Pick up to max_n image URLs from stories.
+
+    Checks multiple field names to handle different Apify actor schemas:
+      - imageUrl   (singhera07 actor)
+      - mediaUrl   (automation-lab actor)
+      - thumbnailUrl (automation-lab actor fallback)
+    """
     urls = []
     for item in stories:
-        url = item.get("imageUrl") or ""
+        url = (item.get("imageUrl") or
+               item.get("mediaUrl") or
+               item.get("thumbnailUrl") or "")
         if url:
             urls.append(url)
         if len(urls) >= max_n:
