@@ -858,9 +858,9 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
 
 V2_HIGHLIGHTS_HEADERS = [
     "Конкурент", "Название highlight", "Порядок",
-    "Тема", "Задача", "Что внутри",
-    "Механика подачи", "Куда ведет CTA", "CTA финальных кадров",
-    "Количество кадров",
+    "Тема highlight", "Задача highlight", "Что внутри",
+    "Механика подачи", "Хук обложки",
+    "CTA финальных кадров", "Количество кадров", "Куда ведет CTA",
 ]
 
 
@@ -922,16 +922,17 @@ def build_v2_highlights_rows(sources: dict) -> tuple[list, list, list]:
         count_str = str(count) if count is not None else ""
 
         v2_fields = {
-            "Конкурент":          _competitor,
-            "Название highlight": h.get("title", ""),
-            "Порядок":            str(h.get("position", "")),
-            "Тема":               _field_val(h, "tema"),
-            "Задача":             _field_val(h, "zadacha"),
-            "Что внутри":         _field_val(h, "chto_vnutri"),
-            "Механика подачи":    _field_val(h, "mekhanika"),
-            "Куда ведет CTA":     _field_val(h, "cta"),
+            "Конкурент":            _competitor,
+            "Название highlight":   h.get("title", ""),
+            "Порядок":              str(h.get("position", "")),
+            "Тема highlight":       _field_val(h, "tema"),
+            "Задача highlight":     _field_val(h, "zadacha"),
+            "Что внутри":           _field_val(h, "chto_vnutri"),
+            "Механика подачи":      _field_val(h, "mekhanika"),
+            "Хук обложки":          "",  # only CDN URLs available, no text
             "CTA финальных кадров": cta_final,
-            "Количество кадров":  count_str,
+            "Количество кадров":    count_str,
+            "Куда ведет CTA":       _field_val(h, "cta"),
         }
         rows.append(_make_row(V2_HIGHLIGHTS_HEADERS, v2_fields))
 
