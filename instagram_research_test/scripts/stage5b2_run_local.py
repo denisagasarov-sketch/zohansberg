@@ -7,12 +7,14 @@ Stage 5B-2: Local runner.
   2. stage5b2_create_report.py              — Markdown report (runtime, не коммитить)
 
 Использование:
-  python scripts/stage5b2_run_local.py --dry-run         # без Apify, все валидные ID
-  python scripts/stage5b2_run_local.py --dry-run --limit 5
-  python scripts/stage5b2_run_local.py                   # реальный запуск, все
-  python scripts/stage5b2_run_local.py --limit 3         # первые 3 валидных highlight
+  python scripts/stage5b2_run_local.py --dry-run              # без Apify, первые 5 (дефолт)
+  python scripts/stage5b2_run_local.py --dry-run --limit 3
+  python scripts/stage5b2_run_local.py                        # реальный запуск, первые 5
+  python scripts/stage5b2_run_local.py --limit 10             # первые 10 валидных highlight
+  python scripts/stage5b2_run_local.py --from-position 5 --limit 5  # следующие 5 (позиции 6–10)
 """
 
+import json
 import sys
 import os
 from pathlib import Path
@@ -22,16 +24,27 @@ os.environ["PYTHONUTF8"] = "1"
 BASE = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
 
-DRY_RUN = "--dry-run" in sys.argv
+DRY_RUN       = "--dry-run"       in sys.argv
+REFRESH_STALE = "--refresh-stale" in sys.argv
 
-# Parse --limit N
-LIMIT = None
+# Parse --limit N (default: 5)
+LIMIT = 5
 for i, arg in enumerate(sys.argv):
     if arg == "--limit" and i + 1 < len(sys.argv):
         try:
             LIMIT = int(sys.argv[i + 1])
         except ValueError:
             print(f"[ERROR] --limit must be an integer, got: {sys.argv[i + 1]}", file=sys.stderr)
+            sys.exit(1)
+
+# Parse --from-position N (default: 0) — skip first N valid highlights
+FROM_POSITION = 0
+for i, arg in enumerate(sys.argv):
+    if arg == "--from-position" and i + 1 < len(sys.argv):
+        try:
+            FROM_POSITION = int(sys.argv[i + 1])
+        except ValueError:
+            print(f"[ERROR] --from-position must be an integer, got: {sys.argv[i + 1]}", file=sys.stderr)
             sys.exit(1)
 
 ACCOUNT = "vlada_kliuiko"
@@ -57,9 +70,48 @@ def main():
               file=sys.stderr)
         sys.exit(1)
 
+    # Apply FROM_POSITION: skip first N valid highlights
+    if FROM_POSITION > 0:
+        valid_skipped = 0
+        filtered = []
+        for h in highlights:
+            if h["id_valid"] and valid_skipped < FROM_POSITION:
+                valid_skipped += 1
+            else:
+                filtered.append(h)
+        highlights_to_process = filtered
+    else:
+        highlights_to_process = highlights
+
+    remaining_valid = sum(1 for h in highlights_to_process if h["id_valid"])
+
+    # --refresh-stale: override highlights_to_process with only the stale IDs
+    if REFRESH_STALE:
+        stale_path = BASE / "data" / ACCOUNT / "normalized" / "stale_highlights.json"
+        if not stale_path.exists():
+            print("[INFO] stale_highlights.json not found — nothing to refresh")
+            sys.exit(0)
+        try:
+            stale_data = json.loads(stale_path.read_text(encoding="utf-8"))
+            stale_ids  = set(str(x) for x in (stale_data.get("stale_highlight_ids") or []))
+        except Exception as e:
+            print(f"[ERROR] Failed to read stale_highlights.json: {e}", file=sys.stderr)
+            sys.exit(1)
+        if not stale_ids:
+            print("[INFO] stale_highlights.json is empty — nothing to refresh")
+            sys.exit(0)
+
+        def _hid(h: dict) -> str:
+            return str(h.get("raw_id") or h.get("highlight_id") or h.get("id") or "")
+
+        highlights_to_process = [h for h in highlights if _hid(h) in stale_ids]
+        remaining_valid = sum(1 for h in highlights_to_process if h.get("id_valid", True))
+        print(f"[REFRESH-STALE] {len(highlights_to_process)} stale highlight(s) to re-collect:")
+        for h in highlights_to_process:
+            print(f"  - {h.get('title', _hid(h))} (id={_hid(h)})")
+
     if DRY_RUN:
-        collector.run_dry_run(highlights, LIMIT)
-        # sys.exit called inside
+        collector.run_dry_run(highlights_to_process, LIMIT)
         return
 
     # Real run
@@ -81,11 +133,7 @@ def main():
 
     client = ApifyClient(token)
 
-    to_process = [h for h in highlights if h["id_valid"]]
-    if LIMIT:
-        to_process_count = min(LIMIT, len(to_process))
-    else:
-        to_process_count = len(to_process)
+    to_process_count = min(LIMIT, remaining_valid) if LIMIT else remaining_valid
 
     print("=== Stage 5B-2: Highlight Stories Collector ===")
     print(f"Actor:    {collector.ACTOR_ID}")
@@ -94,10 +142,20 @@ def main():
     print(f"highlights total:    {len(highlights)}")
     print(f"highlights valid:    {valid_count}")
     print(f"highlights invalid:  {invalid_count}")
-    print(f"limit:               {LIMIT if LIMIT else 'none (all valid)'}")
+    print(f"from-position:       {FROM_POSITION}")
+    print(f"limit:               {LIMIT}")
+    print(f"will process:        {to_process_count}")
     print(f"planned_apify_calls: 1  (single batch, usernames=[{ACCOUNT!r}], maxHighlights={to_process_count})")
 
-    summary = collector.collect(client, highlights, LIMIT)
+    limit_for_collect = None if REFRESH_STALE else LIMIT
+    summary = collector.collect(client, highlights_to_process, limit_for_collect)
+
+    # After refresh-stale: remove stale_highlights.json so stage5b2v re-evaluates
+    if REFRESH_STALE:
+        stale_path = BASE / "data" / ACCOUNT / "normalized" / "stale_highlights.json"
+        if stale_path.exists():
+            stale_path.unlink()
+            print(f"[REFRESH-STALE] Cleared: {stale_path.relative_to(BASE)}")
 
     print("\n=== Creating report ===")
     import stage5b2_create_report as reporter

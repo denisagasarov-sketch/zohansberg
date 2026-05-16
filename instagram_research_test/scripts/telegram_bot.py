@@ -167,10 +167,21 @@ def _build_stages_summary(username: str) -> str:
         lines.append("8. Анализ лендинга — ⏭ пропущен")
 
     # 9. Хайлайты
-    hi = _j(norm / "highlights_index.json")
+    hi  = _j(norm / "highlights_index.json")
+    b2s = _j(norm / "stage5b2_highlights_stories_summary.json")
     if hi:
-        n = len(hi.get("highlights") or [])
-        lines.append(f"9. Хайлайты — ✅ {n} штук, названия и порядок")
+        total = len(hi.get("highlights") or [])
+        if b2s:
+            ok_results  = [r for r in (b2s.get("results") or []) if r.get("status") == "OK"]
+            n_in_table  = len(ok_results)
+            titles      = [r.get("title", "?") for r in ok_results[:5]]
+            table_str   = ", ".join(titles)
+            n_not       = total - n_in_table
+            if n_not > 0:
+                table_str += f" (+{n_not} не вошли)"
+            lines.append(f"9. Хайлайты — ✅ {total} штук\n   В таблице: {table_str}")
+        else:
+            lines.append(f"9. Хайлайты — ✅ {total} штук, названия и порядок")
     else:
         lines.append("9. Хайлайты — ⏭ пропущен")
 
@@ -265,6 +276,62 @@ def _build_changes_summary(username: str) -> str | None:
     return "\n".join(lines)
 
 
+def _get_stale_count(username: str) -> int:
+    """Return number of stale highlight IDs recorded for a username."""
+    path = BASE / "data" / username / "normalized" / "stale_highlights.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return len(data.get("stale_highlight_ids") or [])
+    except Exception:
+        return 0
+
+
+def _get_remaining_highlights(username: str) -> tuple[int, int]:
+    """Return (already_processed, remaining) for a username."""
+    norm = BASE / "data" / username / "normalized"
+
+    def _j(path):
+        try:
+            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        except Exception:
+            return None
+
+    hi  = _j(norm / "highlights_index.json")
+    b2s = _j(norm / "stage5b2_highlights_stories_summary.json")
+    if not hi or not b2s:
+        return 0, 0
+    total     = len(hi.get("highlights") or [])
+    processed = b2s.get("highlights_ok", 0)
+    remaining = max(0, total - processed)
+    return processed, remaining
+
+
+def _highlights_load_keyboard(username: str, remaining: int,
+                               stale_count: int = 0) -> InlineKeyboardMarkup:
+    buttons = []
+    if remaining > 0:
+        cost_5   = round(min(5,  remaining) * 0.03, 2)
+        cost_10  = round(min(10, remaining) * 0.03, 2)
+        cost_all = round(remaining * 0.03, 2)
+        row = []
+        if remaining >= 1:
+            row.append(InlineKeyboardButton(f"+5 (~${cost_5:.2f})",   callback_data=f"hl_more_5:{username}"))
+        if remaining >= 10:
+            row.append(InlineKeyboardButton(f"+10 (~${cost_10:.2f})", callback_data=f"hl_more_10:{username}"))
+        if row:
+            buttons.append(row)
+        buttons.append([InlineKeyboardButton(
+            f"Все оставшиеся (~${cost_all:.2f})", callback_data=f"hl_more_all:{username}"
+        )])
+    if stale_count > 0:
+        cost_stale = round(stale_count * 0.03, 2)
+        buttons.append([InlineKeyboardButton(
+            f"🔄 Обновить протухшие ({stale_count} шт. ~${cost_stale:.2f})",
+            callback_data=f"hl_refresh_stale:{username}",
+        )])
+    return InlineKeyboardMarkup(buttons)
+
+
 def _main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
@@ -324,6 +391,82 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Введите username аккаунта Instagram для анализа\n"
             "(например: kate.jet):"
         )
+        return
+
+    if query.data.startswith("hl_more_"):
+        parts    = query.data.split(":", 1)
+        amount   = parts[0][len("hl_more_"):]   # "5", "10", "all"
+        username = parts[1] if len(parts) > 1 else ""
+
+        if not username:
+            await query.edit_message_text("❌ Ошибка: username не найден в callback")
+            return
+
+        if current_job["running"]:
+            await query.answer(f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.")
+            return
+
+        processed, remaining = _get_remaining_highlights(username)
+
+        if remaining == 0:
+            await query.edit_message_text(f"✅ Все хайлайты @{username} уже загружены")
+            return
+
+        if amount == "all":
+            limit = remaining
+        else:
+            try:
+                limit = int(amount)
+            except ValueError:
+                await query.edit_message_text("❌ Неверный параметр кнопки")
+                return
+
+        await query.edit_message_text(
+            f"⏳ Загружаю ещё {limit} хайлайтов для @{username}...\n"
+            f"   (позиции {processed + 1}–{processed + limit})"
+        )
+
+        current_job["account"]              = username
+        current_job["started_at"]           = time.time()
+        current_job["running"]              = True
+        current_job["chat_id"]              = update.effective_chat.id
+        current_job["apify_balance_before"] = await _get_apify_balance()
+
+        asyncio.create_task(
+            _run_pipeline(update, context, username,
+                          skip_apify=False,
+                          highlights_limit=limit,
+                          highlights_from=processed)
+        )
+        return
+
+    if query.data.startswith("hl_refresh_stale:"):
+        username = query.data[len("hl_refresh_stale:"):]
+
+        if current_job["running"]:
+            await query.answer(f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.")
+            return
+
+        stale_count = _get_stale_count(username)
+        if stale_count == 0:
+            await query.edit_message_text(f"✅ Протухших хайлайтов для @{username} нет")
+            return
+
+        await query.edit_message_text(
+            f"⏳ Обновляю {stale_count} протухших хайлайтов для @{username}..."
+        )
+
+        current_job["account"]              = username
+        current_job["started_at"]           = time.time()
+        current_job["running"]              = True
+        current_job["chat_id"]              = update.effective_chat.id
+        current_job["apify_balance_before"] = await _get_apify_balance()
+
+        asyncio.create_task(
+            _run_pipeline(update, context, username,
+                          skip_apify=False,
+                          refresh_stale=True)
+        )
 
 
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -377,7 +520,15 @@ async def _launch(update: Update, context: ContextTypes.DEFAULT_TYPE, username: 
     asyncio.create_task(_run_pipeline(update, context, username, skip_apify))
 
 
-async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, username: str, skip_apify: bool):
+async def _run_pipeline(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    username: str,
+    skip_apify: bool,
+    highlights_limit: int = 5,
+    highlights_from: int = 0,
+    refresh_stale: bool = False,
+):
     start = time.time()
     log_path = BASE / "output" / username / "pipeline.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -385,6 +536,12 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
     cmd = [sys.executable, str(SCRIPTS_DIR / "run_pipeline.py"), "--account", username]
     if skip_apify:
         cmd.append("--skip-apify")
+    if refresh_stale:
+        cmd.append("--refresh-stale")
+    else:
+        cmd += ["--highlights-limit", str(highlights_limit)]
+        if highlights_from > 0:
+            cmd += ["--highlights-from", str(highlights_from)]
 
     try:
         loop = asyncio.get_running_loop()
@@ -465,6 +622,17 @@ async def _run_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE, user
 
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         logger.info(f"Pipeline for @{username} finished, returncode={result.returncode}")
+
+        # If highlights were limited or stale, offer action buttons
+        _, remaining  = _get_remaining_highlights(username)
+        stale_count   = _get_stale_count(username)
+        if remaining > 0 or stale_count > 0:
+            keyboard = _highlights_load_keyboard(username, remaining, stale_count)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"Догрузить ещё хайлайты для @{username}:",
+                reply_markup=keyboard,
+            )
 
     except Exception as e:
         logger.exception(f"Pipeline error for @{username}: {e}")

@@ -206,6 +206,21 @@ _DOWNLOAD_HEADERS = {
     )
 }
 
+STALE_PATH = NORM_DIR / "stale_highlights.json"
+
+
+def check_url_alive(url: str, timeout: int = 3) -> bool:
+    """HEAD-request the URL; return True only on HTTP 200."""
+    import requests
+    try:
+        resp = requests.head(
+            url, timeout=timeout,
+            headers=_DOWNLOAD_HEADERS, allow_redirects=True,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
 
 def download_as_base64(url: str, pil_image_cls, timeout: int = 10) -> str | None:
     """Download image URL, resize to IMAGE_MAX_SIDE, return base64 data URI or None."""
@@ -400,7 +415,8 @@ def build_highlight_result(highlight_id: str, meta: dict, stories: list,
                            image_urls: list[str], vision_result: dict,
                            cover_result: dict = None,
                            cta_result: dict = None,
-                           skipped: bool = False, skip_reason: str = "") -> dict:
+                           skipped: bool = False, skip_reason: str = "",
+                           stale_urls: bool = False) -> dict:
     base = {
         "highlight_id":     highlight_id,
         "title":            meta.get("title", ""),
@@ -410,6 +426,8 @@ def build_highlight_result(highlight_id: str, meta: dict, stories: list,
         "imageUrls_used":   image_urls,
         "skipped":          skipped,
     }
+    if stale_urls:
+        base["stale_urls"] = True
     if skipped:
         base["skip_reason"] = skip_reason
         return base
@@ -593,7 +611,9 @@ def main():
 
     client = OpenAI(api_key=api_key)
 
-    results = []
+    results      = []
+    stale_ids_detected: list[str] = []
+
     for hid in target_ids:
         meta  = hl_meta.get(hid) or {"title": f"highlight_{hid}", "position": None}
         title = meta.get("title") or f"highlight_{hid}"
@@ -611,6 +631,21 @@ def main():
 
         candidate_urls = select_image_urls(stories)
         print(f"  Stories total: {len(stories)}, candidate images: {len(candidate_urls)}")
+
+        # Staleness check: HEAD request on first candidate URL (timeout 3 s)
+        if candidate_urls:
+            alive = check_url_alive(candidate_urls[0])
+            if not alive:
+                print(f"  [WARN] Stale URL (HEAD 403/error/timeout): {candidate_urls[0][:80]}")
+                stale_ids_detected.append(hid)
+                results.append(build_highlight_result(
+                    hid, meta, stories, candidate_urls,
+                    vision_result={},
+                    skipped=True,
+                    skip_reason="stale_urls",
+                    stale_urls=True,
+                ))
+                continue
 
         print("  Downloading and encoding images...")
         original_urls, data_uris = prepare_images(candidate_urls, PILImage)
@@ -669,9 +704,36 @@ def main():
     OUTPUT_PATH.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[OK] Written: {OUTPUT_PATH.relative_to(BASE)}")
 
+    # Save or clear stale_highlights.json
+    if stale_ids_detected:
+        print(f"\n[WARN] Stale URLs detected in {len(stale_ids_detected)} highlight(s):")
+        for r in results:
+            if r.get("stale_urls"):
+                print(f"  - {r.get('title', r['highlight_id'])} "
+                      f"(pos {r.get('position', '?')}, id={r['highlight_id']})")
+        STALE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        STALE_PATH.write_text(json.dumps({
+            "account":             ACCOUNT,
+            "stale_highlight_ids": stale_ids_detected,
+            "generated_at":        datetime.now(timezone.utc).isoformat(),
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  Saved: {STALE_PATH.relative_to(BASE)}")
+        print(f"  Re-collect: python scripts/stage5b2_run_local.py "
+              f"--account {ACCOUNT} --refresh-stale")
+    elif STALE_PATH.exists():
+        STALE_PATH.unlink()
+        print(f"[OK] {STALE_PATH.relative_to(BASE)} cleared (no stale URLs)")
+
     print("\n=== Summary ===")
     for r in results:
-        status = "SKIPPED" if r.get("skipped") else ("PARSE_ERROR" if r.get("parse_error") else "OK")
+        if r.get("stale_urls"):
+            status = "STALE"
+        elif r.get("skipped"):
+            status = "SKIPPED"
+        elif r.get("parse_error"):
+            status = "PARSE_ERROR"
+        else:
+            status = "OK"
         print(f"  [{status}] {r.get('title', r['highlight_id'])}")
 
 

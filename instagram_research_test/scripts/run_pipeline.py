@@ -92,6 +92,7 @@ STAGE_ORDER = [
         "requires_apify": True,
         "requires_openai": False,
         "cost_estimate": "$0.10–2.00",
+        "extra_args": ["--limit", "5"],  # overridden dynamically by --highlights-limit
     },
     {
         "name": "5B-2V: Vision для хайлайтов",
@@ -140,9 +141,16 @@ def has_stories_data(account: str) -> bool:
     return len(glob.glob(pattern)) > 0
 
 
-def run_stage(stage: dict, account: str, dry_run: bool, skip_apify: bool) -> bool:
+def run_stage(stage: dict, account: str, dry_run: bool, skip_apify: bool,
+              highlights_from: int = 0, refresh_stale: bool = False) -> bool:
     if skip_apify and stage.get("requires_apify"):
         print(f"[SKIP] Пропущен (--skip-apify): {stage['name']}")
+        return True
+
+    # Skip profile/highlights-index when appending highlights or refreshing stale
+    if (highlights_from > 0 or refresh_stale) and \
+            stage["script"] in ("stage5a1_run_local.py", "stage5b1_run_local.py"):
+        print(f"[SKIP] Пропущен (--highlights-from / --refresh-stale): {stage['name']}")
         return True
 
     if stage.get("skip_if_no_stories") and not has_stories_data(account):
@@ -162,17 +170,37 @@ def run_stage(stage: dict, account: str, dry_run: bool, skip_apify: bool) -> boo
 
 def main():
     parser = argparse.ArgumentParser(description="Instagram Competitor Research Pipeline")
-    parser.add_argument("--account",    required=True, help="Instagram username")
-    parser.add_argument("--estimate",   action="store_true", help="Показать оценку затрат")
-    parser.add_argument("--dry-run",    action="store_true", help="Dry-run без реальных API")
-    parser.add_argument("--skip-apify", action="store_true", help="Пропустить Apify stages")
+    parser.add_argument("--account",          required=True, help="Instagram username")
+    parser.add_argument("--estimate",         action="store_true", help="Показать оценку затрат")
+    parser.add_argument("--dry-run",          action="store_true", help="Dry-run без реальных API")
+    parser.add_argument("--skip-apify",       action="store_true", help="Пропустить Apify stages")
+    parser.add_argument("--highlights-limit", type=int, default=5,
+                        help="Лимит хайлайтов для stage5b2 (дефолт: 5)")
+    parser.add_argument("--highlights-from",  type=int, default=0,
+                        help="Пропустить первые N хайлайтов (для догрузки следующих; дефолт: 0)")
+    parser.add_argument("--refresh-stale",    action="store_true",
+                        help="Пересобрать только протухшие хайлайты из stale_highlights.json")
     args = parser.parse_args()
 
-    account    = args.account
-    dry_run    = args.dry_run
-    skip_apify = args.skip_apify
+    account          = args.account
+    dry_run          = args.dry_run
+    skip_apify       = args.skip_apify
+    highlights_limit = args.highlights_limit
+    highlights_from  = args.highlights_from
+    refresh_stale    = args.refresh_stale
 
     check_env()
+
+    # Update stage5b2 extra_args based on highlights parameters
+    for _stage in STAGE_ORDER:
+        if _stage["script"] == "stage5b2_run_local.py":
+            if refresh_stale:
+                _stage["extra_args"] = ["--refresh-stale"]
+            else:
+                _stage["extra_args"] = ["--limit", str(highlights_limit)]
+                if highlights_from > 0:
+                    _stage["extra_args"] += ["--from-position", str(highlights_from)]
+            break
 
     if args.estimate:
         print(f"\nАккаунт: @{account}")
@@ -208,7 +236,7 @@ def main():
         print(f"[{i+1}/{total}] {stage['name']}")
         print(f"{'='*60}")
 
-        ok = run_stage(stage, account, dry_run, skip_apify)
+        ok = run_stage(stage, account, dry_run, skip_apify, highlights_from, refresh_stale)
 
         if ok:
             completed += 1
