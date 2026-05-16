@@ -856,6 +856,91 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
     return V2_PINNED_HEADERS, rows, warnings
 
 
+V2_HIGHLIGHTS_HEADERS = [
+    "Конкурент", "Название highlight", "Порядок",
+    "Тема", "Задача", "Что внутри",
+    "Механика подачи", "Куда ведет CTA", "CTA финальных кадров",
+    "Количество кадров",
+]
+
+
+def _stories_count_index() -> dict:
+    """Return {highlight_id: stories_count} from stage5b2_highlights_stories_summary.json."""
+    path = BASE / "data" / ACCOUNT / "normalized" / "stage5b2_highlights_stories_summary.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {
+        r["highlight_id"]: r.get("stories_count", 0)
+        for r in data.get("results", [])
+        if r.get("highlight_id")
+    }
+
+
+def build_v2_highlights_rows(sources: dict) -> tuple[list, list, list]:
+    """Build rows for 'Анализ хайлайтс v2'.
+
+    Returns (headers, rows, warnings).
+    Primary source: stage5b2v_highlights_visual.json → analyzed_highlights[].
+    stories_count from stage5b2_highlights_stories_summary.json.
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings    = []
+    _competitor = _account_label(sources)
+
+    visual_data = sources.get("highlights_visual")
+    if not visual_data:
+        warnings.append("stage5b2v_highlights_visual.json not found; 'Анализ хайлайтс v2' skipped")
+        return V2_HIGHLIGHTS_HEADERS, [], warnings
+
+    analyzed = visual_data.get("analyzed_highlights", [])
+    if not analyzed:
+        warnings.append("analyzed_highlights is empty in highlights_visual; sheet skipped")
+        return V2_HIGHLIGHTS_HEADERS, [], warnings
+
+    stories_count_idx = _stories_count_index()
+
+    def _field_val(h: dict, key: str) -> str:
+        f = h.get("fields", {}).get(key) or {}
+        return str(f.get("value") or "")
+
+    rows = []
+    for h in analyzed:
+        if h.get("skipped"):
+            continue
+
+        hid = h.get("highlight_id", "")
+
+        # CTA финальных кадров — поле из v2 prompt (cta_targeted), если есть
+        cta_targeted = h.get("cta_targeted") or {}
+        cta_final    = str(cta_targeted.get("text") or "")
+
+        count = stories_count_idx.get(hid)
+        count_str = str(count) if count is not None else ""
+
+        v2_fields = {
+            "Конкурент":          _competitor,
+            "Название highlight": h.get("title", ""),
+            "Порядок":            str(h.get("position", "")),
+            "Тема":               _field_val(h, "tema"),
+            "Задача":             _field_val(h, "zadacha"),
+            "Что внутри":         _field_val(h, "chto_vnutri"),
+            "Механика подачи":    _field_val(h, "mekhanika"),
+            "Куда ведет CTA":     _field_val(h, "cta"),
+            "CTA финальных кадров": cta_final,
+            "Количество кадров":  count_str,
+        }
+        rows.append(_make_row(V2_HIGHLIGHTS_HEADERS, v2_fields))
+
+    if not rows:
+        warnings.append("All highlights skipped in visual analysis; no rows produced")
+
+    return V2_HIGHLIGHTS_HEADERS, rows, warnings
+
+
 def build_funnel_rows(sources, headers) -> tuple[list, list]:
     """0 or 1 provisional row if external_url is known."""
     bio      = sources.get("bio_analysis")
