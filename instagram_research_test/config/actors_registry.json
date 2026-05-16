@@ -146,7 +146,7 @@
       "notes": [
         "Price: $0.0026 per reel.",
         "Input: username (ARRAY) + resultsLimit (int).",
-        "Does NOT return transcript — field absent from output.",
+        "Transcript: set includeTranscript:true — returns plain string via Whisper, no extra cost.",
         "Uses displayUrl for thumbnail (not thumbnailUrl).",
         "videoPlayCount = total plays, videoViewCount = unique views."
       ],
@@ -194,10 +194,18 @@
             "inputUrl",
             "alt"
           ],
+          "transcript_support": {
+            "enabled_by": "includeTranscript: true in input",
+            "method": "Whisper (audio downloaded, then transcribed server-side)",
+            "output_field": "transcript",
+            "output_type": "plain string (not segments)",
+            "confirmed_test": "DYVM0IWuuGP — 1973 chars of Russian text in 41s",
+            "extra_cost": "none — included in $0.0026/reel price"
+          },
           "schema_notes": [
             "thumbnailUrl: ABSENT — use displayUrl instead.",
             "viewCount: ABSENT — use videoPlayCount (total plays) or videoViewCount (unique views).",
-            "transcript: ABSENT — actor does not return captions/transcripts.",
+            "transcript: only present when includeTranscript:true is passed in input.",
             "url field: full Instagram URL in /p/<shortCode>/ format (not /reel/).",
             "images[]: array of image variants; use displayUrl for the primary thumbnail."
           ],
@@ -216,6 +224,32 @@
             "transcript not available — actor doesn't return it.",
             "displayUrl CDN URLs may go stale (same issue as highlight stories).",
             "isPinned present in output — confirmed for vlada_kliuiko test."
+          ]
+        }
+      }
+    },
+    "crawlerbros/instagram-transcript-scraper": {
+      "purpose": "Reel transcript via Whisper — tested and rejected in favor of apify/instagram-reel-scraper",
+      "status": "rejected",
+      "confidence": "high",
+      "last_verified": "2026-05-16",
+      "notes": [
+        "Tested 2026-05-16 on vlada_kliuiko reel DXxLzsNug-u.",
+        "Input field is 'videoUrls' (array), NOT 'urls'.",
+        "First run: downloaded audio (952KB), started Whisper base model — TIMED OUT at 120s.",
+        "Second run: 'Could not extract video data from page' — unreliable page scraping.",
+        "Uses Playwright + Whisper CPU — slow and fragile vs apify actor which does it in 41s.",
+        "DO NOT USE: apify/instagram-reel-scraper with includeTranscript:true is faster and cheaper."
+      ],
+      "confirmed_actions": {
+        "transcript": {
+          "tested": true,
+          "verdict": "rejected",
+          "input_field": "videoUrls (array of Instagram post URLs)",
+          "output_fields_when_working": ["segmentIndex", "segmentStart", "segmentEnd", "segmentText", "totalSegments", "transcriptionMethod"],
+          "failure_modes": [
+            "TIMED_OUT — Whisper CPU transcription > 120s for ~1min reel",
+            "Could not extract video data from page — page scraping unreliable"
           ]
         }
       }

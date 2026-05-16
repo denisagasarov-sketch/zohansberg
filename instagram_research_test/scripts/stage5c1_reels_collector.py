@@ -23,7 +23,8 @@ STAGE      = "stage5c1"
 MAX_SELECTED = 10   # max reels in normalized output
 
 # Fields to carry into normalized output (with fallback aliases)
-# Real actor schema (confirmed 2026-05-16): displayUrl (not thumbnailUrl), videoPlayCount (not viewCount), no transcript
+# Real actor schema (confirmed 2026-05-16): displayUrl (not thumbnailUrl), videoPlayCount (not viewCount)
+# transcript requires includeTranscript:true in input — returns plain string when available
 _FIELD_MAP = [
     ("reel_id",       ["id", "shortCode"]),
     ("url",           ["url", "shortCode"]),     # post-processed below
@@ -33,6 +34,7 @@ _FIELD_MAP = [
     ("likes_count",   ["likesCount"]),
     ("comments_count",["commentsCount"]),
     ("caption",       ["caption"]),
+    ("transcript",    ["transcript"]),
     ("timestamp",     ["timestamp"]),
     ("is_pinned",     ["isPinned"]),
 ]
@@ -103,15 +105,19 @@ def normalize_reels(raw_items: list, max_total: int = MAX_SELECTED) -> tuple[lis
 # Dry-run
 # ---------------------------------------------------------------------------
 
-def run_dry_run(account: str, limit: int):
+def run_dry_run(account: str, limit: int, include_transcript: bool):
     print("[DRY-RUN] No Apify call. No files written.\n")
-    print(f"Actor:          {ACTOR_ID}")
-    print(f"Account:        @{account}")
-    print(f"resultsLimit:   {limit}")
-    print(f"max_selected:   {MAX_SELECTED}")
+    print(f"Actor:              {ACTOR_ID}")
+    print(f"Account:            @{account}")
+    print(f"resultsLimit:       {limit}")
+    print(f"includeTranscript:  {include_transcript}")
+    print(f"max_selected:       {MAX_SELECTED}")
     print()
+    run_input = {"username": [account], "resultsLimit": limit}
+    if include_transcript:
+        run_input["includeTranscript"] = True
     print("Input payload that WOULD be sent:")
-    print(json.dumps({"username": [account], "resultsLimit": limit}, indent=2))
+    print(json.dumps(run_input, indent=2))
     print()
 
     raw_dir  = BASE / "data" / account / "raw"
@@ -123,6 +129,8 @@ def run_dry_run(account: str, limit: int):
     print("Estimated cost:")
     cost = round(limit * 0.0026, 4)
     print(f"  {limit} reels × $0.0026 = ${cost:.4f}")
+    if include_transcript:
+        print("  (transcript via Whisper is included in actor price — no extra cost)")
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +141,22 @@ def main():
     parser = argparse.ArgumentParser(
         description="Stage 5C-1: Reels Collector (apify/instagram-reel-scraper)"
     )
-    parser.add_argument("--account",  default="vlada_kliuiko",
+    parser.add_argument("--account",       default="vlada_kliuiko",
                         help="Instagram username to collect Reels for")
-    parser.add_argument("--limit",    type=int, default=10,
+    parser.add_argument("--limit",         type=int, default=10,
                         help="How many Reels to collect (resultsLimit, default: 10)")
-    parser.add_argument("--dry-run",  action="store_true",
+    parser.add_argument("--no-transcript", action="store_true",
+                        help="Skip transcript extraction (faster, same $0.0026/reel cost)")
+    parser.add_argument("--dry-run",       action="store_true",
                         help="Show what would happen; no Apify call, no files written")
     args = parser.parse_args()
 
-    account = args.account
-    limit   = args.limit
+    account            = args.account
+    limit              = args.limit
+    include_transcript = not args.no_transcript
 
     if args.dry_run:
-        run_dry_run(account, limit)
+        run_dry_run(account, limit, include_transcript)
         return
 
     # --- Real run ---
@@ -165,14 +176,17 @@ def main():
     except ImportError:
         raise SystemExit("apify-client not installed — run: pip install apify-client")
 
-    client     = ApifyClient(token)
-    run_input  = {"username": [account], "resultsLimit": limit}
+    client    = ApifyClient(token)
+    run_input = {"username": [account], "resultsLimit": limit}
+    if include_transcript:
+        run_input["includeTranscript"] = True
 
     print(f"=== Stage 5C-1: Reels Collector ===")
-    print(f"Actor:   {ACTOR_ID}")
-    print(f"Account: @{account}")
-    print(f"Limit:   {limit} reels")
-    print(f"Input:   {json.dumps(run_input)}")
+    print(f"Actor:             {ACTOR_ID}")
+    print(f"Account:           @{account}")
+    print(f"Limit:             {limit} reels")
+    print(f"includeTranscript: {include_transcript}")
+    print(f"Input:             {json.dumps(run_input)}")
     print()
     print("Starting Apify run...")
 
