@@ -138,6 +138,47 @@
         }
       }
     },
+    "apify/instagram-reel-scraper": {
+      "purpose": "collect Reels for an Instagram account",
+      "status": "planned",
+      "confidence": "medium",
+      "last_verified": "2026-05-16",
+      "notes": [
+        "Price: $0.0026 per reel.",
+        "Input: username (string) + resultsLimit (int).",
+        "Returns video metadata including transcript if available."
+      ],
+      "confirmed_actions": {
+        "reels": {
+          "tested": false,
+          "input_schema_source": "actor_documentation",
+          "safe_input_payload_example": {
+            "username": "vlada_kliuiko",
+            "resultsLimit": 10
+          },
+          "confirmed_output_fields": [
+            "videoUrl",
+            "thumbnailUrl",
+            "viewCount",
+            "caption",
+            "transcript",
+            "likesCount",
+            "commentsCount",
+            "timestamp",
+            "isPinned"
+          ],
+          "pricing": {
+            "per_reel_usd": 0.0026,
+            "example_10_reels_usd": 0.026
+          },
+          "limitations": [
+            "Not yet tested in production — schema may differ from documentation.",
+            "transcript availability depends on the reel having auto-generated captions.",
+            "isPinned may be absent if actor version does not support it."
+          ]
+        }
+      }
+    },
     "igview-owner/instagram-highlights-stories-viewer": {
       "purpose": "deprecated fallback — replaced by automation-lab",
       "status": "deprecated",
