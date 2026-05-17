@@ -341,11 +341,14 @@ def call_text(client, reel: dict, model: str) -> dict:
 
 def build_reel_result(reel: dict, vision: dict, text: dict) -> dict:
     return {
+        # Identity & metrics — carried from stage5c1
         "position":         reel.get("position"),
         "reel_id":          reel.get("reel_id"),
         "url":              reel.get("url"),
         "view_count":       reel.get("view_count"),
+        "likes_count":      reel.get("likes_count"),
         "is_pinned":        reel.get("is_pinned"),
+        "published_at":     reel.get("timestamp"),
         # Vision fields
         "vision_status":    vision.get("status"),
         "hook":             vision.get("hook"),

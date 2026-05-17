@@ -26,6 +26,7 @@ from stage5d1_prepare_sheet_rows import (
     build_v2_highlights_rows,
     build_v2_landing_rows,
     build_v2_profile_rows,
+    build_reels_rows,
     _redact_url,
 )
 
@@ -309,6 +310,27 @@ def main():
     except Exception as _v2l_err:
         print(f"  [WARN] build_v2_landing_rows failed (non-fatal): {_v2l_err}")
         warnings_all.append(f"[Лендинг v2] build failed: {_v2l_err}")
+
+    # Build reels rows and inject into payload (errors are non-fatal)
+    try:
+        vr_headers, vr_rows, vr_warnings = build_reels_rows(sources)
+        if vr_rows:
+            clean_vr = [
+                [_redact_url(cell, payload_mode=True) for cell in row]
+                for row in vr_rows
+            ]
+            payload["sheets"]["Reels"] = {
+                "headers": vr_headers,
+                "rows":    clean_vr,
+            }
+            print(f"  reels rows: {len(vr_rows)} row(s) added to payload")
+        else:
+            print(f"  reels rows: skipped — {vr_warnings[0] if vr_warnings else 'no data'}")
+        if vr_warnings:
+            warnings_all.extend(f"[Reels] {w}" for w in vr_warnings)
+    except Exception as _vr_err:
+        print(f"  [WARN] build_reels_rows failed (non-fatal): {_vr_err}")
+        warnings_all.append(f"[Reels] build failed: {_vr_err}")
 
     # Extract pinned rows metadata
     pinned_data = sheet_data.get("Закрепленные посты", {})

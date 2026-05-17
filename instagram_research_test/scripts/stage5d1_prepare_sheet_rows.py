@@ -92,6 +92,8 @@ SOURCE_FILES = {
     "pinned_hooks":         BASE / "data" / ACCOUNT / "normalized" / "stage5a2d_pinned_hooks.json",
     "landing_analysis":     BASE / "data" / ACCOUNT / "normalized" / "stage5a2g_landing_analysis.json",
     "link_destination":     BASE / "data" / ACCOUNT / "normalized" / "stage5a2f_link_destination.json",
+    "stage5c1_reels":       BASE / "data" / ACCOUNT / "normalized" / "stage5c1_reels_index.json",
+    "stage5c2_reels":       BASE / "data" / ACCOUNT / "normalized" / "stage5c2_reels_analysis.json",
 }
 
 _SECRET_PATTERNS = [
@@ -1285,6 +1287,115 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
 def build_bot_rows(sources, headers) -> tuple[list, list]:
     """No bot data — headers only."""
     return [], ["No bot/lead-magnet source; headers-only CSV created"]
+
+
+# ---------------------------------------------------------------------------
+# Reels rows (stage5c2)
+# ---------------------------------------------------------------------------
+
+V2_REELS_HEADERS = [
+    "Конкурент", "Ссылка", "Тема", "Хук визуальный", "Формат подачи",
+    "Просмотры", "Лайки", "CTA", "Роль в воронке", "Боль", "Решение",
+    "Закреплён", "Дата",
+]
+
+
+def _fmt_date(raw) -> str:
+    """Parse ISO timestamp and return дд.мм.гггг, or '' on failure."""
+    if not raw:
+        return ""
+    try:
+        s = str(raw).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt.strftime("%d.%m.%Y")
+    except Exception:
+        return str(raw)[:10]
+
+
+def _field_ok(f) -> str:
+    """Return value string if data_status==ok, else ''."""
+    if isinstance(f, dict) and f.get("data_status") == "ok":
+        return str(f.get("value") or "").strip()
+    return ""
+
+
+def build_reels_rows(sources: dict) -> tuple[list, list, list]:
+    """Build rows for 'Reels' sheet from stage5c2_reels_analysis.json.
+
+    Metrics (view_count, likes_count, is_pinned, published_at) are read from
+    stage5c1_reels_index.json by reel_id as the authoritative source — stage5c2
+    may have been generated before these fields were added to build_reel_result.
+
+    Returns (headers, rows, warnings).
+    If file is missing or empty — returns (headers, [], [warning]) without error.
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings    = []
+    _competitor = _account_label(sources)
+
+    raw = sources.get("stage5c2_reels")
+    if not raw or not isinstance(raw, dict):
+        warnings.append(
+            "stage5c2_reels_analysis.json not found or empty; 'Reels' sheet skipped"
+        )
+        return V2_REELS_HEADERS, [], warnings
+
+    reels = raw.get("reels") or []
+    if not reels:
+        warnings.append("reels list empty in stage5c2_reels_analysis.json; 'Reels' sheet skipped")
+        return V2_REELS_HEADERS, [], warnings
+
+    # Build lookup {reel_id: metrics} from stage5c1 for authoritative metric values
+    _c1_by_id: dict = {}
+    _c1_raw = sources.get("stage5c1_reels")
+    if isinstance(_c1_raw, dict):
+        for _r in (_c1_raw.get("reels") or []):
+            _rid = _r.get("reel_id") or _r.get("id") or ""
+            if _rid:
+                _c1_by_id[str(_rid)] = _r
+
+    rows = []
+    for r in reels:
+        reel_id    = str(r.get("reel_id") or "")
+        url        = r.get("url") or ""
+
+        # Prefer stage5c1 metrics; fall back to stage5c2 values
+        _c1 = _c1_by_id.get(reel_id, {})
+        views      = _c1.get("view_count")    if _c1 else r.get("view_count")
+        likes      = _c1.get("likes_count")   if _c1 else r.get("likes_count")
+        is_pinned  = _c1.get("is_pinned")     if _c1 else r.get("is_pinned")
+        published  = _fmt_date(_c1.get("timestamp") if _c1 else r.get("published_at"))
+
+        hook_val   = _field_ok(r.get("hook"))
+        fmt_val    = _field_ok(r.get("vizual_format"))
+        tema_val   = _field_ok(r.get("tema"))
+        cta_val    = _field_ok(r.get("cta"))
+        role_val   = _field_ok(r.get("rol_v_voronke"))
+        bol_val    = _field_ok(r.get("bol"))
+        res_val    = _field_ok(r.get("reshenie"))
+
+        pinned_str = "да" if is_pinned else "нет"
+        views_str  = str(views) if views is not None else ""
+        likes_str  = str(likes) if likes is not None else ""
+
+        row = {
+            "Конкурент":      _competitor,
+            "Ссылка":         _redact_url(url) if url else "",
+            "Тема":           tema_val  or "не найдено",
+            "Хук визуальный": hook_val  or "не найдено",
+            "Формат подачи":  fmt_val   or "не найдено",
+            "Просмотры":      views_str,
+            "Лайки":          likes_str,
+            "CTA":            cta_val   or "не найдено",
+            "Роль в воронке": role_val  or "не найдено",
+            "Боль":           bol_val   or "не найдено",
+            "Решение":        res_val   or "не найдено",
+            "Закреплён":      pinned_str,
+            "Дата":           published,
+        }
+        rows.append(_make_row(V2_REELS_HEADERS, row))
+
+    return V2_REELS_HEADERS, rows, warnings
 
 
 # ---------------------------------------------------------------------------

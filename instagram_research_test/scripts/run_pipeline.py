@@ -103,6 +103,20 @@ STAGE_ORDER = [
         "skip_if_no_stories": True,
     },
     {
+        "name": "5C-1: Сбор Reels",
+        "script": "stage5c1_reels_collector.py",
+        "requires_apify": True,
+        "requires_openai": False,
+        "cost_estimate": "$0.03",
+    },
+    {
+        "name": "5C-2: Анализ Reels",
+        "script": "stage5c2_reels_analyzer.py",
+        "requires_apify": False,
+        "requires_openai": True,
+        "cost_estimate": "$0.02",
+    },
+    {
         "name": "5D-1: Сборка payload",
         "script": "stage5d1_run_local.py",
         "requires_apify": False,
