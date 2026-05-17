@@ -29,17 +29,18 @@ MAX_SELECTED = 10   # max reels in normalized output
 # Real actor schema (confirmed 2026-05-16): displayUrl (not thumbnailUrl), videoPlayCount (not viewCount)
 # transcript requires includeTranscript:true in input — returns plain string when available
 _FIELD_MAP = [
-    ("reel_id",       ["id", "shortCode"]),
-    ("url",           ["url", "shortCode"]),     # post-processed below
-    ("video_url",     ["videoUrl"]),
-    ("thumbnail_url", ["displayUrl"]),
-    ("view_count",    ["videoPlayCount", "videoViewCount"]),
-    ("likes_count",   ["likesCount"]),
-    ("comments_count",["commentsCount"]),
-    ("caption",       ["caption"]),
-    ("transcript",    ["transcript"]),
-    ("timestamp",     ["timestamp"]),
-    ("is_pinned",     ["isPinned"]),
+    ("reel_id",        ["id", "shortCode"]),
+    ("url",            ["url", "shortCode"]),     # post-processed below
+    ("video_url",      ["videoUrl"]),
+    ("thumbnail_url",  ["displayUrl"]),
+    ("view_count",     ["videoPlayCount", "videoViewCount"]),
+    ("likes_count",    ["likesCount"]),
+    ("comments_count", ["commentsCount"]),
+    ("video_duration", ["videoDuration"]),
+    ("caption",        ["caption"]),
+    ("transcript",     ["transcript"]),
+    ("timestamp",      ["timestamp"]),
+    ("is_pinned",      ["isPinned"]),
 ]
 
 
@@ -73,6 +74,10 @@ def _extract_reel(item: dict, position: int) -> dict:
             out["url"] = _build_reel_url(item)
         else:
             out[norm_key] = _pick(item, aliases)
+
+    # Derived: uses_original_audio from nested musicInfo
+    music_info = item.get("musicInfo") or {}
+    out["uses_original_audio"] = music_info.get("uses_original_audio")
 
     # Derived: hashtags extracted from caption
     caption_raw = out.get("caption") or ""

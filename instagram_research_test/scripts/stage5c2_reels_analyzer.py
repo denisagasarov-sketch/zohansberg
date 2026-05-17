@@ -38,7 +38,7 @@ PROMPT_VERSION = "v2"
 DEFAULT_MODEL  = "gpt-4o"
 IMAGE_DETAIL   = "low"
 MAX_TOKENS_VIS = 300
-MAX_TOKENS_TXT = 500
+MAX_TOKENS_TXT = 600
 
 MIN_TRANSCRIPT_WORDS = 20
 
@@ -128,6 +128,10 @@ TEXT_SYSTEM = """\
                   Примеры: "факт → история → вывод", "боль → решение → CTA",
                   "вопрос → ответ → CTA", "тезис → аргументы → вывод".
                   Если не подходит ни один — описать своими словами в том же формате через →.
+8. hook_type   — тип крючка по transcript, один из вариантов:
+                  "вопрос" | "факт" | "история" | "провокация" | "обещание" | "не найдено".
+                  Классифицируй по первым секундам транскрипта, независимо от поля kryuchok.
+                  "не найдено" если явного крючка нет.
 
 ПРАВИЛА:
 - Отвечай только по переданному тексту, не домысливай.
@@ -144,7 +148,8 @@ TEXT_SYSTEM = """\
   "cta":            {"value": "...", "data_status": "ok|not_found"},
   "rol_v_voronke":  {"value": "...", "data_status": "ok"},
   "kryuchok":       {"value": "...", "data_status": "ok|not_found"},
-  "struktura":      {"value": "...", "data_status": "ok"}
+  "struktura":      {"value": "...", "data_status": "ok"},
+  "hook_type":      {"value": "вопрос|факт|история|провокация|обещание|не найдено", "data_status": "ok|not_found"}
 }"""
 
 
@@ -317,6 +322,7 @@ def call_text(client, reel: dict, model: str) -> dict:
         "rol_v_voronke": _not_found_field("no_text"),
         "kryuchok":      _not_found_field("no_text"),
         "struktura":     _not_found_field("no_text"),
+        "hook_type":     _not_found_field("no_text"),
         "tokens_used":   0,
     }
 
@@ -347,6 +353,7 @@ def call_text(client, reel: dict, model: str) -> dict:
                 "rol_v_voronke": _not_found_field("parse_error"),
                 "kryuchok":      _not_found_field("parse_error"),
                 "struktura":     _not_found_field("parse_error"),
+                "hook_type":     _not_found_field("parse_error"),
                 "tokens_used":   tokens,
             }
         kryuchok = _apply_length_limit(
@@ -362,6 +369,7 @@ def call_text(client, reel: dict, model: str) -> dict:
             "rol_v_voronke": parsed.get("rol_v_voronke", _not_found_field("missing_key")),
             "kryuchok":      kryuchok,
             "struktura":     parsed.get("struktura",     _not_found_field("missing_key")),
+            "hook_type":     parsed.get("hook_type",     _not_found_field("missing_key")),
             "tokens_used":   tokens,
         }
     except Exception as e:
@@ -376,6 +384,7 @@ def call_text(client, reel: dict, model: str) -> dict:
             "rol_v_voronke": _not_found_field("openai_error"),
             "kryuchok":      _not_found_field("openai_error"),
             "struktura":     _not_found_field("openai_error"),
+            "hook_type":     _not_found_field("openai_error"),
             "tokens_used":   0,
         }
 
@@ -385,15 +394,21 @@ def call_text(client, reel: dict, model: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def build_reel_result(reel: dict, vision: dict, text: dict) -> dict:
+    _views = reel.get("view_count") or 0
+    _likes = reel.get("likes_count") or 0
+    _engagement_rate = f"{(_likes / _views * 100):.2f}%" if _views > 0 else None
+
     return {
         # Identity & metrics — carried from stage5c1
         "position":         reel.get("position"),
         "reel_id":          reel.get("reel_id"),
         "url":              reel.get("url"),
-        "view_count":       reel.get("view_count"),
-        "likes_count":      reel.get("likes_count"),
+        "view_count":       _views,
+        "likes_count":      _likes,
         "is_pinned":        reel.get("is_pinned"),
         "published_at":     reel.get("timestamp"),
+        # Computed metrics
+        "engagement_rate":  _engagement_rate,
         # Vision fields
         "vision_status":    vision.get("status"),
         "hook":             vision.get("hook"),
@@ -408,6 +423,7 @@ def build_reel_result(reel: dict, vision: dict, text: dict) -> dict:
         "rol_v_voronke":    text.get("rol_v_voronke"),
         "kryuchok":         text.get("kryuchok"),
         "struktura":        text.get("struktura"),
+        "hook_type":        text.get("hook_type"),
         # Diagnostics
         "tokens_vision":    vision.get("tokens_used", 0),
         "tokens_text":      text.get("tokens_used", 0),

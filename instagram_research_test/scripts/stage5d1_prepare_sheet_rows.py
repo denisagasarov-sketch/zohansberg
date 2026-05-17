@@ -326,6 +326,18 @@ def _pinned_hooks_index(sources: dict) -> dict:
     return result
 
 
+def _followers_count(sources: dict) -> int | None:
+    """Return followers count from profile_summary.json, or None if unavailable."""
+    ps = sources.get("profile_summary") or {}
+    fc = ps.get("followers_count")
+    if isinstance(fc, dict):
+        v = fc.get("value")
+        return int(v) if v is not None else None
+    if isinstance(fc, (int, float)):
+        return int(fc)
+    return None
+
+
 def _pinned_carousel_index(sources: dict) -> dict:
     """Return {position: {"carousel_narrative": str, "carousel_cta": str}} from stage5a2d_pinned_hooks.json."""
     raw = sources.get("pinned_hooks")
@@ -1359,9 +1371,10 @@ def build_bot_rows(sources, headers) -> tuple[list, list]:
 
 V2_REELS_HEADERS = [
     "Конкурент", "Ссылка", "Тема", "Хук визуальный", "Формат подачи",
-    "Просмотры", "Лайки", "CTA", "Роль в воронке", "Боль", "Решение",
-    "Крючок", "Структура",
-    "Закреплён", "Дата", "Хэштеги", "День недели",
+    "Просмотры", "Лайки", "Комментарии", "CTA", "Роль в воронке", "Боль", "Решение",
+    "Крючок", "Структура", "Тип хука",
+    "Вовлечённость", "Виральность",
+    "Закреплён", "Дата", "Длительность", "Хэштеги", "День недели",
 ]
 
 
@@ -1440,9 +1453,24 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
         res_val       = _field_ok(r.get("reshenie"))
         kryuchok_val  = _field_ok(r.get("kryuchok"))
         struktura_val = _field_ok(r.get("struktura"))
+        hook_type_val = _field_ok(r.get("hook_type"))
 
+        comments_raw  = _c1.get("comments_count") if _c1 else None
+        comments_val  = str(comments_raw) if comments_raw is not None else ""
+        duration_raw  = _c1.get("video_duration") if _c1 else None
+        duration_val  = f"{int(duration_raw)}с" if duration_raw is not None else ""
         hashtags_val  = _c1.get("hashtags", "")   if _c1 else ""
         dow_val       = _c1.get("day_of_week", "") if _c1 else ""
+
+        engagement_val = r.get("engagement_rate") or ""
+
+        _followers = _followers_count(sources)
+        _views_int = views if isinstance(views, (int, float)) else 0
+        virality_val = (
+            f"{(_views_int / _followers * 100):.1f}%"
+            if (_followers and _views_int)
+            else ""
+        )
 
         pinned_str = "да" if is_pinned else "нет"
         views_str  = str(views) if views is not None else ""
@@ -1456,14 +1484,19 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
             "Формат подачи":  fmt_val       or "не найдено",
             "Просмотры":      views_str,
             "Лайки":          likes_str,
+            "Комментарии":    comments_val,
             "CTA":            cta_val       or "не найдено",
             "Роль в воронке": role_val      or "не найдено",
             "Боль":           bol_val       or "не найдено",
             "Решение":        res_val       or "не найдено",
             "Крючок":         kryuchok_val  or "не найдено",
             "Структура":      struktura_val or "не найдено",
+            "Тип хука":       hook_type_val or "не найдено",
+            "Вовлечённость":  engagement_val,
+            "Виральность":    virality_val,
             "Закреплён":      pinned_str,
             "Дата":           published,
+            "Длительность":   duration_val,
             "Хэштеги":        hashtags_val  or "",
             "День недели":    dow_val       or "",
         }
