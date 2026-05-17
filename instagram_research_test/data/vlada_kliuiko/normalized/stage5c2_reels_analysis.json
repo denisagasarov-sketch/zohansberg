@@ -3,11 +3,11 @@
   "stage": "stage5c2",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T12:37:32.645197+00:00",
+  "generated_at": "2026-05-17T13:37:07.515124+00:00",
   "reels_analyzed": 3,
   "reels_ok": 3,
   "reels_skipped": 0,
-  "total_tokens": 5932,
+  "total_tokens": 6310,
   "reels": [
     {
       "position": 1,
@@ -20,7 +20,7 @@
       "engagement_rate": "11.44%",
       "vision_status": "ok",
       "hook": {
-        "value": "крупный текст '#рубрика разбор от маркетолога' на фоне магазина — привлекает",
+        "value": "надпись на красной стене среди разноцветной керамики — визуальный акцент на",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -30,7 +30,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "История каблуков и их роль в обществе",
+        "value": "История каблуков и их трансформация от военного атрибута к символу сексуальности",
         "data_status": "ok"
       },
       "bol": {
@@ -61,9 +61,9 @@
         "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 496,
-      "tokens_text": 1569,
-      "tokens_total": 2065
+      "tokens_vision": 613,
+      "tokens_text": 1587,
+      "tokens_total": 2200
     },
     {
       "position": 2,
@@ -76,7 +76,7 @@
       "engagement_rate": "2.59%",
       "vision_status": "ok",
       "hook": {
-        "value": "девушка фотографирует особняк — интерес ко внутреннему содержанию",
+        "value": "фигура человека с телефоном на фоне роскошного здания — вызывает любопытство к",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -86,7 +86,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "Стратегия работы маркетингового агентства с новыми клиентами",
+        "value": "Важность влюбленности маркетолога в продукт клиента",
         "data_status": "ok"
       },
       "bol": {
@@ -102,7 +102,7 @@
         "data_status": "not_found"
       },
       "rol_v_voronke": {
-        "value": "знакомство",
+        "value": "доверие",
         "data_status": "ok"
       },
       "kryuchok": {
@@ -110,16 +110,16 @@
         "data_status": "ok"
       },
       "struktura": {
-        "value": "факт → аналогия → вывод",
+        "value": "личный опыт → теория → аналогия",
         "data_status": "ok"
       },
       "hook_type": {
-        "value": "провокация",
+        "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 476,
-      "tokens_text": 1320,
-      "tokens_total": 1796
+      "tokens_vision": 597,
+      "tokens_text": 1317,
+      "tokens_total": 1914
     },
     {
       "position": 3,
@@ -132,7 +132,7 @@
       "engagement_rate": "6.67%",
       "vision_status": "ok",
       "hook": {
-        "value": "женщина с игрушечной птицей в руках — вызывает любопытство",
+        "value": "женщина с игрушечной птицей в руках на фоне комнаты — привлекает внимание",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -142,7 +142,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "Почему попкорн едят в кинотеатрах",
+        "value": "История попкорна в кинотеатрах",
         "data_status": "ok"
       },
       "bol": {
@@ -150,7 +150,7 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Пересмотреть свою продуктовую линейку для увеличения прибыли",
+        "value": "Иногда, чтобы увеличить прибыль, нужно пересмотреть продуктовую линейку",
         "data_status": "ok"
       },
       "cta": {
@@ -162,20 +162,20 @@
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "виновата в этом Великая Депрессия",
+        "value": "вы знаете, что виновата в этом Великая Депрессия",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "история → вывод → CTA",
+        "value": "история → анализ рынка → вывод",
         "data_status": "ok"
       },
       "hook_type": {
         "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 483,
-      "tokens_text": 1588,
-      "tokens_total": 2071
+      "tokens_vision": 603,
+      "tokens_text": 1593,
+      "tokens_total": 2196
     }
   ]
 }

@@ -3,22 +3,22 @@
   "stage": "stage5a2e",
   "prompt_version": "v6",
   "model": "gpt-4o-mini",
-  "generated_at": "2026-05-17T13:22:00.828862+00:00",
+  "generated_at": "2026-05-17T13:35:23.322627+00:00",
   "bio_text": "аналитически точные стратегии с опорой на цифры\nоснователь @elpodium_agency \nкаждый четверг-рубрика разборов \n↓ курс по маркетинговым стратегиям с AI",
   "openai_status": "ok",
-  "tokens_used": 2140,
+  "tokens_used": 2142,
   "fields": {
     "niche": {
       "value": "маркетинг",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Тематика деятельности связана с маркетингом."
+      "notes": "Общая тематика деятельности связана с маркетингом."
     },
     "target_audience": {
       "value": "не определено",
       "data_status": "not_found",
       "source": "bio_text",
-      "notes": "Целевая аудитория не указана в тексте."
+      "notes": "Целевая аудитория не указана явно."
     },
     "result_promise": {
       "value": "научиться создавать маркетинговые стратегии с помощью AI",
@@ -36,7 +36,7 @@
       "value": "основатель @elpodium_agency",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Указана должность и место работы."
+      "notes": "Указана должность основателя агентства."
     },
     "social_proof": {
       "value": "не найдено",

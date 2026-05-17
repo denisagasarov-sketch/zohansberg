@@ -1460,7 +1460,7 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
         comments_raw  = _c1.get("comments_count") if _c1 else None
         comments_val  = str(comments_raw) if comments_raw is not None else ""
         duration_raw  = _c1.get("video_duration") if _c1 else None
-        duration_val  = f"{int(duration_raw)}с" if duration_raw is not None else ""
+        duration_val  = f"{int(duration_raw)}с" if duration_raw else ""
         hashtags_val  = _c1.get("hashtags", "")   if _c1 else ""
         dow_val       = _c1.get("day_of_week", "") if _c1 else ""
 

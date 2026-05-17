@@ -83,6 +83,11 @@ VISION_SYSTEM = """\
    "лицо с удивлением крупным планом — эмоциональный контакт".
    НЕ описывай всю сцену.
    data_status: "not_found" если: однотонный фон без текста, стандартный пейзаж без людей, логотип.
+   ВАЖНО — хэштеги: если на экране написан хэштег (#слово) — НЕ упоминай хэштег.
+   Опиши что происходит ВОКРУГ: цвет и текстура фона, есть ли люди или предметы, размер и цвет
+   шрифта если текст декоративный.
+   Пример: вместо "#маркетинг на красном фоне" пиши "крупный белый текст на ярко-красном фоне —
+   контраст останавливает взгляд".
 2. vizual_format — один из вариантов:
    "говорящая голова" | "текст на экране" | "скринкаст" | "b-roll" | "анимация" | "смешанный"
 
@@ -290,6 +295,9 @@ def call_vision(client, reel: dict, model: str) -> dict:
         hook = _apply_length_limit(
             parsed.get("hook", _not_found_field("missing_key")), 80
         )
+        # Postprocessing: if model returned a hashtag despite prompt instruction, clear it
+        if "#" in (hook.get("value") or ""):
+            hook = _not_found_field("hashtag_in_hook")
         return {
             "status":        "ok",
             "hook":          hook,
