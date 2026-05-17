@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -40,6 +41,32 @@ MAX_TOKENS_VIS = 300
 MAX_TOKENS_TXT = 500
 
 MIN_TRANSCRIPT_WORDS = 20
+
+_DOWNLOAD_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.instagram.com/",
+}
+
+
+def _fetch_image_as_data_uri(url: str, timeout: int = 10) -> tuple[str, str | None]:
+    """Download image and return (data_uri, error_or_None)."""
+    try:
+        import requests
+    except ImportError:
+        return "", "requests not installed"
+    try:
+        resp = requests.get(url, headers=_DOWNLOAD_HEADERS, timeout=timeout)
+        if resp.status_code != 200:
+            return "", f"HTTP {resp.status_code}"
+        content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        b64 = base64.b64encode(resp.content).decode("ascii")
+        return f"data:{content_type};base64,{b64}", None
+    except Exception as e:
+        return "", str(e)
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +195,11 @@ def _not_found_field(reason: str = "no_text") -> dict:
 # ---------------------------------------------------------------------------
 
 def call_vision(client, reel: dict, model: str) -> dict:
-    """Returns {status, hook, vizual_format, tokens_used}."""
+    """Returns {status, hook, vizual_format, tokens_used}.
+
+    Instagram CDN URLs are session-signed and can't be fetched by OpenAI servers.
+    We download the image locally and pass it as a base64 data URI.
+    """
     position    = reel.get("position", 0)
     display_url = (reel.get("thumbnail_url") or "").strip()
 
@@ -178,6 +209,16 @@ def call_vision(client, reel: dict, model: str) -> dict:
             "skip_reason":  "no_thumbnail_url",
             "hook":         _not_found_field("no_thumbnail_url"),
             "vizual_format":_not_found_field("no_thumbnail_url"),
+            "tokens_used":  0,
+        }
+
+    data_uri, fetch_err = _fetch_image_as_data_uri(display_url)
+    if fetch_err:
+        return {
+            "status":       "fetch_error",
+            "skip_reason":  fetch_err,
+            "hook":         _not_found_field("fetch_error"),
+            "vizual_format":_not_found_field("fetch_error"),
             "tokens_used":  0,
         }
 
@@ -192,7 +233,7 @@ def call_vision(client, reel: dict, model: str) -> dict:
                     "content": [
                         {
                             "type": "image_url",
-                            "image_url": {"url": display_url, "detail": IMAGE_DETAIL},
+                            "image_url": {"url": data_uri, "detail": IMAGE_DETAIL},
                         },
                         {"type": "text", "text": vision_user_prompt(position)},
                     ],
