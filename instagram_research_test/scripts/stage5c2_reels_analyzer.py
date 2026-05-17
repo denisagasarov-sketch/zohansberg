@@ -78,25 +78,21 @@ VISION_SYSTEM = """\
 Извлеки два поля и верни строго JSON — никакого текста вне JSON.
 
 ПОЛЯ:
-1. hook — что в первую очередь притягивает взгляд и заставляет остановиться:
-   эмоция на лице / неожиданное действие / провокационный текст / яркий визуал.
-   НЕ переписывай хэштеги или названия рубрик — опиши что именно цепляет визуально.
-   Одна фраза до 120 символов.
+1. hook — главный элемент который останавливает скролл. Одна фраза: [что именно] + [почему цепляет].
+   Примеры: "крупный красный текст с вопросом — читаешь до конца",
+   "лицо с удивлением крупным планом — эмоциональный контакт".
+   НЕ описывай всю сцену.
+   data_status: "not_found" если: однотонный фон без текста, стандартный пейзаж без людей, логотип.
 2. vizual_format — один из вариантов:
    "говорящая голова" | "текст на экране" | "скринкаст" | "b-roll" | "анимация" | "смешанный"
 
 ПРАВИЛА:
-- hook: описывай визуальный триггер — не копируй механически текст с экрана.
-  Примеры: "крупный план лица с удивлённым выражением", "красный заголовок на чёрном фоне бьёт в боль",
-  "резкий переход от хаоса к чистому столу", "провокационный вопрос крупным шрифтом".
-- Если на кадре только нейтральный хэштег или название рубрики без визуального крючка — опиши
-  визуальный контекст вокруг него (цвет фона, шрифт, атмосфера).
 - vizual_format определяй только по тому, что видно на кадре.
-- Поле data_status: "ok" если данные получены, "not_found" если изображение нечитаемо.
+- Поле data_status у vizual_format: "ok" если определён, "not_found" если изображение нечитаемо.
 
 ФОРМАТ (строго):
 {
-  "hook": {"value": "...", "data_status": "ok"},
+  "hook": {"value": "...", "data_status": "ok|not_found"},
   "vizual_format": {"value": "...", "data_status": "ok"}
 }"""
 
@@ -123,9 +119,11 @@ TEXT_SYSTEM = """\
                   "не найдено" если CTA нет.
 5. rol_v_voronke — роль в воронке, один из вариантов:
    "знакомство" | "доверие" | "прогрев" | "продажа" | "лидогенерация"
-6. kryuchok    — что заставляет досмотреть: интересный факт / неожиданная история /
-                  спорное утверждение / вопрос без ответа / провокационный тезис.
-                  Одна фраза до 100 символов. "не найдено" если не определяется.
+6. kryuchok    — триггер из первых секунд который создаёт интригу.
+                  НЕ пересказывай содержание ("рассказывает о каблуках" — это пересказ).
+                  Пиши сам крючок близко к тексту ("оказывается каблуки носили солдаты" — это крючок).
+                  Типы: неожиданный факт / история с неожиданной связью / вопрос без ответа /
+                  спорное утверждение. "не найдено" если крючка нет.
 7. struktura   — структура Reel в формате X → Y → Z, максимум 3 элемента.
                   Примеры: "факт → история → вывод", "боль → решение → CTA",
                   "вопрос → ответ → CTA", "тезис → аргументы → вывод".
@@ -204,6 +202,25 @@ def _not_found_field(reason: str = "no_text") -> dict:
     return {"value": "не найдено", "data_status": "not_found", "skip_reason": reason}
 
 
+def _truncate_at_word(text: str, max_len: int) -> str:
+    """Trim to max_len chars, cutting at the last space to avoid mid-word breaks."""
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    last_space = cut.rfind(" ")
+    return cut[:last_space] if last_space > 0 else cut
+
+
+def _apply_length_limit(field: dict, max_len: int) -> dict:
+    """Truncate field value in-place if data_status==ok and value exceeds max_len."""
+    if isinstance(field, dict) and field.get("data_status") == "ok":
+        val = field.get("value") or ""
+        if len(val) > max_len:
+            field = dict(field)  # don't mutate parsed dict
+            field["value"] = _truncate_at_word(val, max_len)
+    return field
+
+
 # ---------------------------------------------------------------------------
 # OpenAI calls
 # ---------------------------------------------------------------------------
@@ -265,9 +282,12 @@ def call_vision(client, reel: dict, model: str) -> dict:
                 "vizual_format": _not_found_field("parse_error"),
                 "tokens_used":   tokens,
             }
+        hook = _apply_length_limit(
+            parsed.get("hook", _not_found_field("missing_key")), 80
+        )
         return {
             "status":        "ok",
-            "hook":          parsed.get("hook", _not_found_field("missing_key")),
+            "hook":          hook,
             "vizual_format": parsed.get("vizual_format", _not_found_field("missing_key")),
             "tokens_used":   tokens,
         }
@@ -329,6 +349,9 @@ def call_text(client, reel: dict, model: str) -> dict:
                 "struktura":     _not_found_field("parse_error"),
                 "tokens_used":   tokens,
             }
+        kryuchok = _apply_length_limit(
+            parsed.get("kryuchok", _not_found_field("missing_key")), 100
+        )
         return {
             "status":        "ok",
             "source":        source,
@@ -337,7 +360,7 @@ def call_text(client, reel: dict, model: str) -> dict:
             "reshenie":      parsed.get("reshenie",      _not_found_field("missing_key")),
             "cta":           parsed.get("cta",           _not_found_field("missing_key")),
             "rol_v_voronke": parsed.get("rol_v_voronke", _not_found_field("missing_key")),
-            "kryuchok":      parsed.get("kryuchok",      _not_found_field("missing_key")),
+            "kryuchok":      kryuchok,
             "struktura":     parsed.get("struktura",     _not_found_field("missing_key")),
             "tokens_used":   tokens,
         }
