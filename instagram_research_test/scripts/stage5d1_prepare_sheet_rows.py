@@ -960,7 +960,7 @@ def build_v2_highlights_rows(sources: dict) -> tuple[list, list, list]:
         cta_targeted = h.get("cta_targeted") or {}
         cta_final    = str(cta_targeted.get("text") or "").strip()
         if cta_final.lower() in ("not_found", "не найдено", "нет cta", "cta не найден", ""):
-            cta_final = ""
+            cta_final = "CTA не найден"
 
         count = stories_count_idx.get(hid)
         count_str = str(count) if count is not None else ""
