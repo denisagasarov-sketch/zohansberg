@@ -1,0 +1,21 @@
+{
+  "status": "SKIPPED",
+  "actor_id": "igview-owner/instagram-highlights-stories-viewer",
+  "highlight_id_tested": null,
+  "stories_count": 0,
+  "dataset_type": "empty",
+  "sample_item_fields": [],
+  "has_storyNumber": false,
+  "has_storyId": false,
+  "has_storyType": false,
+  "has_imageUrl": false,
+  "has_videoUrl": false,
+  "has_any_media_url": false,
+  "has_takenAt": false,
+  "has_duration": false,
+  "has_rawStoryData": false,
+  "raw_path": "data/raw/highlight_stories_test_raw.json",
+  "sample_path": "data/raw/sample_story_item.json",
+  "skip_reason": "No valid clean_highlight_id from highlights index",
+  "errors": []
+}

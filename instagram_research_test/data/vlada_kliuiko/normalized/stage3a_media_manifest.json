@@ -1,0 +1,58 @@
+{
+  "post_media": [
+    {
+      "source": "post",
+      "content_id": "DF2bxZHtdW8",
+      "media_type": "image",
+      "source_url_field": "displayUrl",
+      "source_url": "https://scontent-atl3-1.cdninstagram.com/v/t51.2885-15/476876344_18483138763013703_2391582186481231548_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-atl3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gGhLu8a6gHoGhUtOHy2MhEDgo5SDrhRJDysP9E4uZBTwfN8uAk28ZmthpGHfWyb3aE&_nc_ohc=O3CkM8wbi4gQ7kNvwGTxaNp&_nc_gid=jpiJXoG9TE3ctc2E_jQ6fw&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af49-NB8MrS0Z1FkZsmQsn4g7Cj_aPK3RhznQEjmB9OH6g&oe=6A07A621&_nc_sid=10d13b",
+      "local_path": "output/media/stage3a/posts/DF2bxZHtdW8_image.jpg",
+      "downloaded": true,
+      "file_size_bytes": 127381,
+      "error": null
+    },
+    {
+      "source": "post",
+      "content_id": "DXxLzsNug-u",
+      "media_type": "video",
+      "source_url_field": "videoUrl",
+      "source_url": "https://scontent-ord5-3.cdninstagram.com/o1/v/t16/f2/m86/AQPXj0mjIVx3ExW7nB8cJ3EqMQOvZCZCPKGO7pGmetJC7V6WZ4N6X4zA8FmFx53FbH4H_CPuylnRnJfvQtgRz1OBAx3gHdEtPlswV_I.mp4?stp=dst-mp4&efg=eyJxZV9ncm91cHMiOiJbXCJpZ193ZWJfZGVsaXZlcnlfdnRzX290ZlwiXSIsInZlbmNvZGVfdGFnIjoidnRzX3ZvZF91cmxnZW4uY2xpcHMuYzIuNzIwLmJhc2VsaW5lIn0&_nc_cat=106&vs=1761293488566323_4157479866&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC8zRjQ1NTJEQ0Y2QUY4ODkxMDI0Rjg1RURFMzQ3NTJBQ192aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYUWlnX3hwdl9wbGFjZW1lbnRfcGVybWFuZW50X3YyL0Y5NEUxQzRFQzE5NUM5OUY5NkZFQURFODc4Qzk3QjhDX2F1ZGlvX2Rhc2hpbml0Lm1wNBUCAsgBEgAoABgAGwAVAAAm5tTCoa%2BH%2FAIVAigCQzMsF0BeLMzMzMzNGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX%2BB2XmnQEA&_nc_rid=da556f5e0d&ccb=9-4&oh=00_Af5oWR-r9PRdk5dqnLADE1xllcFmyETQMfWHdxMSlLGuCA&oe=6A038D0A&_nc_sid=10d13b",
+      "local_path": "output/media/stage3a/posts/DXxLzsNug-u_video.mp4",
+      "downloaded": true,
+      "file_size_bytes": 13413399,
+      "error": null
+    }
+  ],
+  "highlight_media": [
+    {
+      "source": "highlight_story",
+      "story_id": "3856463035712234989",
+      "media_type": "image",
+      "source_url_field": "imageUrl",
+      "source_url": "https://instagram.fnqz5-1.fna.fbcdn.net/v/t51.82787-15/654031864_18568468531013703_3784164257145263376_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=102&ig_cache_key=Mzg1NjQ2MzAzNTcxMjIzNDk4OQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjEzMjAuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=EHpi6k0CzD8Q7kNvwE8vztb&_nc_oc=Adpsr40fPHRYzyT3SIO0215UMUlCPwONMHFxme_uXYttVX-B9iyFunkqHNxjVLP-c84&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=instagram.fnqz5-1.fna&_nc_gid=CgaGcN7NACjtSPcZXqt4KA&_nc_ss=7a22e&oh=00_Af4v7N2gKUxqIJ6svx9Y2HzgTgnrYWRwQItLgzsUYrgv-w&oe=6A079102",
+      "local_path": "output/media/stage3a/highlights/3856463035712234989_image.jpg",
+      "downloaded": true,
+      "file_size_bytes": 184543,
+      "error": null
+    },
+    {
+      "source": "highlight_story",
+      "story_id": "3867898391649144314",
+      "media_type": "video",
+      "source_url_field": "videoUrl",
+      "source_url": "https://instagram.fnqz5-1.fna.fbcdn.net/o1/v/t2/f2/m78/AQNkSbsxuxeze7Ie6nYO98oIrGhF2K7UR3QFGx6dFY7KiPI0j2H7vSGQSIxg78amtfHMprgSS0QZbO-yKXmGVxHVapkq4L07-fjFmpg.mp4?_nc_cat=100&_nc_oc=Adrlpf0hEH5E9ud-Tk26SCB9uBoAl9oYhMiIdYa0F-VT_zRN2W1_4mFIzIwgqM2DcoU&_nc_sid=5e9851&_nc_ht=instagram.fnqz5-1.fna.fbcdn.net&_nc_ohc=GesxxGnuai0Q7kNvwF_Gd6F&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uU1RPUlkuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6MTc5MDg2MDk1MTgzODU4MjksImFzc2V0X2FnZV9kYXlzIjozNiwidmlfdXNlY2FzZV9pZCI6MTA4MjYsImR1cmF0aW9uX3MiOjcsInVybGdlbl9zb3VyY2UiOiJ3d3cifQ%3D%3D&ccb=17-1&vs=cc95285ce121c3a5&_nc_vs=HBksFQIYUWlnX3hwdl9wbGFjZW1lbnRfcGVybWFuZW50X3YyLzFFNDEzREE2MzJFNUY0QjBFMzBFOEJBMUZBMTFCQkJGX3ZpZGVvX2Rhc2hpbml0Lm1wNBUAAsgBEgAVAhhRaWdfeHB2X3BsYWNlbWVudF9wZXJtYW5lbnRfdjIvRDQ0NDk2Q0JBMDNERERDNEVCNUZFRkYzNTY5QkJFODNfYXVkaW9fZGFzaGluaXQubXA0FQICyAESACgAGAAbAogHdXNlX29pbAExEnByb2dyZXNzaXZlX3JlY2lwZQExFQAAJsrqncyi8s8_FQIoAkMzLBdAHTMzMzMzMxgSZGFzaF9iYXNlbGluZV8xX3YxEQB16AdllKkBAA&_nc_gid=CgaGcN7NACjtSPcZXqt4KA&_nc_ss=7a22e&_nc_zt=28&oh=00_Af5xqQkf493vVKs6TqzfBGt2ZpQ6E0F5x2VoYHCNcT8wgw&oe=6A03856D",
+      "local_path": "output/media/stage3a/highlights/3867898391649144314_video.mp4",
+      "downloaded": true,
+      "file_size_bytes": 1155360,
+      "error": null
+    }
+  ],
+  "summary": {
+    "post_image_downloaded": true,
+    "post_video_downloaded": true,
+    "highlight_image_downloaded": true,
+    "highlight_video_downloaded": true,
+    "total_files_downloaded": 4,
+    "status": "OK"
+  }
+}

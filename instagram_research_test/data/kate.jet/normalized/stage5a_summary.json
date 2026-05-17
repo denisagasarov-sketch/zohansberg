@@ -1,0 +1,36 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a1",
+  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "planned_apify_calls": 2,
+  "actual_apify_calls": 0,
+  "profile_status": "partial",
+  "bio_status": "missing",
+  "pinned_posts_status": "manual_needed",
+  "fields_ok": 1,
+  "fields_partial": 0,
+  "fields_missing": 1,
+  "fields_manual_needed": 15,
+  "profile_sheet_coverage": {
+    "can_fill_facts": false,
+    "can_fill_interpretation": "missing",
+    "coverage_status": "missing",
+    "notes": "rule-based bio fields are partial — requires human review"
+  },
+  "coverage_by_sheet": {
+    "Описание профиля": "missing",
+    "Закрепленные посты": "manual_needed",
+    "Воронка": "missing",
+    "Анализ хайлайтс": "not_started",
+    "Лендинг": "not_started",
+    "Бот лид-магнит": "not_started"
+  },
+  "can_fill_profile_sheet": "missing",
+  "can_fill_pinned_posts_sheet": "manual_needed",
+  "can_run_stage5b": false,
+  "can_run_stage5d": false,
+  "blockers": [
+    "pinned posts not detected — fill pinned_posts_manual.json"
+  ],
+  "next_recommendation": "Profile and facts are available. Bio analysis is rule-based/partial — review bio_analysis.json and fill manual fields. Before Stage 5B: provide highlight IDs in data/input/highlights_manual.json."
+}

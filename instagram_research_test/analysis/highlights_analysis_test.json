@@ -1,0 +1,47 @@
+{
+  "account": "vlada_kliuiko",
+  "analysis_scope": "highlight_sample_only",
+  "not_full_highlight_analysis": true,
+  "highlight_id": "17874797856565339",
+  "stories_total_in_raw": 57,
+  "stories_analyzed": 2,
+  "visual_inputs_count": 6,
+  "observed_facts": {
+    "visible_text": [
+      "вообще, я хотела ближайшие 3 месяца в блоге по минимуму говорить про работу)) но похоже, пока нет такой возможности",
+      "каждый раз, когда я открываю чат с учениками курса, меня распирает гордость за тот продукт, который мы сделали 🥹🥹",
+      "Рабочий чат курса ELPO... 134 участника, 75 в сети",
+      "Закреплённое сообщение Что делать, если клиент на продаже говорит «...",
+      "Олеся Маркетинг SMM #клиент Взяла в работу клиента, за 2500 долларов, на стратегию + внедрение, благодаря тому, что наконец-то научилась продавать себя, как специалиста, раньше были большие проблемы с этим, экспертиза есть, а продавать стыдно и страшно. Спасибо огромнейшее Вике и Владе 🙏🔥💗",
+      "On top of client work, I’m currently doing a course in AI-powered marketing. And I have to be honest with you: I didn’t expect it to hit this hard🥲",
+      "ученики курса «маркетинговые стратегии с AI» 💔💔",
+      "и кажется, у нас ученики есть со всего мира) Англия, Америка, и большинство ребят с ЕС"
+    ],
+    "visual_facts": [
+      "Screenshots of chat messages from a course group chat with 134 participants",
+      "Testimonial from a course participant named Olesya about client work and learning to sell herself",
+      "Repeated video or photo of a marina with boats and a brick building in the background",
+      "Overlay text in English about doing a course in AI-powered marketing and being surprised by its impact",
+      "Mention of course name 'маркетинговые стратегии с AI' (Marketing strategies with AI)",
+      "Emojis used include crying face, broken hearts, fire, and prayer hands"
+    ]
+  },
+  "inferred_meanings": {
+    "main_role": "education",
+    "summary": "The highlight sample features personal reflections and testimonials related to a marketing course, specifically focusing on AI-powered marketing strategies. The account owner expresses pride in the course product and shares positive feedback from students who have successfully applied the skills learned, including client work and self-promotion. The course appears to have an international student base.",
+    "cta_found": "Indirect call to action through testimonials and pride in the course product, encouraging interest in the course.",
+    "offer_found": "Marketing course on AI-powered marketing strategies.",
+    "social_proof_found": "Testimonial from a student named Olesya praising the course and its impact on her client work and sales skills.",
+    "decision_support_score": 7
+  },
+  "evidence": [
+    "Text: 'каждый раз, когда я открываю чат с учениками курса, меня распирает гордость за тот продукт, который мы сделали 🥹🥹' indicates pride in the course product.",
+    "Testimonial from Olesya: 'Взяла в работу клиента, за 2500 долларов...научилась продавать себя, как специалиста... Спасибо огромнейшее Вике и Владе 🙏🔥💗' shows social proof and course effectiveness.",
+    "Repeated overlay text in English: 'On top of client work, I’m currently doing a course in AI-powered marketing. And I have to be honest with you: I didn’t expect it to hit this hard🥲' highlights course content and impact.",
+    "Mention of course name 'маркетинговые стратегии с AI' and international students from England, America, and EU supports course scope and reach."
+  ],
+  "limitations": [
+    "Only 2 stories from a 57-story highlight were analyzed"
+  ],
+  "confidence": "medium"
+}

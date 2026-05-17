@@ -1,0 +1,25 @@
+{
+  "account": "vlada_kliuiko",
+  "actor": "automation-lab/instagram-stories-scraper",
+  "mode": "normalize_only",
+  "run_timestamp": "2026-05-12T12:12:10.155958+00:00",
+  "apify_run_id": "xVKGkqmQoxQZCbvXx",
+  "apify_dataset_id": "BK63gBVOkYdEDuA0e",
+  "max_highlights_requested": 3,
+  "total_items_returned": 179,
+  "active_stories_count": 6,
+  "highlight_stories_count": 173,
+  "highlights_returned": 3,
+  "highlights_in_index": 32,
+  "can_analyze_highlights": true,
+  "normalization_stats": {
+    "total_normalized": 179,
+    "image_stories": 143,
+    "video_stories": 36,
+    "null_id_count": 0,
+    "null_media_count": 0,
+    "highlight_stories": 173
+  },
+  "warnings": [],
+  "blockers": []
+}

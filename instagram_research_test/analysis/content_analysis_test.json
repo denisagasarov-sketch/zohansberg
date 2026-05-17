@@ -1,0 +1,54 @@
+{
+  "account": "vlada_kliuiko",
+  "analysis_scope": "single_post_sample",
+  "content_id": "DF2bxZHtdW8",
+  "url": "https://www.instagram.com/p/DF2bxZHtdW8/",
+  "type": "Sidecar",
+  "observed_facts": {
+    "caption_facts": [
+      "The team helps small and medium businesses, experts, and bloggers scale and succeed in EU and CIS markets for over 6 years.",
+      "Clients include large construction companies, hotels, restaurants, medical centers, and others.",
+      "They have completed over a thousand successful projects worldwide using deep analysis and proprietary marketing methods.",
+      "They offer a full range of marketing services including social media management, targeted advertising setup, contextual advertising, marketing strategy creation, PR strategy, reputation marketing, and marketing department consulting.",
+      "Services are suitable for small and medium businesses, experts, teams seeking skill upgrades, and marketing professionals wanting to scale.",
+      "They provide personal consultations with diagnostic calls, website creation, and business analytics.",
+      "They accept projects with advertising budgets starting from 1000 euros.",
+      "Call to action: write the word 'консультация' (consultation) in the comments."
+    ],
+    "visual_facts": [
+      "Image shows a classical sculpture of two figures embracing, placed on a pedestal inside a museum or gallery with beige stone walls.",
+      "Text overlay on image reads 'услуги маркетингового агентства' (marketing agency services)."
+    ]
+  },
+  "inferred_meanings": {
+    "topic": "Marketing agency services for business growth and scaling",
+    "format": "Informative promotional post with service listing and call to action",
+    "hook": "Experienced marketing agency with 6+ years and 1000+ successful projects",
+    "main_message": "Offering comprehensive marketing services tailored for small and medium businesses and professionals to scale and succeed in EU and CIS markets",
+    "audience_pain": "Difficulty scaling business and marketing efforts effectively in competitive markets",
+    "audience_desire": "To grow business presence, improve marketing results, and gain expert support",
+    "barrier_or_objection": "Minimum advertising budget requirement of 1000 euros",
+    "cta": "Write 'консультация' in comments to get a consultation and cost estimate",
+    "offer": "Full spectrum of marketing services including SMM, targeted ads, PR, reputation management, consulting, and analytics",
+    "social_proof": "Over 6 years of experience and more than 1000 successful projects worldwide",
+    "funnel_role": "leadgen",
+    "target_segment": "Small and medium businesses, experts, bloggers, marketing professionals seeking growth"
+  },
+  "evidence": [
+    "Caption: 'Мы с командой помогаем малым и средним бизнесам... уже более 6 лет.'",
+    "Caption: 'Более тысячи успешных проектов и кейсов по всему миру...'",
+    "Caption: 'Мы оказываем полный спектр маркетинговых услуг: ...'",
+    "Caption: 'Пишите слово «консультация» в комментариях 👇🏼'",
+    "Caption: '*Берем в работу проекты с рекламными бюджетами от 1000ye'",
+    "Image text: 'услуги маркетингового агентства'",
+    "Visual: classical sculpture in a museum setting"
+  ],
+  "visual_summary": "A classical sculpture in a museum with overlaid text indicating marketing agency services, suggesting a blend of art and professionalism.",
+  "score": 7,
+  "limitations": [
+    "No direct pricing details beyond minimum budget mentioned.",
+    "No client testimonials or explicit social proof beyond project count.",
+    "Visual content is artistic but not directly related to marketing services."
+  ],
+  "confidence": "high"
+}

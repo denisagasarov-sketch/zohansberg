@@ -1,0 +1,38 @@
+{
+  "story_id": "3873557859233762379",
+  "highlight_id": "18110898391654002",
+  "canonical_title": "GEO",
+  "position_in_highlight": 0,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:09:57.221381+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 276578,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "educational",
+    "commercial_role": "education",
+    "has_visible_text": true,
+    "extracted_text": "сегодня будет крайне полезный строительный для предпринимателей, маркетологов и экспертов\nрасскажу вам про инструмент продвижения, который в ближайшие полгода наберет колоссальную популярность\nа еще спустя время станет в какой-то степени более обхватным, чем продвижение по Google/Яндекс\nобязательно посмотрите эту линейку сториз до конца, если хотите получать клиентов с минимальными затратами",
+    "has_cta": true,
+    "cta_text": "обязательно посмотрите эту линейку сториз до конца",
+    "main_subject": "женщина с видеообращением",
+    "visual_style": "минималистичный, светлый, спокойные цвета",
+    "sentiment": "positive",
+    "tags": [
+      "маркетинг",
+      "продвижение",
+      "инструменты",
+      "сториз",
+      "предприниматели"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3386,
+  "from_cache": false
+}

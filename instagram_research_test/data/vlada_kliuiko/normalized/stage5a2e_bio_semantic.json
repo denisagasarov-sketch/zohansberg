@@ -1,0 +1,36 @@
+{
+  "account": "vlada_kliuiko",
+  "stage": "stage5a2e",
+  "prompt_version": "v1",
+  "model": "gpt-4o-mini",
+  "generated_at": "2026-05-17T10:00:41.104485+00:00",
+  "bio_text": "аналитически точные стратегии с опорой на цифры\nоснователь @elpodium_agency \nкаждый четверг-рубрика разборов \n↓ курс по маркетинговым стратегиям с AI",
+  "openai_status": "ok",
+  "tokens_used": 960,
+  "fields": {
+    "target_audience": {
+      "value": "",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Нет явных маркеров, указывающих на целевую аудиторию."
+    },
+    "result_promise": {
+      "value": "",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Нет явного обещания результата для клиентов."
+    },
+    "trust_arguments": {
+      "value": "основатель @elpodium_agency",
+      "data_status": "ok",
+      "source": "bio_text",
+      "notes": "Явное упоминание должности и компании."
+    },
+    "social_proof": {
+      "value": "",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Нет социальных доказательств, таких как цифры или отзывы."
+    }
+  }
+}

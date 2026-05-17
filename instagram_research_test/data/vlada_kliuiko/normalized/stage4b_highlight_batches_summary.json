@@ -1,0 +1,11 @@
+{
+  "batches_total": 8,
+  "batches_ok": 8,
+  "batches_partial": 0,
+  "batches_fail": 0,
+  "batches_skipped_existing_ok": 0,
+  "openai_calls_made": 8,
+  "only_filter": null,
+  "status": "OK",
+  "errors": []
+}

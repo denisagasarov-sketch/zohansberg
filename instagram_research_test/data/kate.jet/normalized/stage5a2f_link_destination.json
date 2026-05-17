@@ -1,0 +1,23 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a2f",
+  "prompt_version": "v1",
+  "url_input": "https://t.me/SMMworkshopBot",
+  "url_clean": "https://t.me/SMMworkshopBot",
+  "url_final": "https://t.me/SMMworkshopBot",
+  "fetch_status": 200,
+  "redirected": false,
+  "title": "Telegram: Launch @SMMworkshopBot",
+  "og_title": "Воркшоп по SMM от Кейт Семёновой",
+  "description": "⚡️ Систематизируй SMM с помощью курса |https://clck.ru/3SX9aE | Старт 1 июня \t⚡️ По вопросам писать @kate_jet",
+  "server_hint": "nginx",
+  "classification_method": "heuristic",
+  "tokens_used": null,
+  "generated_at": "2026-05-16T01:11:05.219098+00:00",
+  "result": {
+    "destination_type": "бот",
+    "confidence": "high",
+    "reasoning": "Domain matched heuristic rule for бот",
+    "data_status": "ok"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a1",
+  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "analysis_method": "rule_based",
+  "source_ref": "profile_summary.bio_text",
+  "niche": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "target_audience": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "result_promise": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "positioning": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "social_proof": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "trust_arguments": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "cta_text": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "bio_text missing — cannot analyse"
+  },
+  "cta_destination": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "No external_url in profile — fill manually"
+  }
+}

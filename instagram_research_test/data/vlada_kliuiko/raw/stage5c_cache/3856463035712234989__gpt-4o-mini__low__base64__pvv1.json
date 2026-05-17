@@ -1,0 +1,38 @@
+{
+  "story_id": "3856463035712234989",
+  "highlight_id": "17874797856565339",
+  "canonical_title": "отзывы курс",
+  "position_in_highlight": 0,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:09:45.100354+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 184543,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "student_review",
+    "commercial_role": "trust",
+    "has_visible_text": true,
+    "extracted_text": "вообще, я хотела ближ Nayшие 3 месяца в блоге по минимуму говорить про работу)) но похоже, пока нет такой возможности каждый раз, когда я открываю чат с учениками курса, меня распирает гордость за тот продукт, который мы сделали! 😍\n\nЗакрываем сделки! #клиент\n\nВера в работу клиента, за 2500 долларов, сделала, когда клиент на продаже говорит, что наконец-то зарабатывает! Самые греющие моменты, когда посылаешь слово поддержка... Веки и Влада...💖💖💖",
+    "has_cta": false,
+    "cta_text": null,
+    "main_subject": "Отзыв ученика о курсе",
+    "visual_style": "Яркий, эмоциональный, с акцентом на текст",
+    "sentiment": "positive",
+    "tags": [
+      "отзывы",
+      "курс",
+      "успех",
+      "клиент",
+      "гордость"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3413,
+  "from_cache": false
+}

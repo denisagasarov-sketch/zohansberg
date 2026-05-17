@@ -1,0 +1,57 @@
+{
+  "stage": "stage5b2",
+  "account": "kate.jet",
+  "run_timestamp": "2026-05-16T03:44:55.497531+00:00",
+  "highlights": [
+    {
+      "position": 1,
+      "highlight_id": "18048529088454532",
+      "title": "Отзывы",
+      "status": "OK",
+      "stories_count": 13,
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18048529088454532_raw.json"
+    },
+    {
+      "position": 2,
+      "highlight_id": "18136644298466967",
+      "title": "Публикации",
+      "status": "OK",
+      "stories_count": 11,
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18136644298466967_raw.json"
+    },
+    {
+      "position": 3,
+      "highlight_id": "18145835785306063",
+      "title": "Мой путь",
+      "status": "OK",
+      "stories_count": 77,
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18145835785306063_raw.json"
+    },
+    {
+      "position": 4,
+      "highlight_id": "18036274999576186",
+      "title": "Обо мне",
+      "status": "OK",
+      "stories_count": 14,
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18036274999576186_raw.json"
+    },
+    {
+      "position": 5,
+      "highlight_id": "17919926188005828",
+      "title": "КНИГИ",
+      "status": "OK",
+      "stories_count": 34,
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_17919926188005828_raw.json"
+    }
+  ]
+}

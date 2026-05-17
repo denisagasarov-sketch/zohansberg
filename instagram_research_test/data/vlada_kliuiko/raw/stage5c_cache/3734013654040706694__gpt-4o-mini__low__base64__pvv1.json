@@ -1,0 +1,38 @@
+{
+  "story_id": "3734013654040706694",
+  "highlight_id": "18124257904515721",
+  "canonical_title": "отзывы курс",
+  "position_in_highlight": 2,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:14:12.129388+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 167034,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "student_review",
+    "commercial_role": "trust",
+    "has_visible_text": true,
+    "extracted_text": "«И уже после трех модулей могу сказать, что пока это лучший курс, что я проходила»",
+    "has_cta": false,
+    "cta_text": null,
+    "main_subject": "Отзыв студентки о курсе",
+    "visual_style": "Современный, яркие цвета, графические элементы",
+    "sentiment": "positive",
+    "tags": [
+      "отзыв",
+      "курс",
+      "маркетинг",
+      "стратегии",
+      "учеба"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3303,
+  "from_cache": false
+}

@@ -1,0 +1,20 @@
+{
+  "actor": "automation-lab/instagram-stories-scraper",
+  "username": "vlada_kliuiko",
+  "run_id": "AkB2EgsysgjG0bG5l",
+  "dataset_id": "ltyH9V6TKBst54G1e",
+  "maxHighlights": 3,
+  "total_items": 179,
+  "active_story_items": 6,
+  "highlight_items": 173,
+  "highlight_titles": {
+    "отзывы курс": 156,
+    "GEO": 17
+  },
+  "highlight_ids": {
+    "highlight:17874797856565339": 57,
+    "highlight:18110898391654002": 17,
+    "highlight:18124257904515721": 99
+  },
+  "can_replace_igview_owner": true
+}

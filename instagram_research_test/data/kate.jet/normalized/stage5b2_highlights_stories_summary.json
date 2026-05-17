@@ -1,0 +1,185 @@
+{
+  "stage": "stage5b2",
+  "account": "kate.jet",
+  "actor": "automation-lab/instagram-stories-scraper",
+  "run_timestamp": "2026-05-16T03:44:55.497531+00:00",
+  "planned_apify_calls": 1,
+  "actual_apify_calls": 1,
+  "apify_run_ids": [
+    "pZN9uhyy99wuXS7pC"
+  ],
+  "highlights_total": 5,
+  "highlights_processed": 5,
+  "highlights_ok": 5,
+  "highlights_empty": 0,
+  "highlights_fail": 0,
+  "highlights_invalid": 0,
+  "highlights_skipped": 0,
+  "total_stories_count": 149,
+  "highlights_with_media": 0,
+  "can_analyze_highlights": true,
+  "blockers": [],
+  "warnings": [],
+  "results": [
+    {
+      "position": 1,
+      "highlight_id": "18048529088454532",
+      "raw_id": "18048529088454532",
+      "id_valid": true,
+      "title": "Отзывы",
+      "status": "OK",
+      "stories_count": 13,
+      "fields_found": [
+        "type",
+        "timestamp",
+        "highlightId",
+        "highlightTitle"
+      ],
+      "fields_missing": [
+        "id",
+        "imageUrl",
+        "videoUrl"
+      ],
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "has_any_media_url": false,
+      "sample_values": {
+        "type": "story",
+        "timestamp": "2025-12-08T14:53:01.000Z",
+        "highlightId": "highlight:18048529088454532",
+        "highlightTitle": "Отзывы"
+      },
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18048529088454532_raw.json",
+      "errors": [],
+      "apify_run_id": "pZN9uhyy99wuXS7pC"
+    },
+    {
+      "position": 2,
+      "highlight_id": "18136644298466967",
+      "raw_id": "18136644298466967",
+      "id_valid": true,
+      "title": "Публикации",
+      "status": "OK",
+      "stories_count": 11,
+      "fields_found": [
+        "type",
+        "timestamp",
+        "highlightId",
+        "highlightTitle"
+      ],
+      "fields_missing": [
+        "id",
+        "imageUrl",
+        "videoUrl"
+      ],
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "has_any_media_url": false,
+      "sample_values": {
+        "type": "story",
+        "timestamp": "2025-11-23T13:27:09.000Z",
+        "highlightId": "highlight:18136644298466967",
+        "highlightTitle": "Публикации"
+      },
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18136644298466967_raw.json",
+      "errors": [],
+      "apify_run_id": "pZN9uhyy99wuXS7pC"
+    },
+    {
+      "position": 3,
+      "highlight_id": "18145835785306063",
+      "raw_id": "18145835785306063",
+      "id_valid": true,
+      "title": "Мой путь",
+      "status": "OK",
+      "stories_count": 77,
+      "fields_found": [
+        "type",
+        "timestamp",
+        "highlightId",
+        "highlightTitle"
+      ],
+      "fields_missing": [
+        "id",
+        "imageUrl",
+        "videoUrl"
+      ],
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "has_any_media_url": false,
+      "sample_values": {
+        "type": "story",
+        "timestamp": "2023-10-26T03:33:48.000Z",
+        "highlightId": "highlight:18145835785306063",
+        "highlightTitle": "Мой путь"
+      },
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18145835785306063_raw.json",
+      "errors": [],
+      "apify_run_id": "pZN9uhyy99wuXS7pC"
+    },
+    {
+      "position": 4,
+      "highlight_id": "18036274999576186",
+      "raw_id": "18036274999576186",
+      "id_valid": true,
+      "title": "Обо мне",
+      "status": "OK",
+      "stories_count": 14,
+      "fields_found": [
+        "type",
+        "timestamp",
+        "highlightId",
+        "highlightTitle"
+      ],
+      "fields_missing": [
+        "id",
+        "imageUrl",
+        "videoUrl"
+      ],
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "has_any_media_url": false,
+      "sample_values": {
+        "type": "story",
+        "timestamp": "2023-10-20T07:57:27.000Z",
+        "highlightId": "highlight:18036274999576186",
+        "highlightTitle": "Обо мне"
+      },
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_18036274999576186_raw.json",
+      "errors": [],
+      "apify_run_id": "pZN9uhyy99wuXS7pC"
+    },
+    {
+      "position": 5,
+      "highlight_id": "17919926188005828",
+      "raw_id": "17919926188005828",
+      "id_valid": true,
+      "title": "КНИГИ",
+      "status": "OK",
+      "stories_count": 34,
+      "fields_found": [
+        "type",
+        "timestamp",
+        "highlightId",
+        "highlightTitle"
+      ],
+      "fields_missing": [
+        "id",
+        "imageUrl",
+        "videoUrl"
+      ],
+      "has_imageUrl": false,
+      "has_videoUrl": false,
+      "has_any_media_url": false,
+      "sample_values": {
+        "type": "story",
+        "timestamp": "2022-05-16T20:00:44.000Z",
+        "highlightId": "highlight:17919926188005828",
+        "highlightTitle": "КНИГИ"
+      },
+      "raw_path": "data/kate.jet/raw/stage5b2_stories_17919926188005828_raw.json",
+      "errors": [],
+      "apify_run_id": "pZN9uhyy99wuXS7pC"
+    }
+  ]
+}

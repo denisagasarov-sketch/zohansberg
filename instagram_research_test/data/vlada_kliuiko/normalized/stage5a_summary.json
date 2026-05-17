@@ -1,0 +1,34 @@
+{
+  "account": "vlada_kliuiko",
+  "stage": "stage5a1",
+  "run_timestamp": "2026-05-12T08:31:40.530389+00:00",
+  "planned_apify_calls": 2,
+  "actual_apify_calls": 2,
+  "profile_status": "ok",
+  "bio_status": "partial",
+  "pinned_posts_status": "ok",
+  "fields_ok": 10,
+  "fields_partial": 3,
+  "fields_missing": 0,
+  "fields_manual_needed": 4,
+  "profile_sheet_coverage": {
+    "can_fill_facts": true,
+    "can_fill_interpretation": "partial",
+    "coverage_status": "partial",
+    "notes": "rule-based bio fields are partial — requires human review"
+  },
+  "coverage_by_sheet": {
+    "Описание профиля": "partial",
+    "Закрепленные посты": "ok",
+    "Воронка": "missing",
+    "Анализ хайлайтс": "not_started",
+    "Лендинг": "not_started",
+    "Бот лид-магнит": "not_started"
+  },
+  "can_fill_profile_sheet": "partial",
+  "can_fill_pinned_posts_sheet": "ok",
+  "can_run_stage5b": false,
+  "can_run_stage5d": false,
+  "blockers": [],
+  "next_recommendation": "Profile and facts are available. Bio analysis is rule-based/partial — review bio_analysis.json and fill manual fields. Before Stage 5B: provide highlight IDs in data/input/highlights_manual.json."
+}

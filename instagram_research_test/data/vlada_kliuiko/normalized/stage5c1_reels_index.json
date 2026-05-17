@@ -1,0 +1,54 @@
+{
+  "account": "vlada_kliuiko",
+  "stage": "stage5c1",
+  "generated_at": "2026-05-17T03:18:07.367949+00:00",
+  "apify_run_id": "NvgD2S8wsS9hEWMAe",
+  "actor": "apify/instagram-reel-scraper",
+  "reels_total_raw": 3,
+  "reels_selected": 3,
+  "selection_strategy": "pinned_first_then_top_by_views",
+  "reels": [
+    {
+      "position": 1,
+      "reel_id": "3886939884077322158",
+      "url": "https://www.instagram.com/p/DXxLzsNug-u/",
+      "video_url": "https://scontent-hou1-1.cdninstagram.com/o1/v/t16/f2/m86/AQPXj0mjIVx3ExW7nB8cJ3EqMQOvZCZCPKGO7pGmetJC7V6WZ4N6X4zA8FmFx53FbH4H_CPuylnRnJfvQtgRz1OBAx3gHdEtPlswV_I.mp4?stp=dst-mp4&efg=eyJxZV9ncm91cHMiOiJbXCJpZ193ZWJfZGVsaXZlcnlfdnRzX290ZlwiXSIsInZlbmNvZGVfdGFnIjoidnRzX3ZvZF91cmxnZW4uY2xpcHMuYzIuNzIwLmJhc2VsaW5lIn0&_nc_cat=106&vs=1761293488566323_4157479866&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC8zRjQ1NTJEQ0Y2QUY4ODkxMDI0Rjg1RURFMzQ3NTJBQ192aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYUWlnX3hwdl9wbGFjZW1lbnRfcGVybWFuZW50X3YyL0Y5NEUxQzRFQzE5NUM5OUY5NkZFQURFODc4Qzk3QjhDX2F1ZGlvX2Rhc2hpbml0Lm1wNBUCAsgBEgAoABgAGwAVAAAm5tTCoa%2BH%2FAIVAigCQzMsF0BeLMzMzMzNGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX%2BB2XmnQEA&_nc_rid=ec12211507&ccb=9-4&oh=00_Af5K_x08zVsdrZfl-8PjLAmsNA83B8OVwMCMOI-bzipZug&oe=6A0B058A&_nc_sid=10d13b",
+      "thumbnail_url": "https://scontent-hou1-1.cdninstagram.com/v/t51.82787-15/681976014_18579947596013703_4685602901251186675_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-hou1-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gFiUOrmCo2vYBOaOBGe4pplG6IFuKTkMcCG1Vtxkp5jcoYTgVOoZB5Qpr4KchFTVOE&_nc_ohc=fVnLAHYX3X0Q7kNvwFChYOS&_nc_gid=guPptpEh3MZVtMtNJsUhRA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af7BwbrEhxS1UwJmEYyY8WiCu1NjnmO0pyMXnLKLhUEBMw&oe=6A0F207C&_nc_sid=10d13b",
+      "view_count": 218889,
+      "likes_count": 25041,
+      "comments_count": 55,
+      "caption": "Как вам факт?) 💅🏼 каждый четверг делаю рубрику разьор от маркетолога \nПодписывайся @vlada_kliuiko чтобы не пропустить 💘",
+      "transcript": "Каблуки придумали мужчины, чтобы было проще воевать, а женщины начали их носить, чтобы выглядеть мужественнее. Как так вышло и кто на этом заработал? 10 век, Персия, элитная кавалерия, проблема. Всадник стреляет из лука на скаку, когда пристает в тременах, нога проскальзывает. Решение приподнять пятку каблук упирается в стриме, стрелок стабилен. Так родился каблук, военная технология, ничего сексуального. 600 лет персидские воины носят каблуки даже вне битвы, так как это демонстрирует их статус. Если мужчина носит каблук, значит у него есть лошадь, а иметь лошадь это первый признак богатства. Спустя время каблуки начинают носить и в Европе, и к мужчинам присоединяются женщины, чтобы выглядеть мужественнее. В те времена была мода на маскулинность. В 18 веке наступает эпоха просвещения, и мужчины постепенно уходят в практичность, снимают каблуки. И вот тут начинается самое интересное, потому что по логике женщины могли их тоже снять, но не сняли. А все потому, что появляется фотография, и начинают массово снимать женщин, в том числе обнаженных. И ставят их на каблуки, потому что каблук заставляет выгибать спину, отставлять ягодицы, менять осанку. И таким образом из зарождения фотографии каблук становится символом сексуальности. А дальше это подхватывают модные дома, Кристиан Диор создает стиль не лук, индустрия моды берет ассоциацию созданную фотографией и продает ее как элегантность и женственность. Как итог, все женские профессии спустя время требовали ношения каблука. Ну как бы понятно, зачем это выгодно модным домам, это просто больше прибыли дает. Кто-то взял военную технологию персидских воинов, связал ее с сексуальностью, переупаковал в элегантность через высокую моду и продал миллиардам женщинам как обязательный атрибут. Персидский воин посмотрел бы на шпильки сейчас и ничего бы не понял. Маркетинг не создает продукты, маркетинг создает смыслы и продает их нам. Каждый четверг делаю рубрику Разбор от Маркетолога, подписывайся, чтобы не пропустить.",
+      "timestamp": "2026-04-30T20:03:57.000Z",
+      "is_pinned": false
+    },
+    {
+      "position": 2,
+      "reel_id": "3884690275088331990",
+      "url": "https://www.instagram.com/p/DXpMTklDfTW/",
+      "video_url": "https://scontent-iad3-1.cdninstagram.com/o1/v/t16/f2/m86/AQOAfP67GUqTsfHRBcW25wRAL3LGkN3z7IckbstVa353JMera1mgcL70O4zutnJLDmvnk747aQKD5ck4HfgV3azrjG33PaS08Y-pX7Q.mp4?stp=dst-mp4&efg=eyJxZV9ncm91cHMiOiJbXCJpZ193ZWJfZGVsaXZlcnlfdnRzX290ZlwiXSIsInZlbmNvZGVfdGFnIjoidnRzX3ZvZF91cmxnZW4uY2xpcHMuYzIuNzIwLmJhc2VsaW5lIn0&_nc_cat=101&vs=2061813064758181_3344866681&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC8xQjRGRkI3RjVBQTQxM0VCQzZCNjM0Rjc0MzE5Rjk4Ql92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYUWlnX3hwdl9wbGFjZW1lbnRfcGVybWFuZW50X3YyL0M1NDM3NzI5OEQzQ0U3MEM5Q0RGNjExM0JCOEM3MUFCX2F1ZGlvX2Rhc2hpbml0Lm1wNBUCAsgBEgAoABgAGwAVAAAmyrfH697P0T8VAigCQzMsF0BOzMzMzMzNGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX%2BB2XmnQEA&_nc_rid=b643417576&ccb=9-4&oh=00_Af4171Lr4zU2MfXY0Q4l-PJtp97uFqmwAxW7IfS44te8GA&oe=6A0B04F1&_nc_sid=10d13b",
+      "thumbnail_url": "https://scontent-iad3-2.cdninstagram.com/v/t51.82787-15/681451671_18579044647013703_7703312115716956896_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-iad3-2.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gFTpRSn96srls8vjvtjaSbTLR9-_leq1GIAkdxzAx4vbF0pbiKYG-EbeYmvXcTAUQ0&_nc_ohc=j76VWNeh_HwQ7kNvwF-x681&_nc_gid=TmZB0x4_etxj93o-fRe8hA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af4lmT8UXytddUrvbednGTNBSmcewp8ttPlaaWDwMcX3Xg&oe=6A0F1672&_nc_sid=10d13b",
+      "view_count": 9482,
+      "likes_count": 246,
+      "comments_count": 13,
+      "caption": "А вы что думаете, влияет ли «влюбленность в продукт» на результат?",
+      "transcript": "У меня свое маркетинговое агентство с 40 проектами в моменте, и каждый первый созвон с новым клиентом мы начинаем с этой фразы. Дорогой клиент, продайте нам свой продукт. У меня есть теория. Если маркетолог не влюблен в продукт своего клиента, продать его будет в разы тяжелее. Простая аналогия. Представьте, что вы хотите поехать в путешествие и хотите взять с собой мужа или подругу. Вы приходите к ним продавать идею, и вы не просто накидываете список сухих аргументов. Вы горите этой идеей, вы заряжаете их своей энергией, и как следствие они, конечно, соглашаются. С продуктом клиента идентичная логика. Когда клиент продает нам свой продукт на первом созвоне, происходят две вещи. Первое. Мы сами понимаем вообще, насколько клиент верит в то, что делает или нет. Второе. Мы заряжаемся вот этой энергией и по итогу влюбляемся в его продукт и иногда покупаем его, просто потому что нас это действительно зацепило. Возможно, я, конечно, романтизирую, и вероятно это так, но я считаю, что на эмоциональном уровне это действительно влияет косвенно на результаты в проекте, потому что когда вы любите то, что делаете, вы готовы на очень многое для того, чтобы точно дать результат.",
+      "timestamp": "2026-04-27T17:35:47.000Z",
+      "is_pinned": false
+    },
+    {
+      "position": 3,
+      "reel_id": "3897077411501236623",
+      "url": "https://www.instagram.com/p/DYVM0IWuuGP/",
+      "video_url": "https://scontent-phx1-1.cdninstagram.com/o1/v/t16/f2/m86/AQPoIKwDg2LrUk45Gc3Y20D09mvgWp0Yhzb_gEeDaue7UIx1lXQ3PFx_J_LwyZ1hCoaZTN3UhaoX9GakjCPO6qbP-MvHxUXFO1ghVkA.mp4?stp=dst-mp4&efg=eyJxZV9ncm91cHMiOiJbXCJpZ193ZWJfZGVsaXZlcnlfdnRzX290ZlwiXSIsInZlbmNvZGVfdGFnIjoidnRzX3ZvZF91cmxnZW4uY2xpcHMuYzIuNzIwLmJhc2VsaW5lIn0&_nc_cat=101&vs=1223190846393308_979700461&_nc_vs=HBksFQIYUmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC8zMjQ5MkQzREM1QkVENTc4NjkyNEExMTgwQUExRUNBOF92aWRlb19kYXNoaW5pdC5tcDQVAALIARIAFQIYUWlnX3hwdl9wbGFjZW1lbnRfcGVybWFuZW50X3YyLzBFNDk3MzlCQjVFQzVGM0Y2MjdGMTFEMDI1QjM3MUE1X2F1ZGlvX2Rhc2hpbml0Lm1wNBUCAsgBEgAoABgAGwAVAAAmzrGX7r3ouQUVAigCQzMsF0BZ%2BZmZmZmaGBJkYXNoX2Jhc2VsaW5lXzFfdjERAHX%2BB2XmnQEA&_nc_rid=b067947074&ccb=9-4&oh=00_Af4r2z57Mqjn8H30T4l93heOpA9YL1gOL-dXPORzFflJ_g&oe=6A0AFA73&_nc_sid=10d13b",
+      "thumbnail_url": "https://scontent-phx1-1.cdninstagram.com/v/t51.82787-15/695745079_18583728382013703_5627842133726894514_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-phx1-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF8AUW1elxF1Ox3M8bmMSxGkWV_ynDDNsJusIaCi5QoWhGZG1bQyzvUA1HNmEZp_o8&_nc_ohc=M61PEI0YJowQ7kNvwFnRrdB&_nc_gid=VqvMDmu6B01I7D-wONFUFQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5rh4V6v5aSFw1IECU79fj4xg-C1bYYexXr346LD9XlvA&oe=6A0EF0DD&_nc_sid=10d13b",
+      "view_count": 9249,
+      "likes_count": 617,
+      "comments_count": 14,
+      "caption": "Подписывайся @vlada_kliuiko💘\nКаждый четверг делаю рубрику разбора\n\nКстати, если вам понравилась эта история, советую почитать книгу Гарольд Роббинс «торговцы грезами», там рассказано про зарождение кинематографа))",
+      "transcript": "Вот мы привыкли с вами кушать попкорн при просмотре фильмов, а вы знаете, что виновата в этом Великая Депрессия. Начало 20 века, кинотеатры — это дворцы с красными коврами и бархатными креслами. Владельцы хотели быть как театры. Элитное искусство для образованной публики. Кино тогда было немым, титры на экране, тишина в зале, любой хруст еды — это мудак, который портит всем просмотр. Но в 1927 году в кино появляется звук, и все меняется. Теперь не нужно читать титры, в кинотеатры резко хлынули люди, которые раньше туда не ходили, потому что были неграмотными. Соответственно, аудитория сильно расширилась. У входа в кинотеатр начинают появляться уличные торговцы с тележками и продают попкорн по 5-10 центов. Это на тот момент была еда для бедных. Люди покупают, проносят в зал, жуют во время фильма, владельцы злятся и пытаются запретить, потому что из-за еды кино превращается из искусства в простонародный досуг. Но начинается Великая Депрессия, и кинотеатры разоряются. Билеты не окупают аренду, а залы пустеют. И владельцы кинозалов резко начинают смотреть все цифры. Те кинотеатры, которые разрешают еду, делают самую большую выручку. Это начинают использовать. В кино ставят аппараты попкорна прямо в фойе. Себестоимость попкорна копейки продается в кинотеатре в разы дороже, а моржа космическая. Перед фильмами крутят рекламу «Не забудьте купить попкорн в фойе». И многие кинотеатры держатся на плаву только благодаря доп-продажам еды. Если убрать их, бизнес-модель рухнет. Кстати, по похожему, но обратному принципу работает Икея со своими знаменитыми фрикадельками. Они продают еду очень дёшево и делают её реально вкусно, таким образом увеличивая проходимость в магазине. Люди постоянно приезжают на обед и всё равно что-то да помелочи покупают из товаров. Каждый четверг делаю рубрику «Разбор от маркетолога». Подписывайся, чтобы не пропустить. И не забывайте, что иногда, дабы увеличить прибыль, достаточно просто пересмотреть свою продуктовую линейку.",
+      "timestamp": "2026-05-14T19:45:52.000Z",
+      "is_pinned": false
+    }
+  ]
+}

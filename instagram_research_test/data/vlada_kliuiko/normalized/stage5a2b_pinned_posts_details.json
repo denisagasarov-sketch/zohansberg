@@ -1,0 +1,151 @@
+{
+  "account": "vlada_kliuiko",
+  "stage": "stage5a2b",
+  "run_timestamp": "2026-05-17T10:00:34.096470+00:00",
+  "source": "stage5a1_existing_raw",
+  "actor": "apify/instagram-scraper",
+  "run_id": null,
+  "dataset_id": null,
+  "strategy": "from_existing_stage5a1_raw",
+  "total_pinned_posts": 3,
+  "warnings": [
+    "Post 2 is Sidecar but no carousel_items found",
+    "Post 3 is Sidecar but no carousel_items found"
+  ],
+  "posts": [
+    {
+      "position": 1,
+      "permalink": "https://www.instagram.com/p/DTKl6n3jWnB/",
+      "shortcode": "DTKl6n3jWnB",
+      "post_id": "3804019591526312385",
+      "timestamp": "2026-01-06T10:15:24.000Z",
+      "media_type": "Video",
+      "full_caption": "Тенденции маркетинга в 2026: как прогнозировать результаты еще до старта и работы и стать специалистом, которому платят выше рынка \n\n🤌🏼 Что изменится в маркетинге в 2026 и почему большинство это проспит\n🤌🏼 Как использовать ИИ так, чтобы ваш контент отличался от того, что выдают копирайтеры и маркетологи с ChatGPT\n🤌🏼Как прогнозировать результаты с точностью до 85%. На цифрах. Чтобы на вопрос «а где гарантии?» у вас всегда был ответ\n🤌🏼 Покажу кусочки реальных стратегий, что именно мы делаем, чтобы давать клиентам результат\n🤌🏼Как понять еще до старта, реально ли дать результат в проекте или нет \n\nСпойлер: в 2026 вопрос «а где гарантии?» клиенты будут задавать в разы чаще, и к этому лучше быть готовым, как отвечать на этот вопрос детально разобрали во время эфира",
+      "caption_for_analysis": "Тенденции маркетинга в 2026: как прогнозировать результаты еще до старта и работы и стать специалистом, которому платят выше рынка \n\n🤌🏼 Что изменится в маркетинге в 2026 и почему большинство это проспит\n🤌🏼 Как использовать ИИ так, чтобы ваш контент отличался от того, что выдают копирайтеры и маркетологи с ChatGPT\n🤌🏼Как прогнозировать результаты с точностью до 85%. На цифрах. Чтобы на вопрос «а где гарантии?» у вас всегда был ответ\n🤌🏼 Покажу кусочки реальных стратегий, что именно мы делаем, чтобы давать клиентам результат\n🤌🏼Как понять еще до старта, реально ли дать результат в проекте или нет \n\nСпойлер: в 2026 вопрос «а где гарантии?» клиенты будут задавать в разы чаще, и к этому лучше быть готовым, как отвечать на этот вопрос детально разобрали во время эфира",
+      "caption_length": 769,
+      "caption_is_full": true,
+      "caption_source_field": "caption",
+      "display_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/612231910_18547550839013703_5600052074615965154_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF3Kyu0GUE9-2_PRDPSzKyZ0b4Avipegbl3tk123gxl86PZGbiWIuUxMvxvu8tHoWc&_nc_ohc=uZoPGdiumvwQ7kNvwHH9zss&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6ofRtNY1ny0NUBzLtrsV5m_jBo2QUHcvdkteDoSzZE9g&oe=6A08CA6B&_nc_sid=10d13b",
+      "thumbnail_url": null,
+      "video_url": "https://scontent-lga3-1.cdninstagram.com/o1/v/t2/f2/m86/AQOdPIzm3po-Rpp0Yy1N0_-y5BM6e7bl3s6NWY326ZnU3JJ1t3dhPzv4EeGqI9UaA_x2QGwjH9PIOXJzslxXh7brqFDSGXy1sSR8F5op35YlRN0QI-kyGWjWeL5vRfgA5sDLMzGKjI9SBdwZIhmqSM0.mp4?strext=1&_nc_cat=103&_nc_sid=5e9851&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_ohc=z4vFO8LpbnIQ7kNvwG7ko1y&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6ODkxNjQ5NzYzMzkwMDA4LCJhc3NldF9hZ2VfZGF5cyI6MTI1LCJ2aV91c2VjYXNlX2lkIjoxMDEwMiwiZHVyYXRpb25fcyI6NzkyNiwidXJsZ2VuX3NvdXJjZSI6Ind3dyJ9&ccb=17-1&vs=8ac7e92a797d60fb&_nc_vs=HBksFQIYcmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC85OTQyMjc0QTIyMEQ0MzEwNEEwQ0ExM0QwN0NFRjM5M193YXNfbGl2ZV9yZW11eF9kYXNoX29pbF9ub19hdWRpby12aWRlb19vdXRwdXRfZGFzaBUAAsgBEgAVAhh-aWdfeHB2X3JlZWxzX3Blcm1hbmVudF9zcl9wcm9kLzgyNDVEODg1MjQ3ODhGRDY0QzNEMjRGMTdCRDU5NzkxX3dhc19saXZlX3JlbXV4X2Rhc2hfb2lsX3dpdGhfbGl2ZV90b192b2RfbWFwLWF1ZGlvX291dHB1dF9kYXNoFQICyAESACgAGAAbAogHdXNlX29pbAExEnByb2dyZXNzaXZlX3JlY2lwZQExFQAAJvDIybbsvJUDFQIoAkMzLBdAvvZgxJul4xgSZGFzaF9iYXNlbGluZV8xX3YxEQB1_gdl7J0BAA&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&_nc_zt=28&_nc_ss=7a22e&oh=00_Af7va6oBD0YFcBm0cfurJNkR7foA783LqDieO32uyUhXCg&oe=6A04B0FB",
+      "cover_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/612231910_18547550839013703_5600052074615965154_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF3Kyu0GUE9-2_PRDPSzKyZ0b4Avipegbl3tk123gxl86PZGbiWIuUxMvxvu8tHoWc&_nc_ohc=uZoPGdiumvwQ7kNvwHH9zss&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6ofRtNY1ny0NUBzLtrsV5m_jBo2QUHcvdkteDoSzZE9g&oe=6A08CA6B&_nc_sid=10d13b",
+      "carousel_items": [],
+      "carousel_items_count": 0,
+      "media_for_visual_analysis": {
+        "primary_image_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/612231910_18547550839013703_5600052074615965154_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF3Kyu0GUE9-2_PRDPSzKyZ0b4Avipegbl3tk123gxl86PZGbiWIuUxMvxvu8tHoWc&_nc_ohc=uZoPGdiumvwQ7kNvwHH9zss&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6ofRtNY1ny0NUBzLtrsV5m_jBo2QUHcvdkteDoSzZE9g&oe=6A08CA6B&_nc_sid=10d13b",
+        "candidate_urls": [
+          "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/612231910_18547550839013703_5600052074615965154_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF3Kyu0GUE9-2_PRDPSzKyZ0b4Avipegbl3tk123gxl86PZGbiWIuUxMvxvu8tHoWc&_nc_ohc=uZoPGdiumvwQ7kNvwHH9zss&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6ofRtNY1ny0NUBzLtrsV5m_jBo2QUHcvdkteDoSzZE9g&oe=6A08CA6B&_nc_sid=10d13b",
+          "https://scontent-lga3-1.cdninstagram.com/o1/v/t2/f2/m86/AQOdPIzm3po-Rpp0Yy1N0_-y5BM6e7bl3s6NWY326ZnU3JJ1t3dhPzv4EeGqI9UaA_x2QGwjH9PIOXJzslxXh7brqFDSGXy1sSR8F5op35YlRN0QI-kyGWjWeL5vRfgA5sDLMzGKjI9SBdwZIhmqSM0.mp4?strext=1&_nc_cat=103&_nc_sid=5e9851&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_ohc=z4vFO8LpbnIQ7kNvwG7ko1y&efg=eyJ2ZW5jb2RlX3RhZyI6Inhwdl9wcm9ncmVzc2l2ZS5JTlNUQUdSQU0uQ0xJUFMuQzMuNzIwLmRhc2hfYmFzZWxpbmVfMV92MSIsInhwdl9hc3NldF9pZCI6ODkxNjQ5NzYzMzkwMDA4LCJhc3NldF9hZ2VfZGF5cyI6MTI1LCJ2aV91c2VjYXNlX2lkIjoxMDEwMiwiZHVyYXRpb25fcyI6NzkyNiwidXJsZ2VuX3NvdXJjZSI6Ind3dyJ9&ccb=17-1&vs=8ac7e92a797d60fb&_nc_vs=HBksFQIYcmlnX3hwdl9yZWVsc19wZXJtYW5lbnRfc3JfcHJvZC85OTQyMjc0QTIyMEQ0MzEwNEEwQ0ExM0QwN0NFRjM5M193YXNfbGl2ZV9yZW11eF9kYXNoX29pbF9ub19hdWRpby12aWRlb19vdXRwdXRfZGFzaBUAAsgBEgAVAhh-aWdfeHB2X3JlZWxzX3Blcm1hbmVudF9zcl9wcm9kLzgyNDVEODg1MjQ3ODhGRDY0QzNEMjRGMTdCRDU5NzkxX3dhc19saXZlX3JlbXV4X2Rhc2hfb2lsX3dpdGhfbGl2ZV90b192b2RfbWFwLWF1ZGlvX291dHB1dF9kYXNoFQICyAESACgAGAAbAogHdXNlX29pbAExEnByb2dyZXNzaXZlX3JlY2lwZQExFQAAJvDIybbsvJUDFQIoAkMzLBdAvvZgxJul4xgSZGFzaF9iYXNlbGluZV8xX3YxEQB1_gdl7J0BAA&_nc_gid=kDqFo13IqOZxKP_WNS7aFA&_nc_zt=28&_nc_ss=7a22e&oh=00_Af7va6oBD0YFcBm0cfurJNkR7foA783LqDieO32uyUhXCg&oe=6A04B0FB"
+        ],
+        "source_fields": [
+          "displayUrl"
+        ]
+      },
+      "has_full_caption": true,
+      "has_cover_or_thumbnail": true,
+      "has_carousel_items": false,
+      "has_media_urls": true,
+      "analysis_readiness": {
+        "caption_semantic_possible": true,
+        "visual_ocr_input_possible": true
+      },
+      "source_quality": "full",
+      "missing_fields": [],
+      "limitations": []
+    },
+    {
+      "position": 2,
+      "permalink": "https://www.instagram.com/p/DR5LoKnjQSQ/",
+      "shortcode": "DR5LoKnjQSQ",
+      "post_id": "3781104500845905040",
+      "timestamp": "2025-12-05T19:26:42.000Z",
+      "media_type": "Sidecar",
+      "full_caption": "3 поток курса будет в ноябре 2026 год \n\n‼️Чтобы узнать все подробности о программе, получить эксклюзивные условия и бонусы, пишите «АНКЕТА» в директ и комментарии, мы вам вышлем ссылку на анкету предзаписи\n\nПосле заполнения анкеты предзаписи мы добавим вас в закрытый канал, где я делюсь внутрянкой работы агентства, отдаю множество промптов и регулярно делаю разборы, которые развивают маркетинговое мышление 🤌🏼",
+      "caption_for_analysis": "3 поток курса будет в ноябре 2026 год \n\n‼️Чтобы узнать все подробности о программе, получить эксклюзивные условия и бонусы, пишите «АНКЕТА» в директ и комментарии, мы вам вышлем ссылку на анкету предзаписи\n\nПосле заполнения анкеты предзаписи мы добавим вас в закрытый канал, где я делюсь внутрянкой работы агентства, отдаю множество промптов и регулярно делаю разборы, которые развивают маркетинговое мышление 🤌🏼",
+      "caption_length": 412,
+      "caption_is_full": true,
+      "caption_source_field": "caption",
+      "display_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/589048644_18541877737013703_8081237379379135920_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gHE7JUwgTMYw6zGKki8hq2N5dVeqsIXi7Ag_Xnu43B_3E-K3R5tJi71PICVAOLlZfA&_nc_ohc=NVEYaffkMzUQ7kNvwGnuut5&_nc_gid=o9g-p29ahSZdaDJcCvIfvQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af58_BZgayQBGdB_xHli-qA-rcjflP2jzFzvesK5HfUvnA&oe=6A08B4DA&_nc_sid=10d13b",
+      "thumbnail_url": null,
+      "video_url": null,
+      "cover_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/589048644_18541877737013703_8081237379379135920_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gHE7JUwgTMYw6zGKki8hq2N5dVeqsIXi7Ag_Xnu43B_3E-K3R5tJi71PICVAOLlZfA&_nc_ohc=NVEYaffkMzUQ7kNvwGnuut5&_nc_gid=o9g-p29ahSZdaDJcCvIfvQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af58_BZgayQBGdB_xHli-qA-rcjflP2jzFzvesK5HfUvnA&oe=6A08B4DA&_nc_sid=10d13b",
+      "carousel_items": [],
+      "carousel_items_count": 0,
+      "media_for_visual_analysis": {
+        "primary_image_url": "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/589048644_18541877737013703_8081237379379135920_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gHE7JUwgTMYw6zGKki8hq2N5dVeqsIXi7Ag_Xnu43B_3E-K3R5tJi71PICVAOLlZfA&_nc_ohc=NVEYaffkMzUQ7kNvwGnuut5&_nc_gid=o9g-p29ahSZdaDJcCvIfvQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af58_BZgayQBGdB_xHli-qA-rcjflP2jzFzvesK5HfUvnA&oe=6A08B4DA&_nc_sid=10d13b",
+        "candidate_urls": [
+          "https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/589048644_18541877737013703_8081237379379135920_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gHE7JUwgTMYw6zGKki8hq2N5dVeqsIXi7Ag_Xnu43B_3E-K3R5tJi71PICVAOLlZfA&_nc_ohc=NVEYaffkMzUQ7kNvwGnuut5&_nc_gid=o9g-p29ahSZdaDJcCvIfvQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af58_BZgayQBGdB_xHli-qA-rcjflP2jzFzvesK5HfUvnA&oe=6A08B4DA&_nc_sid=10d13b"
+        ],
+        "source_fields": [
+          "displayUrl"
+        ]
+      },
+      "has_full_caption": true,
+      "has_cover_or_thumbnail": true,
+      "has_carousel_items": false,
+      "has_media_urls": true,
+      "analysis_readiness": {
+        "caption_semantic_possible": true,
+        "visual_ocr_input_possible": true
+      },
+      "source_quality": "full",
+      "missing_fields": [
+        "carousel_items"
+      ],
+      "limitations": [
+        "post is Sidecar but no carousel_items found in actor output"
+      ]
+    },
+    {
+      "position": 3,
+      "permalink": "https://www.instagram.com/p/DF2bxZHtdW8/",
+      "shortcode": "DF2bxZHtdW8",
+      "post_id": "3564158296593388988",
+      "timestamp": "2025-02-09T11:33:20.000Z",
+      "media_type": "Sidecar",
+      "full_caption": "Мы с командой помогаем малым и средним бизнесам, экспертам и блогерам масштабироваться и добиваться успеха на рынках ЕС и СНГ уже более 6 лет. \n\nСреди наших клиентов — крупные строительные компании, отели, рестораны, медицинские центры и многие другие компании.\n\nБолее тысячи успешных проектов и кейсов по всему миру, благодаря глубокому анализу и применению авторских разработок в маркетинге\n\nМы оказываем полный спектр маркетинговых услуг:\n\n▪️Комплексное ведение соцсетей (SMM + таргет).\n▪️Настройка таргетированной рекламы (Instagram, Facebook, ВКонтакте, LinkedIn, Telegramm).\n▪️Настройка контекстной рекламы (Google Ads, Яндекс Директ).\n▪️Создание маркетинговой стратегии для нового бизнеса или выхода на новый рынок.\n▪️PR-стратегия: публикация статей от вашего имени в СМИ.\n▪️Репутационный маркетинг: работа с картами и сайтами-отзовиками.\n▪️Консалтинг отдела маркетинга: обучение самостоятельному продвижению.\n\n•Отлично подойдет для малого и среднего бизнеса, для экспертов, для повышение квалификации вашей команды, а так же для смм-специалистов/маркетологов/ таргетологов, которые хотят масштабироваться\n\n▪️Личная работа с созвонами-диагностиками.\n▪️Создание сайта.\n▪️Аналитика для вашего бизнеса: изучение целевой аудитории, кастдевы, анализ конкурентов.\n\nПриглашаю вас на консультацию, в ходе которой вы получите расчет стоимости маркетинговых услуг и рекламного бюджета по своему проекту\n\n*Берем в работу проекты с рекламными бюджетами от 1000ye\n\nПишите слово \n«консультация» в комментариях 👇🏼",
+      "caption_for_analysis": "Мы с командой помогаем малым и средним бизнесам, экспертам и блогерам масштабироваться и добиваться успеха на рынках ЕС и СНГ уже более 6 лет. \n\nСреди наших клиентов — крупные строительные компании, отели, рестораны, медицинские центры и многие другие компании.\n\nБолее тысячи успешных проектов и кейсов по всему миру, благодаря глубокому анализу и применению авторских разработок в маркетинге\n\nМы оказываем полный спектр маркетинговых услуг:\n\n▪️Комплексное ведение соцсетей (SMM + таргет).\n▪️Настройка таргетированной рекламы (Instagram, Facebook, ВКонтакте, LinkedIn, Telegramm).\n▪️Настройка контекстной рекламы (Google Ads, Яндекс Директ).\n▪️Создание маркетинговой стратегии для нового бизнеса или выхода на новый рынок.\n▪️PR-стратегия: публикация статей от вашего имени в СМИ.\n▪️Репутационный маркетинг: работа с картами и сайтами-отзовиками.\n▪️Консалтинг отдела маркетинга: обучение самостоятельному продвижению.\n\n•Отлично подойдет для малого и среднего бизнеса, для экспертов, для повышение квалификации вашей команды, а так же для смм-специалистов/маркетологов/ таргетологов, которые хотят масштабироваться\n\n▪️Личная работа с созвонами-диагностиками.\n▪️Создание сайта.\n▪️Аналитика для вашего бизнеса: изучение целевой аудитории, кастдевы, анализ конкурентов.\n\nПриглашаю вас на консультацию, в ходе которой вы получите расчет стоимости маркетинговых услуг и рекламного бюджета по своему проекту\n\n*Берем в работу проекты с рекламными бюджетами от 1000ye\n\nПишите слово \n«консультация» в комментариях 👇🏼",
+      "caption_length": 1505,
+      "caption_is_full": true,
+      "caption_source_field": "caption",
+      "display_url": "https://scontent-ord5-2.cdninstagram.com/v/t51.2885-15/476876344_18483138763013703_2391582186481231548_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF7la6w2d-7PifU_3CVo0Hb5K5rDYT1bRgyz6b_QAAFvqb1fv5s1cmDnMEgqL_RSCM&_nc_ohc=OsaOmvaziXwQ7kNvwG6j4sF&_nc_gid=Pw71U7wNok6pKOqTe6dwww&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af7Hc4wNXHs7bx06aDYT3figsTHE82GgQKF-2K0L6MtTig&oe=6A08BF61&_nc_sid=10d13b",
+      "thumbnail_url": null,
+      "video_url": null,
+      "cover_url": "https://scontent-ord5-2.cdninstagram.com/v/t51.2885-15/476876344_18483138763013703_2391582186481231548_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF7la6w2d-7PifU_3CVo0Hb5K5rDYT1bRgyz6b_QAAFvqb1fv5s1cmDnMEgqL_RSCM&_nc_ohc=OsaOmvaziXwQ7kNvwG6j4sF&_nc_gid=Pw71U7wNok6pKOqTe6dwww&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af7Hc4wNXHs7bx06aDYT3figsTHE82GgQKF-2K0L6MtTig&oe=6A08BF61&_nc_sid=10d13b",
+      "carousel_items": [],
+      "carousel_items_count": 0,
+      "media_for_visual_analysis": {
+        "primary_image_url": "https://scontent-ord5-2.cdninstagram.com/v/t51.2885-15/476876344_18483138763013703_2391582186481231548_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF7la6w2d-7PifU_3CVo0Hb5K5rDYT1bRgyz6b_QAAFvqb1fv5s1cmDnMEgqL_RSCM&_nc_ohc=OsaOmvaziXwQ7kNvwG6j4sF&_nc_gid=Pw71U7wNok6pKOqTe6dwww&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af7Hc4wNXHs7bx06aDYT3figsTHE82GgQKF-2K0L6MtTig&oe=6A08BF61&_nc_sid=10d13b",
+        "candidate_urls": [
+          "https://scontent-ord5-2.cdninstagram.com/v/t51.2885-15/476876344_18483138763013703_2391582186481231548_n.jpg?stp=dst-jpg_e35_p1080x1080_sh2.08_tt6&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gF7la6w2d-7PifU_3CVo0Hb5K5rDYT1bRgyz6b_QAAFvqb1fv5s1cmDnMEgqL_RSCM&_nc_ohc=OsaOmvaziXwQ7kNvwG6j4sF&_nc_gid=Pw71U7wNok6pKOqTe6dwww&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af7Hc4wNXHs7bx06aDYT3figsTHE82GgQKF-2K0L6MtTig&oe=6A08BF61&_nc_sid=10d13b"
+        ],
+        "source_fields": [
+          "displayUrl"
+        ]
+      },
+      "has_full_caption": true,
+      "has_cover_or_thumbnail": true,
+      "has_carousel_items": false,
+      "has_media_urls": true,
+      "analysis_readiness": {
+        "caption_semantic_possible": true,
+        "visual_ocr_input_possible": true
+      },
+      "source_quality": "full",
+      "missing_fields": [
+        "carousel_items"
+      ],
+      "limitations": [
+        "post is Sidecar but no carousel_items found in actor output"
+      ]
+    }
+  ],
+  "summary": {
+    "posts_with_full_caption": 3,
+    "posts_with_cover_or_thumbnail": 3,
+    "posts_with_carousel_items": 0,
+    "caption_semantic_possible": true,
+    "visual_ocr_input_possible": true,
+    "next_stage_recommendation": "Stage 5A-2C: Caption-only semantic analyzer. All posts have full caption; run OpenAI analysis for Тема поста, Почему закреплен, Ключевые смыслы, Какой CTA, Куда ведет CTA, Роль в воронке. Stage 5A-2D (visual/OCR) can also proceed for Хук / первый экран."
+  }
+}

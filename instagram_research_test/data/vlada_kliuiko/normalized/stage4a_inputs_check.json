@@ -1,0 +1,25 @@
+{
+  "posts_raw": {
+    "exists": true,
+    "not_empty": true,
+    "items_count": 5,
+    "status": "OK"
+  },
+  "highlight_stories_raw": {
+    "exists": true,
+    "not_empty": true,
+    "items_count": 57,
+    "status": "OK"
+  },
+  "stage3a_manifest": {
+    "exists": true,
+    "status": "OK"
+  },
+  "stage3b1_preview": {
+    "exists": true,
+    "status": "OK"
+  },
+  "gitignore_safe": true,
+  "stage4a_can_continue": true,
+  "errors": []
+}

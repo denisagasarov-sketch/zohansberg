@@ -1,0 +1,181 @@
+{
+  "account": "vlada_kliuiko",
+  "stage": "stage5c2",
+  "prompt_version": "v2",
+  "model": "gpt-4o",
+  "generated_at": "2026-05-17T10:02:20.820886+00:00",
+  "reels_analyzed": 3,
+  "reels_ok": 3,
+  "reels_skipped": 0,
+  "total_tokens": 5963,
+  "reels": [
+    {
+      "position": 1,
+      "reel_id": "3886939884077322158",
+      "url": "https://www.instagram.com/p/DXxLzsNug-u/",
+      "view_count": 218889,
+      "likes_count": 25041,
+      "is_pinned": false,
+      "published_at": "2026-04-30T20:03:57.000Z",
+      "engagement_rate": "11.44%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "текст '#рубрика разбор отмаркетолога' поверх красной стены — вызывает",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "текст на экране",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "История каблуков и их трансформация от мужского аксессуара к символу женственности",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "подписывайся, чтобы не пропустить",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "прогрев",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Каблуки придумали мужчины, чтобы было проще воевать",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "история с неожиданной связью → трансформация → вывод",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "факт",
+        "data_status": "ok"
+      },
+      "tokens_vision": 487,
+      "tokens_text": 1585,
+      "tokens_total": 2072
+    },
+    {
+      "position": 2,
+      "reel_id": "3884690275088331990",
+      "url": "https://www.instagram.com/p/DXpMTklDfTW/",
+      "view_count": 9482,
+      "likes_count": 246,
+      "is_pinned": false,
+      "published_at": "2026-04-27T17:35:47.000Z",
+      "engagement_rate": "2.59%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "не найден",
+        "data_status": "not_found"
+      },
+      "vizual_format": {
+        "value": "b-roll",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Эмоциональная вовлечённость маркетолога в продукт клиента",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "Может быть трудно продать продукт без влюблённости в него",
+        "data_status": "ok"
+      },
+      "reshenie": {
+        "value": "Просить клиента продать свой продукт на первом созвоне",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "доверие",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Дорогой клиент, продайте нам свой продукт.",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "факт → аналогия → вывод",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "провокация",
+        "data_status": "ok"
+      },
+      "tokens_vision": 474,
+      "tokens_text": 1338,
+      "tokens_total": 1812
+    },
+    {
+      "position": 3,
+      "reel_id": "3897077411501236623",
+      "url": "https://www.instagram.com/p/DYVM0IWuuGP/",
+      "view_count": 9249,
+      "likes_count": 617,
+      "is_pinned": false,
+      "published_at": "2026-05-14T19:45:52.000Z",
+      "engagement_rate": "6.67%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "женщина с игрушечной птицей и текст — интрига контента",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "История попкорна в кинотеатрах",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "Дабы увеличить прибыль, достаточно пересмотреть свою продуктовую линейку",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "Подписывайся, чтобы не пропустить",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "прогрев",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "виновата в этом Великая Депрессия",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "факт → история → вывод → CTA",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "факт",
+        "data_status": "ok"
+      },
+      "tokens_vision": 489,
+      "tokens_text": 1590,
+      "tokens_total": 2079
+    }
+  ]
+}

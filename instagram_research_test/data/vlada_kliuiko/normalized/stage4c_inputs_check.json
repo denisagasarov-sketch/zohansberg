@@ -1,0 +1,9 @@
+{
+  "stage": "stage4c_inputs_check",
+  "posts_found": 5,
+  "posts_ok": 5,
+  "highlight_batches_found": 8,
+  "highlight_batches_ok": 8,
+  "stage4c_can_continue": true,
+  "errors": []
+}

@@ -1,0 +1,111 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a2b",
+  "run_timestamp": "2026-05-16T01:10:51.203194+00:00",
+  "source": "stage5a1_existing_raw",
+  "actor": "apify/instagram-scraper",
+  "run_id": null,
+  "dataset_id": null,
+  "strategy": "from_existing_stage5a1_raw",
+  "total_pinned_posts": 2,
+  "warnings": [
+    "Post 1 is Sidecar but no carousel_items found",
+    "Post 2 is Sidecar but no carousel_items found"
+  ],
+  "posts": [
+    {
+      "position": 1,
+      "permalink": "https://www.instagram.com/p/DRhjE6mEk_o/",
+      "shortcode": "DRhjE6mEk_o",
+      "post_id": "3774452232134741992",
+      "timestamp": "2025-11-26T15:09:50.000Z",
+      "media_type": "Sidecar",
+      "full_caption": "Вы ждали мой новый курс как ждал Оскара Том Круз, как на Чукотке ждали орбит арбуз!\n⠀\n«Системный SMM» — курс для тех, кто хочет навести порядок в SMM: собрать рабочую конструкцию из стратегии, аналитики, контента и гипотез, вместо изнуряющего хаоса.\n⠀\n🦾 На курсе ты:\n⠀\n• переводишь работу из угадываний в прозрачную систему действий и метрик — понимаешь, что делать и зачем, и можешь это объяснить команде/руководству;\n⠀\n• внедряешь инструменты, таблицы и фреймворки, которые позволяют управлять результатами;\n⠀\n• укрепляешь свою позицию как спеца: сможешь легче просить деньги, отстаивать решения и чувствовать себя «на уровне», а не самозванцем.\n⠀\n🪩 Если хочешь перейти от хаоса к понятной системе работы — оставляй заявку на курс по ссылке в био.\n⠀\n🐦 Сейчас открыта запись для early birds: ранняя цена и дополнительные материалы для тех, кто присоединится в первую волну.\n⠀\nВ слайдах — программа модулей и то, к каким изменениям мы идём 👉🏽\n⠀\nЕсли в этих фразах узнаешь себя, то курс — то, что ты ищешь:\n⠀\n«Перестали устраивать результаты на работе, нащупал/а свой потолок. Чувствую, что есть пробел в знаниях, но не понимаю, где именно — нужна помощь».\n⠀\n«Работаю интуитивно и не могу дать того результата, который ждут. Тяжело доказать руководству, что делаю что-то важное для бизнеса».\n⠀\n«Кажется, что я отстаю от других спецов по скилам и не дотягиваю до больших чеков».\n⠀\n«Пытался/ась найти инфу самостоятельно, но не всё то: много воды, поверхностно, без структуры и непонятно, как это применять».\n⠀\n«Испытываю тревожность и страх, что не справлюсь, из-за этого постоянно стрессую. Меня это раздражает, я устаю и выгораю».\n⠀\n🪩 Оставляй заявку по ссылке в био — успеешь зафиксировать спецусловия для первых студентов.",
+      "caption_for_analysis": "Вы ждали мой новый курс как ждал Оскара Том Круз, как на Чукотке ждали орбит арбуз!\n⠀\n«Системный SMM» — курс для тех, кто хочет навести порядок в SMM: собрать рабочую конструкцию из стратегии, аналитики, контента и гипотез, вместо изнуряющего хаоса.\n⠀\n🦾 На курсе ты:\n⠀\n• переводишь работу из угадываний в прозрачную систему действий и метрик — понимаешь, что делать и зачем, и можешь это объяснить команде/руководству;\n⠀\n• внедряешь инструменты, таблицы и фреймворки, которые позволяют управлять результатами;\n⠀\n• укрепляешь свою позицию как спеца: сможешь легче просить деньги, отстаивать решения и чувствовать себя «на уровне», а не самозванцем.\n⠀\n🪩 Если хочешь перейти от хаоса к понятной системе работы — оставляй заявку на курс по ссылке в био.\n⠀\n🐦 Сейчас открыта запись для early birds: ранняя цена и дополнительные материалы для тех, кто присоединится в первую волну.\n⠀\nВ слайдах — программа модулей и то, к каким изменениям мы идём 👉🏽\n⠀\nЕсли в этих фразах узнаешь себя, то курс — то, что ты ищешь:\n⠀\n«Перестали устраивать результаты на работе, нащупал/а свой потолок. Чувствую, что есть пробел в знаниях, но не понимаю, где именно — нужна помощь».\n⠀\n«Работаю интуитивно и не могу дать того результата, который ждут. Тяжело доказать руководству, что делаю что-то важное для бизнеса».\n⠀\n«Кажется, что я отстаю от других спецов по скилам и не дотягиваю до больших чеков».\n⠀\n«Пытался/ась найти инфу самостоятельно, но не всё то: много воды, поверхностно, без структуры и непонятно, как это применять».\n⠀\n«Испытываю тревожность и страх, что не справлюсь, из-за этого постоянно стрессую. Меня это раздражает, я устаю и выгораю».\n⠀\n🪩 Оставляй заявку по ссылке в био — успеешь зафиксировать спецусловия для первых студентов.",
+      "caption_length": 1724,
+      "caption_is_full": true,
+      "caption_source_field": "caption",
+      "display_url": "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gG3BsRKa7tlERzqrne9RetN7JKQfTnjyLh8qXcym3cLxM1LgXIWawi110XVTyomt9Q&_nc_ohc=9A3fUoCAFkEQ7kNvwFZ1vYn&_nc_gid=Tn4XwdNZn6HXAEOARF88hQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6E9dP8_DDN4g5QUyE1rK46pR_WD2VyK5hx2zGAYGtrAg&oe=6A0D9BF6&_nc_sid=10d13b",
+      "thumbnail_url": null,
+      "video_url": null,
+      "cover_url": "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gG3BsRKa7tlERzqrne9RetN7JKQfTnjyLh8qXcym3cLxM1LgXIWawi110XVTyomt9Q&_nc_ohc=9A3fUoCAFkEQ7kNvwFZ1vYn&_nc_gid=Tn4XwdNZn6HXAEOARF88hQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6E9dP8_DDN4g5QUyE1rK46pR_WD2VyK5hx2zGAYGtrAg&oe=6A0D9BF6&_nc_sid=10d13b",
+      "carousel_items": [],
+      "carousel_items_count": 0,
+      "media_for_visual_analysis": {
+        "primary_image_url": "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gG3BsRKa7tlERzqrne9RetN7JKQfTnjyLh8qXcym3cLxM1LgXIWawi110XVTyomt9Q&_nc_ohc=9A3fUoCAFkEQ7kNvwFZ1vYn&_nc_gid=Tn4XwdNZn6HXAEOARF88hQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6E9dP8_DDN4g5QUyE1rK46pR_WD2VyK5hx2zGAYGtrAg&oe=6A0D9BF6&_nc_sid=10d13b",
+        "candidate_urls": [
+          "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gG3BsRKa7tlERzqrne9RetN7JKQfTnjyLh8qXcym3cLxM1LgXIWawi110XVTyomt9Q&_nc_ohc=9A3fUoCAFkEQ7kNvwFZ1vYn&_nc_gid=Tn4XwdNZn6HXAEOARF88hQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6E9dP8_DDN4g5QUyE1rK46pR_WD2VyK5hx2zGAYGtrAg&oe=6A0D9BF6&_nc_sid=10d13b"
+        ],
+        "source_fields": [
+          "displayUrl"
+        ]
+      },
+      "has_full_caption": true,
+      "has_cover_or_thumbnail": true,
+      "has_carousel_items": false,
+      "has_media_urls": true,
+      "analysis_readiness": {
+        "caption_semantic_possible": true,
+        "visual_ocr_input_possible": true
+      },
+      "source_quality": "full",
+      "missing_fields": [
+        "carousel_items"
+      ],
+      "limitations": [
+        "post is Sidecar but no carousel_items found in actor output"
+      ]
+    },
+    {
+      "position": 2,
+      "permalink": "https://www.instagram.com/p/DVYs6lJEu3o/",
+      "shortcode": "DVYs6lJEu3o",
+      "post_id": "3844019821617540584",
+      "timestamp": "2026-03-02T14:48:13.000Z",
+      "media_type": "Sidecar",
+      "full_caption": "Что мне помогло сделать выручку $1 МЛН с SMM 😎\n\nВ первую неделю запуска соцсетей Refocus, у нас было всего 50 подписчиков, но это не помешало сделать продажу с высоким чеком в $1000. В следующий месяц мы сделали выручку $13 000 ⚡\n\nЗа год выручка с SMM была $1 000 000 с ROMI > 6000%. SMM приводил самых горячих лидов, за которых дрались в отделе продаж. У нас была самая высокая конверсия в продажу среди всех контентных воронок 🔥\n\nЯ выстроила систему SMM так, что:\n🟣 Метрики росли беспрерывно\n🟣 Я тратила на управление всего 20% времени \n\nИ вот какие системы я разработала и внедрила, чтобы добиться таких результатов:\n📈Система аналитики.\n📈Система контента.\n📈Система тестирования гипотез.\n📈Система отчетности. \n📈Система коммуникаций.\n\nВ слайдах читай, что помогло добиться таких мощных результатов и приходи на бесплатный воркшоп 4 и 5 марта в 19:00 по мск — там я буду подробно показывать и отдавать свои шаблоны, которые я использую в работе 🔥 \n👉🏽 Регистрация по ссылке в био 🙌🏽\n________\n*Refocus — международный Ed-Tech стартап, топ-10 самых быстрорастущих стартапов 2023 по версии Forbes, 4-е место в списке лучших EdTech-стартапов мира 2023 по версии Dealroom.",
+      "caption_for_analysis": "Что мне помогло сделать выручку $1 МЛН с SMM 😎\n\nВ первую неделю запуска соцсетей Refocus, у нас было всего 50 подписчиков, но это не помешало сделать продажу с высоким чеком в $1000. В следующий месяц мы сделали выручку $13 000 ⚡\n\nЗа год выручка с SMM была $1 000 000 с ROMI > 6000%. SMM приводил самых горячих лидов, за которых дрались в отделе продаж. У нас была самая высокая конверсия в продажу среди всех контентных воронок 🔥\n\nЯ выстроила систему SMM так, что:\n🟣 Метрики росли беспрерывно\n🟣 Я тратила на управление всего 20% времени \n\nИ вот какие системы я разработала и внедрила, чтобы добиться таких результатов:\n📈Система аналитики.\n📈Система контента.\n📈Система тестирования гипотез.\n📈Система отчетности. \n📈Система коммуникаций.\n\nВ слайдах читай, что помогло добиться таких мощных результатов и приходи на бесплатный воркшоп 4 и 5 марта в 19:00 по мск — там я буду подробно показывать и отдавать свои шаблоны, которые я использую в работе 🔥 \n👉🏽 Регистрация по ссылке в био 🙌🏽\n________\n*Refocus — международный Ed-Tech стартап, топ-10 самых быстрорастущих стартапов 2023 по версии Forbes, 4-е место в списке лучших EdTech-стартапов мира 2023 по версии Dealroom.",
+      "caption_length": 1166,
+      "caption_is_full": true,
+      "caption_source_field": "caption",
+      "display_url": "https://scontent-fml1-1.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-fml1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHKUbgO8QzFQd5zi-uTQGftg8SnhRKdsYrYg5F-j1i5IY5yCZBM34PaI7B6Bkn7M80&_nc_ohc=Uq7FxGdoZVAQ7kNvwFtsJHi&_nc_gid=5HJ3kulQiJ_vuz0OO-XNIQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5uzjOk5-sdCBED7GTgxDUanyDjDpa3XBvEGbOzzjH1xA&oe=6A0D7965&_nc_sid=10d13b",
+      "thumbnail_url": null,
+      "video_url": null,
+      "cover_url": "https://scontent-fml1-1.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-fml1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHKUbgO8QzFQd5zi-uTQGftg8SnhRKdsYrYg5F-j1i5IY5yCZBM34PaI7B6Bkn7M80&_nc_ohc=Uq7FxGdoZVAQ7kNvwFtsJHi&_nc_gid=5HJ3kulQiJ_vuz0OO-XNIQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5uzjOk5-sdCBED7GTgxDUanyDjDpa3XBvEGbOzzjH1xA&oe=6A0D7965&_nc_sid=10d13b",
+      "carousel_items": [],
+      "carousel_items_count": 0,
+      "media_for_visual_analysis": {
+        "primary_image_url": "https://scontent-fml1-1.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-fml1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHKUbgO8QzFQd5zi-uTQGftg8SnhRKdsYrYg5F-j1i5IY5yCZBM34PaI7B6Bkn7M80&_nc_ohc=Uq7FxGdoZVAQ7kNvwFtsJHi&_nc_gid=5HJ3kulQiJ_vuz0OO-XNIQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5uzjOk5-sdCBED7GTgxDUanyDjDpa3XBvEGbOzzjH1xA&oe=6A0D7965&_nc_sid=10d13b",
+        "candidate_urls": [
+          "https://scontent-fml1-1.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-fml1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHKUbgO8QzFQd5zi-uTQGftg8SnhRKdsYrYg5F-j1i5IY5yCZBM34PaI7B6Bkn7M80&_nc_ohc=Uq7FxGdoZVAQ7kNvwFtsJHi&_nc_gid=5HJ3kulQiJ_vuz0OO-XNIQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5uzjOk5-sdCBED7GTgxDUanyDjDpa3XBvEGbOzzjH1xA&oe=6A0D7965&_nc_sid=10d13b"
+        ],
+        "source_fields": [
+          "displayUrl"
+        ]
+      },
+      "has_full_caption": true,
+      "has_cover_or_thumbnail": true,
+      "has_carousel_items": false,
+      "has_media_urls": true,
+      "analysis_readiness": {
+        "caption_semantic_possible": true,
+        "visual_ocr_input_possible": true
+      },
+      "source_quality": "full",
+      "missing_fields": [
+        "carousel_items"
+      ],
+      "limitations": [
+        "post is Sidecar but no carousel_items found in actor output"
+      ]
+    }
+  ],
+  "summary": {
+    "posts_with_full_caption": 2,
+    "posts_with_cover_or_thumbnail": 2,
+    "posts_with_carousel_items": 0,
+    "caption_semantic_possible": true,
+    "visual_ocr_input_possible": true,
+    "next_stage_recommendation": "Stage 5A-2C: Caption-only semantic analyzer. All posts have full caption; run OpenAI analysis for Тема поста, Почему закреплен, Ключевые смыслы, Какой CTA, Куда ведет CTA, Роль в воронке. Stage 5A-2D (visual/OCR) can also proceed for Хук / первый экран."
+  }
+}

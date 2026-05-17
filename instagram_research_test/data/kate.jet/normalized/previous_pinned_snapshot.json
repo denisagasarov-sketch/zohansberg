@@ -1,0 +1,13 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a1",
+  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "detection_method": "not_detected",
+  "source_ref": "posts.resultsType=posts.isPinned",
+  "posts_checked": 0,
+  "pinned_count": 0,
+  "manual_needed": true,
+  "notes": "isPinned field absent in all posts — fill pinned_posts_manual.json manually",
+  "pinned_posts": [],
+  "raw_source": "data/raw/stage5a1_posts_for_pinned_raw.json"
+}

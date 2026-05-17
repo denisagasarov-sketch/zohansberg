@@ -1,0 +1,38 @@
+{
+  "story_id": "3873564710411274237",
+  "highlight_id": "18110898391654002",
+  "canonical_title": "GEO",
+  "position_in_highlight": 4,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:13:54.077497+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 145771,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "authority_proof",
+    "commercial_role": "trust",
+    "has_visible_text": true,
+    "extracted_text": "у нас несколько постоянных клиентов уже зашли к нам на Geo!\n\nДевочки, доброе утро\n\nДа, креативы нравятся, давайте так и оставлять\n\nВебинар кстати к нам приходила клиентка и сказала, что нашла нас через ChatGPT, было очень неожиданно и приятно \n\nСпасибо вам за работу!\n\n2,5 месяца делаем статьи уже всем клиентам, то есть приходят к нейронкам\n\nпишите в директ, чтобы узнать об этой услуге, и получить бесплатную консультацию по GEO",
+    "has_cta": true,
+    "cta_text": "пишите в директ, чтобы узнать об этой услуге, и получить бесплатную консультацию по GEO",
+    "main_subject": "отзыв о работе с услугами GEO",
+    "visual_style": "адаптивный, светлые и спокойные цвета",
+    "sentiment": "positive",
+    "tags": [
+      "отзыв",
+      "клиенты",
+      "GEO",
+      "услуга",
+      "ChatGPT"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3427,
+  "from_cache": false
+}

@@ -1,0 +1,72 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a1",
+  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "planned_apify_calls": 2,
+  "actual_apify_calls": 0,
+  "apify_run_ids": [],
+  "profile_url": {
+    "value": "https://www.instagram.com/kate.jet/",
+    "data_status": "ok",
+    "source_ref": "config",
+    "confidence": "high",
+    "notes": ""
+  },
+  "username": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "username not returned by actor"
+  },
+  "full_name": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "fullName not returned by actor"
+  },
+  "bio_text": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "biography not returned by actor"
+  },
+  "external_url": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "externalUrl not in actor output"
+  },
+  "external_url_type": {
+    "value": null,
+    "data_status": "missing",
+    "source_ref": "none",
+    "confidence": null,
+    "notes": "external_url empty or not matched"
+  },
+  "followers_count": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "followersCount not returned by actor"
+  },
+  "following_count": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "followsCount/followingCount not returned by actor"
+  },
+  "posts_count": {
+    "value": null,
+    "data_status": "manual_needed",
+    "source_ref": "manual_input",
+    "confidence": null,
+    "notes": "postsCount not returned by actor"
+  },
+  "raw_source": "data/raw/stage5a1_profile_details_raw.json"
+}

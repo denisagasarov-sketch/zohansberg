@@ -1,0 +1,38 @@
+{
+  "story_id": "3729583195818827979",
+  "highlight_id": "18124257904515721",
+  "canonical_title": "отзывы курс",
+  "position_in_highlight": 1,
+  "mediaType": "Video",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:14:03.892176+00:00",
+  "url_used_field": "thumbnailUrl",
+  "fetch_bytes": 61356,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "student_review",
+    "commercial_role": "proof",
+    "has_visible_text": true,
+    "extracted_text": "2 из миллиона инсайтов неделей:\n\nлучшее обучение по маркетингу из всех, что я покупала.",
+    "has_cta": false,
+    "cta_text": null,
+    "main_subject": "ученица курса",
+    "visual_style": "минималистичный, тёплые оттенки",
+    "sentiment": "positive",
+    "tags": [
+      "отзывы",
+      "маркетинг",
+      "обучение",
+      "мотивация",
+      "успех"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3306,
+  "from_cache": false
+}

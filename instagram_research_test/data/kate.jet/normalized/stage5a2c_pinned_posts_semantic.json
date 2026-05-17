@@ -1,0 +1,152 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5a2c",
+  "run_timestamp": "2026-05-17T08:42:28.226356+00:00",
+  "model": "gpt-4o-mini",
+  "prompt_version": "v2",
+  "total_posts": 2,
+  "source": "caption_only",
+  "visual_analyzed": false,
+  "ocr_analyzed": false,
+  "cache_summary": {
+    "hits": 2,
+    "new": 0,
+    "failed": 0
+  },
+  "total_tokens_used": 4372,
+  "estimated_cost_usd": 0.0,
+  "posts": [
+    {
+      "position": 1,
+      "permalink": "https://www.instagram.com/p/DRhjE6mEk_o/",
+      "shortcode": "DRhjE6mEk_o",
+      "post_id": "3774452232134741992",
+      "caption_length": 1724,
+      "media_type": "Sidecar",
+      "source": "caption_only",
+      "visual_analyzed": false,
+      "ocr_analyzed": false,
+      "cache_status": "hit",
+      "tokens_used": 2255,
+      "openai_status": "analyzed",
+      "google_sheet_fields": {
+        "Тема поста": "Курс 'Системный SMM' для упорядочивания работы в SMM",
+        "Почему закреплен": "Вероятно, закреплен для лидогенерации: курс предлагает решение проблем в SMM и привлекает внимание к записи на него.",
+        "Хук / первый экран": "",
+        "Что в тексте поста": "Пост описывает курс 'Системный SMM', его преимущества и целевую аудиторию, а также содержит призыв к действию.",
+        "Ключевые смыслы": "Курс помогает перейти от хаоса к системе в SMM, внедряет инструменты для управления результатами и укрепляет профессиональную позицию.",
+        "Какой CTA": "",
+        "Куда ведет CTA": "",
+        "Роль в воронке": "лидогенерация"
+      },
+      "confidence": {
+        "Тема поста": "high",
+        "Почему закреплен": "high",
+        "Что в тексте поста": "high",
+        "Ключевые смыслы": "high",
+        "Какой CTA": "low",
+        "Куда ведет CTA": "low",
+        "Роль в воронке": "high",
+        "Хук / первый экран": "low"
+      },
+      "evidence": {
+        "caption_quotes": [
+          "'Системный SMM' — курс для тех, кто хочет навести порядок в SMM",
+          "'Оставляй заявку по ссылке в био'"
+        ],
+        "cta_quotes": [
+          "оставляй заявку по ссылке в био"
+        ],
+        "source_notes": []
+      },
+      "limitations": [
+        "Caption-only analysis. Cover image, carousel slides, and OCR were not analyzed.",
+        "Не указаны конкретные условия курса и его стоимость."
+      ],
+      "validation_warnings": [
+        "Какой CTA: explicit CTA not found; cleared",
+        "Куда ведет CTA: cleared because CTA was invalid"
+      ],
+      "postprocessing_notes": [
+        {
+          "field": "Какой CTA",
+          "original_value": "оставляй заявку по ссылке в био",
+          "final_value": "",
+          "reason": "No explicit action instruction (imperative verb) found"
+        },
+        {
+          "field": "Куда ведет CTA",
+          "original_value": "био-ссылка",
+          "final_value": "",
+          "reason": "Cleared because CTA was invalid"
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "permalink": "https://www.instagram.com/p/DVYs6lJEu3o/",
+      "shortcode": "DVYs6lJEu3o",
+      "post_id": "3844019821617540584",
+      "caption_length": 1166,
+      "media_type": "Sidecar",
+      "source": "caption_only",
+      "visual_analyzed": false,
+      "ocr_analyzed": false,
+      "cache_status": "hit",
+      "tokens_used": 2117,
+      "openai_status": "analyzed",
+      "google_sheet_fields": {
+        "Тема поста": "Как добиться выручки $1 млн с помощью SMM",
+        "Почему закреплен": "Вероятно, закреплен как экспертный прогрев: демонстрирует успешные результаты и приглашает на воркшоп для передачи знаний и шаблонов.",
+        "Хук / первый экран": "",
+        "Что в тексте поста": "Автор делится опытом достижения выручки $1 млн с помощью SMM, описывает системы, которые были внедрены для достижения результатов, и приглашает на бесплатный воркшоп.",
+        "Ключевые смыслы": "Успех в SMM возможен даже с небольшим количеством подписчиков. Важно выстраивать системы аналитики, контента, тестирования гипотез и коммуникаций для достижения высоких результатов.",
+        "Какой CTA": "",
+        "Куда ведет CTA": "",
+        "Роль в воронке": "доверие / прогрев"
+      },
+      "confidence": {
+        "Тема поста": "high",
+        "Почему закреплен": "high",
+        "Что в тексте поста": "high",
+        "Ключевые смыслы": "high",
+        "Какой CTA": "low",
+        "Куда ведет CTA": "low",
+        "Роль в воронке": "high",
+        "Хук / первый экран": "low"
+      },
+      "evidence": {
+        "caption_quotes": [
+          "выручка с SMM была $1 000 000",
+          "приходи на бесплатный воркшоп 4 и 5 марта"
+        ],
+        "cta_quotes": [
+          "Регистрация по ссылке в био"
+        ],
+        "source_notes": []
+      },
+      "limitations": [
+        "Caption-only analysis. Cover image, carousel slides, and OCR were not analyzed.",
+        "Не указаны конкретные детали воркшопа, такие как формат или содержание."
+      ],
+      "validation_warnings": [
+        "Какой CTA: explicit CTA not found; cleared",
+        "Куда ведет CTA: cleared because CTA was invalid"
+      ],
+      "postprocessing_notes": [
+        {
+          "field": "Какой CTA",
+          "original_value": "Регистрация по ссылке в био",
+          "final_value": "",
+          "reason": "No explicit action instruction (imperative verb) found"
+        },
+        {
+          "field": "Куда ведет CTA",
+          "original_value": "био-ссылка",
+          "final_value": "",
+          "reason": "Cleared because CTA was invalid"
+        }
+      ]
+    }
+  ]
+}
