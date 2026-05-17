@@ -81,6 +81,8 @@ _ALL_FIELDS = [
     "bloki_dalshe",
 ]
 
+_NA_FIELD = {"value": "", "data_status": "not_applicable", "confidence": "low"}
+
 
 # ---------------------------------------------------------------------------
 # Input loader
@@ -700,6 +702,85 @@ def _map_to_legacy_fields(fields_new: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Telegram bot analysis (destination_type == "бот")
+# ---------------------------------------------------------------------------
+
+def _fetch_bot_meta(url: str) -> dict:
+    """Return {og_title, og_description} from a Telegram bot page via Playwright."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return {"og_title": "", "og_description": "",
+                "error": "playwright not installed — run: pip install playwright && playwright install chromium"}
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(user_agent=_UA)
+            page    = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_timeout(1000)
+            og_title = page.evaluate(
+                "() => (document.querySelector('meta[property=\"og:title\"]') || {}).content || ''"
+            )
+            og_description = page.evaluate(
+                "() => (document.querySelector('meta[property=\"og:description\"]') || {}).content || ''"
+            )
+            browser.close()
+        return {"og_title": og_title.strip(), "og_description": og_description.strip()}
+    except Exception as e:
+        return {"og_title": "", "og_description": "", "error": str(e)}
+
+
+def _handle_bot(url: str) -> None:
+    """Analyze a Telegram-bot link: fetch OG meta tags, write stage5a2g output, exit."""
+    print("[INFO] Ссылка ведёт в Telegram-бот — анализ лендинга заменён на анализ бота")
+    print(f"  Fetching OG meta tags from {url} ...")
+
+    meta = _fetch_bot_meta(url)
+    if meta.get("error"):
+        print(f"[WARN] Bot meta fetch error: {meta['error']}")
+
+    og_title       = meta.get("og_title", "")
+    og_description = meta.get("og_description", "")
+
+    print(f"  og:title:       {og_title or '(empty)'}")
+    print(f"  og:description: {(og_description[:80] + '...') if len(og_description) > 80 else og_description or '(empty)'}")
+
+    # Build fields_new — not_applicable for everything except the two filled fields
+    fields_new = {key: dict(_NA_FIELD) for key in _ALL_NEW_FIELDS}
+    if og_title:
+        fields_new["glavnyy_zagolovok"] = {"value": og_title, "data_status": "ok", "confidence": "high"}
+    # nazvanie_produkta → chto_prodayut via _map_to_legacy_fields
+    if og_description:
+        fields_new["nazvanie_produkta"] = {"value": og_description, "data_status": "ok", "confidence": "high"}
+
+    fields = _map_to_legacy_fields(fields_new)
+
+    output = {
+        "account":           ACCOUNT,
+        "stage":             STAGE,
+        "prompt_version":    PROMPT_VERSION,
+        "generated_at":      datetime.now(timezone.utc).isoformat(),
+        "url":               url,
+        "destination_type":  "бот",
+        "fetch_success":     not bool(meta.get("error")),
+        "text_length":       0,
+        "is_spa":            False,
+        "screenshots_taken": 0,
+        "pass_statuses":     {f"g{i+1}": "skipped_bot" for i in range(7)},
+        "tokens_used":       0,
+        "fields_new":        fields_new,
+        "fields":            fields,
+    }
+    if meta.get("error"):
+        output["fetch_error"] = meta["error"]
+
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[OK] Written: {OUTPUT_PATH.relative_to(BASE)}")
+
+
+# ---------------------------------------------------------------------------
 # Dry-run
 # ---------------------------------------------------------------------------
 
@@ -830,6 +911,11 @@ def main():
 
     if args.dry_run:
         run_dry_run(url, destination_type)
+        return
+
+    # --- Bot branch: skip full landing analysis ---
+    if not args.url and destination_type == "бот":
+        _handle_bot(url)
         return
 
     # Load env / API key

@@ -1305,8 +1305,52 @@ def build_landing_rows(sources, headers) -> tuple[list, list]:
 
 
 def build_bot_rows(sources, headers) -> tuple[list, list]:
-    """No bot data — headers only."""
-    return [], ["No bot/lead-magnet source; headers-only CSV created"]
+    """Build rows for 'Бот / лид-магнит'.
+
+    If stage5a2g_landing_analysis.json has destination_type='бот',
+    fills bot fields from og:title / og:description. Otherwise returns empty.
+    """
+    landing = sources.get("landing_analysis")
+    if not isinstance(landing, dict) or landing.get("destination_type") != "бот":
+        return [], ["No bot/lead-magnet source; headers-only CSV created"]
+
+    warnings   = []
+    _competitor = _account_label(sources)
+    fields      = landing.get("fields") or {}
+    fields_new  = landing.get("fields_new") or {}
+    url         = landing.get("url") or ""
+
+    def _fv(key: str) -> str:
+        f = fields.get(key)
+        return (str(f.get("value") or "").strip() if isinstance(f, dict) else "")
+
+    def _fnv(key: str) -> str:
+        f = fields_new.get(key)
+        return (str(f.get("value") or "").strip() if isinstance(f, dict) else "")
+
+    bot_name = _fnv("glavnyy_zagolovok") or _fv("glavnyy_zagolovok")
+    bot_desc = _fv("chto_prodayut") or _fnv("nazvanie_produkta")
+
+    row_data = {
+        "Конкурент":                       _competitor,
+        "Где нашли лид-магнит":            "Telegram-бот",
+        "Название лид-магнита":            bot_name,
+        "Обещание лид-магнита":            bot_desc,
+        "Формат лид-магнита":              "Telegram-бот",
+        "Куда ведет":                      url,
+        "Что человек получает сразу":      "",
+        "Первое сообщение / первый экран": "",
+        "Есть ли сегментация и что в ней": "",
+        "Что спрашивают у человека":       "",
+        "Какие сообщения идут дальше":     "",
+        "Когда появляется продажа":        "",
+        "Какой продукт продают":           "",
+        "Какие боли используют":           "",
+        "Какие посылы используют":         "",
+        "Какие возражения снимают":        "",
+        "Финальный CTA":                   "",
+    }
+    return [_make_row(headers, row_data)], warnings
 
 
 # ---------------------------------------------------------------------------
