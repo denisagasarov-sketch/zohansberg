@@ -1184,9 +1184,9 @@ def build_v2_profile_rows(sources: dict) -> tuple[list, list, list]:
     _raw_bio = ps.get("bio_text") or {}
     bio_text = str(_raw_bio.get("value") if isinstance(_raw_bio, dict) else _raw_bio).strip()
 
-    # CTA destination: bio_analysis.cta_destination first, then _bio_url
-    cta_dest = _fval_str(bio, "cta_destination") or ""
-    if not cta_dest:
+    # CTA destination: bio_semantic P1, bio_analysis P2, raw bio_url fallback
+    cta_dest = _sem_or_bio("cta_destination", "cta_destination")
+    if not cta_dest or cta_dest == "не найдено":
         url = _bio_url(sources)
         cta_dest = _redact_url(url) if url else ""
 
@@ -1217,14 +1217,14 @@ def build_v2_profile_rows(sources: dict) -> tuple[list, list, list]:
 
     row = {
         "Конкурент":          _competitor,
-        "Ниша":               _nf(_fval_str(bio, "niche")),
+        "Ниша":               _sem_or_bio("niche",       "niche"),
         "Описание bio":       _nf(bio_text),
         "Для кого":           _sem_or_bio("target_audience", "target_audience"),
         "Обещание результата": _sem_or_bio("result_promise",  "result_promise"),
-        "Позиционирование":   _nf(_fval_str(bio, "positioning")),
+        "Позиционирование":   _sem_or_bio("positioning",  "positioning"),
         "Соцдоказательства":  _sem_or_bio("social_proof",    "social_proof"),
         "Аргументы доверия":  _sem_or_bio("trust_arguments", "trust_arguments"),
-        "Главный CTA":        _nf(_fval_str(bio, "cta_text")),
+        "Главный CTA":        _sem_or_bio("cta_text", "cta_text"),
         "Куда ведет CTA":     _nf(cta_dest),
         "Частота постинга":   compute_posting_frequency(ACCOUNT),
         "Последний пост":     last_post_str,

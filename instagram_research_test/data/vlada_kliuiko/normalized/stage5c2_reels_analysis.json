@@ -3,11 +3,11 @@
   "stage": "stage5c2",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T10:02:20.820886+00:00",
+  "generated_at": "2026-05-17T12:37:32.645197+00:00",
   "reels_analyzed": 3,
   "reels_ok": 3,
   "reels_skipped": 0,
-  "total_tokens": 5963,
+  "total_tokens": 5932,
   "reels": [
     {
       "position": 1,
@@ -20,7 +20,7 @@
       "engagement_rate": "11.44%",
       "vision_status": "ok",
       "hook": {
-        "value": "текст '#рубрика разбор отмаркетолога' поверх красной стены — вызывает",
+        "value": "крупный текст '#рубрика разбор от маркетолога' на фоне магазина — привлекает",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -30,7 +30,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "История каблуков и их трансформация от мужского аксессуара к символу женственности",
+        "value": "История каблуков и их роль в обществе",
         "data_status": "ok"
       },
       "bol": {
@@ -54,16 +54,16 @@
         "data_status": "ok"
       },
       "struktura": {
-        "value": "история с неожиданной связью → трансформация → вывод",
+        "value": "факт → история → вывод",
         "data_status": "ok"
       },
       "hook_type": {
         "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 487,
-      "tokens_text": 1585,
-      "tokens_total": 2072
+      "tokens_vision": 496,
+      "tokens_text": 1569,
+      "tokens_total": 2065
     },
     {
       "position": 2,
@@ -76,8 +76,8 @@
       "engagement_rate": "2.59%",
       "vision_status": "ok",
       "hook": {
-        "value": "не найден",
-        "data_status": "not_found"
+        "value": "девушка фотографирует особняк — интерес ко внутреннему содержанию",
+        "data_status": "ok"
       },
       "vizual_format": {
         "value": "b-roll",
@@ -86,23 +86,23 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "Эмоциональная вовлечённость маркетолога в продукт клиента",
+        "value": "Стратегия работы маркетингового агентства с новыми клиентами",
         "data_status": "ok"
       },
       "bol": {
-        "value": "Может быть трудно продать продукт без влюблённости в него",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Просить клиента продать свой продукт на первом созвоне",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "cta": {
         "value": "не найдено",
         "data_status": "not_found"
       },
       "rol_v_voronke": {
-        "value": "доверие",
+        "value": "знакомство",
         "data_status": "ok"
       },
       "kryuchok": {
@@ -117,9 +117,9 @@
         "value": "провокация",
         "data_status": "ok"
       },
-      "tokens_vision": 474,
-      "tokens_text": 1338,
-      "tokens_total": 1812
+      "tokens_vision": 476,
+      "tokens_text": 1320,
+      "tokens_total": 1796
     },
     {
       "position": 3,
@@ -132,7 +132,7 @@
       "engagement_rate": "6.67%",
       "vision_status": "ok",
       "hook": {
-        "value": "женщина с игрушечной птицей и текст — интрига контента",
+        "value": "женщина с игрушечной птицей в руках — вызывает любопытство",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -142,7 +142,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "История попкорна в кинотеатрах",
+        "value": "Почему попкорн едят в кинотеатрах",
         "data_status": "ok"
       },
       "bol": {
@@ -150,7 +150,7 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Дабы увеличить прибыль, достаточно пересмотреть свою продуктовую линейку",
+        "value": "Пересмотреть свою продуктовую линейку для увеличения прибыли",
         "data_status": "ok"
       },
       "cta": {
@@ -166,16 +166,16 @@
         "data_status": "ok"
       },
       "struktura": {
-        "value": "факт → история → вывод → CTA",
+        "value": "история → вывод → CTA",
         "data_status": "ok"
       },
       "hook_type": {
         "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 489,
-      "tokens_text": 1590,
-      "tokens_total": 2079
+      "tokens_vision": 483,
+      "tokens_text": 1588,
+      "tokens_total": 2071
     }
   ]
 }

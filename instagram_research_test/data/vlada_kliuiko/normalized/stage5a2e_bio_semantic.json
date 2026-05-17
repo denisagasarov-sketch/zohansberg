@@ -1,36 +1,60 @@
 {
   "account": "vlada_kliuiko",
   "stage": "stage5a2e",
-  "prompt_version": "v1",
+  "prompt_version": "v6",
   "model": "gpt-4o-mini",
-  "generated_at": "2026-05-17T10:00:41.104485+00:00",
+  "generated_at": "2026-05-17T13:22:00.828862+00:00",
   "bio_text": "аналитически точные стратегии с опорой на цифры\nоснователь @elpodium_agency \nкаждый четверг-рубрика разборов \n↓ курс по маркетинговым стратегиям с AI",
   "openai_status": "ok",
-  "tokens_used": 960,
+  "tokens_used": 2140,
   "fields": {
+    "niche": {
+      "value": "маркетинг",
+      "data_status": "ok",
+      "source": "bio_text",
+      "notes": "Тематика деятельности связана с маркетингом."
+    },
     "target_audience": {
-      "value": "",
+      "value": "не определено",
       "data_status": "not_found",
       "source": "bio_text",
-      "notes": "Нет явных маркеров, указывающих на целевую аудиторию."
+      "notes": "Целевая аудитория не указана в тексте."
     },
     "result_promise": {
-      "value": "",
-      "data_status": "not_found",
+      "value": "научиться создавать маркетинговые стратегии с помощью AI",
+      "data_status": "ok",
       "source": "bio_text",
-      "notes": "Нет явного обещания результата для клиентов."
+      "notes": "Обещание результата связано с курсом по маркетинговым стратегиям."
+    },
+    "positioning": {
+      "value": "основатель @elpodium_agency",
+      "data_status": "ok",
+      "source": "bio_text",
+      "notes": "Первая строка bio описывает позиционирование."
     },
     "trust_arguments": {
       "value": "основатель @elpodium_agency",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Явное упоминание должности и компании."
+      "notes": "Указана должность и место работы."
     },
     "social_proof": {
+      "value": "не найдено",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Нет упоминаний о социальных доказательствах."
+    },
+    "cta_text": {
+      "value": "курс по маркетинговым стратегиям с AI",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Нет явного призыва к действию."
+    },
+    "cta_destination": {
       "value": "",
       "data_status": "not_found",
       "source": "bio_text",
-      "notes": "Нет социальных доказательств, таких как цифры или отзывы."
+      "notes": "Ссылка на курс не указана."
     }
   }
 }

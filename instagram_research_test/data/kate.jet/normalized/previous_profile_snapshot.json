@@ -27,8 +27,8 @@
     "notes": "fullName not returned by actor"
   },
   "bio_text": {
-    "value": null,
-    "data_status": "manual_needed",
+    "value": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн\n📰 US Forbes писали о моей стратегии в SMM\n⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
+    "data_status": "ok",
     "source_ref": "manual_input",
     "confidence": null,
     "notes": "biography not returned by actor"

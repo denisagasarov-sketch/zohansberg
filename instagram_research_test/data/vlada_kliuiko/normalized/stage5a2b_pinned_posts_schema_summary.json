@@ -28,6 +28,7 @@
     "sidecars",
     "carousel_media",
     "edge_sidecar_to_children",
+    "childPosts",
     "likesCount",
     "likes_count",
     "commentsCount",

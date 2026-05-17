@@ -1,38 +1,60 @@
 {
   "account": "kate.jet",
   "stage": "stage5a2e",
-  "prompt_version": "v1",
+  "prompt_version": "v6",
   "model": "gpt-4o-mini",
-  "generated_at": "2026-05-16T01:11:04.041360+00:00",
+  "generated_at": "2026-05-17T13:22:01.195377+00:00",
   "bio_text": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн\n📰 US Forbes писали о моей стратегии в SMM\n⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
   "openai_status": "ok",
-  "tokens_used": 1013,
+  "tokens_used": 2171,
   "fields": {
-    "target_audience": {
-      "value": "занять место",
-      "data_status": "inferred",
+    "niche": {
+      "value": "SMM",
+      "data_status": "ok",
       "source": "bio_text",
-      "notes": "Неявное указание на целевую аудиторию через фразу 'занять место'.",
-      "confidence": "low"
+      "notes": "Тематика деятельности связана с SMM."
+    },
+    "target_audience": {
+      "value": "не определено",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Целевая аудитория не указана в тексте."
     },
     "result_promise": {
-      "value": "Систематизируй SMM с помощью курса",
-      "data_status": "inferred",
+      "value": "научиться систематизировать SMM с помощью курса",
+      "data_status": "ok",
       "source": "bio_text",
-      "notes": "Обещание результата неявное, так как не указано конкретное время или результат.",
-      "confidence": "low"
+      "notes": "Обещание результата связано с курсом по систематизации SMM."
+    },
+    "positioning": {
+      "value": "Ex-Head of SMM Refocus",
+      "data_status": "ok",
+      "source": "bio_text",
+      "notes": "Первая строка bio описывает позиционирование."
     },
     "trust_arguments": {
       "value": "Ex-Head of SMM Refocus",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Явное указание на должность и опыт в SMM."
+      "notes": "Указана должность, что является аргументом доверия."
     },
     "social_proof": {
-      "value": "$1 млн",
+      "value": "$1 млн выручки; US Forbes писали о моей стратегии в SMM",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Явное социальное доказательство в виде выручки."
+      "notes": "Упомянуты результаты и публикация в Forbes."
+    },
+    "cta_text": {
+      "value": "Систематизируй SMM с помощью курса | занять место",
+      "data_status": "ok",
+      "source": "bio_text",
+      "notes": "Призыв к действию четко сформулирован."
+    },
+    "cta_destination": {
+      "value": "",
+      "data_status": "not_found",
+      "source": "bio_text",
+      "notes": "Ссылка для CTA не указана."
     }
   }
 }

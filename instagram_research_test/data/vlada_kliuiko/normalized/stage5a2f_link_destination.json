@@ -13,7 +13,7 @@
   "server_hint": "tilda",
   "classification_method": "openai",
   "tokens_used": 690,
-  "generated_at": "2026-05-17T10:00:46.780011+00:00",
+  "generated_at": "2026-05-17T12:35:54.538421+00:00",
   "result": {
     "destination_type": "лендинг_курса",
     "confidence": "high",

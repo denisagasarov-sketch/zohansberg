@@ -22,6 +22,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,6 +66,9 @@ _FIELDS_G6 = ["sposob_prodazhi", "est_ogranichenie", "est_bonusy", "finalnyy_cta
 _FIELDS_G7 = ["neobychnye_resheniya"]
 
 _ALL_NEW_FIELDS = _FIELDS_G1 + _FIELDS_G2 + _FIELDS_G3 + _FIELDS_G4 + _FIELDS_G5 + _FIELDS_G6 + _FIELDS_G7
+
+# Words that indicate sales-state text (closed/unavailable), not a real CTA
+_SALE_STATE_RE = re.compile(r"закрыт|закрыта|недоступн", re.IGNORECASE)
 
 # Legacy fields preserved for backward compat with stage5d1
 _ALL_FIELDS = [
@@ -662,6 +666,25 @@ def _collect_fields_new(pass_results: list[dict]) -> dict:
         g1_otzyvy = _norm_field(g1_raw, "otzyvy_format")
         if g1_otzyvy["value"]:
             merged["otzyvy_format"] = g1_otzyvy
+
+    # Postprocessing: if glavnyy_cta contains a sales-state phrase ("закрыт", "закрыта",
+    # "недоступн") it describes availability, not a real CTA. Replace with G2 fallback
+    # or not_found, and move the original text to est_ogranichenie if that field is empty.
+    cta_val = merged.get("glavnyy_cta", {}).get("value", "")
+    if cta_val and _SALE_STATE_RE.search(cta_val):
+        # Save original to est_ogranichenie when it carries no real value yet
+        ogr = merged.get("est_ogranichenie", {})
+        ogr_val = ogr.get("value", "")
+        if not ogr_val or ogr.get("data_status") == "not_found":
+            merged["est_ogranichenie"] = {"value": cta_val, "data_status": "ok", "confidence": "medium"}
+
+        # Try G2's reserve glavnyy_cta
+        g2_raw = (pass_results[1].get("fields") or {}) if len(pass_results) > 1 else {}
+        g2_cta = _norm_field(g2_raw, "glavnyy_cta") if "glavnyy_cta" in g2_raw else None
+        if g2_cta and g2_cta["value"] and not _SALE_STATE_RE.search(g2_cta["value"]):
+            merged["glavnyy_cta"] = g2_cta
+        else:
+            merged["glavnyy_cta"] = {"value": "", "data_status": "not_found", "confidence": "low"}
 
     return merged
 
