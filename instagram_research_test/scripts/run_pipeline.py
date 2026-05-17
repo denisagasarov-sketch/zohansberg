@@ -115,6 +115,7 @@ STAGE_ORDER = [
         "requires_apify": False,
         "requires_openai": True,
         "cost_estimate": "$0.02",
+        "optional": True,
     },
     {
         "name": "5D-1: Сборка payload",
@@ -255,6 +256,8 @@ def main():
         if ok:
             completed += 1
             print(f"[OK] {stage['name']}")
+        elif stage.get("optional"):
+            print(f"[WARN] Опциональный stage завершился с ошибкой (продолжаем): {stage['name']}")
         else:
             failed += 1
             print(f"[ERROR] Stage завершился с ошибкой: {stage['name']}")
