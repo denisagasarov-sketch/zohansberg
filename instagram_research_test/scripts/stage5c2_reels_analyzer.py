@@ -34,7 +34,7 @@ INPUT_PATH  = NORM_DIR / "stage5c1_reels_index.json"
 OUTPUT_PATH = NORM_DIR / "stage5c2_reels_analysis.json"
 
 STAGE          = "stage5c2"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 DEFAULT_MODEL  = "gpt-4o"
 IMAGE_DETAIL   = "low"
 MAX_TOKENS_VIS = 300
@@ -123,6 +123,13 @@ TEXT_SYSTEM = """\
                   "не найдено" если CTA нет.
 5. rol_v_voronke — роль в воронке, один из вариантов:
    "знакомство" | "доверие" | "прогрев" | "продажа" | "лидогенерация"
+6. kryuchok    — что заставляет досмотреть: интересный факт / неожиданная история /
+                  спорное утверждение / вопрос без ответа / провокационный тезис.
+                  Одна фраза до 100 символов. "не найдено" если не определяется.
+7. struktura   — структура Reel в формате X → Y → Z, максимум 3 элемента.
+                  Примеры: "факт → история → вывод", "боль → решение → CTA",
+                  "вопрос → ответ → CTA", "тезис → аргументы → вывод".
+                  Если не подходит ни один — описать своими словами в том же формате через →.
 
 ПРАВИЛА:
 - Отвечай только по переданному тексту, не домысливай.
@@ -137,7 +144,9 @@ TEXT_SYSTEM = """\
   "bol":            {"value": "...", "data_status": "ok|not_found"},
   "reshenie":       {"value": "...", "data_status": "ok|not_found"},
   "cta":            {"value": "...", "data_status": "ok|not_found"},
-  "rol_v_voronke":  {"value": "...", "data_status": "ok"}
+  "rol_v_voronke":  {"value": "...", "data_status": "ok"},
+  "kryuchok":       {"value": "...", "data_status": "ok|not_found"},
+  "struktura":      {"value": "...", "data_status": "ok"}
 }"""
 
 
@@ -286,6 +295,8 @@ def call_text(client, reel: dict, model: str) -> dict:
         "reshenie":      _not_found_field("no_text"),
         "cta":           _not_found_field("no_text"),
         "rol_v_voronke": _not_found_field("no_text"),
+        "kryuchok":      _not_found_field("no_text"),
+        "struktura":     _not_found_field("no_text"),
         "tokens_used":   0,
     }
 
@@ -314,6 +325,8 @@ def call_text(client, reel: dict, model: str) -> dict:
                 "reshenie":      _not_found_field("parse_error"),
                 "cta":           _not_found_field("parse_error"),
                 "rol_v_voronke": _not_found_field("parse_error"),
+                "kryuchok":      _not_found_field("parse_error"),
+                "struktura":     _not_found_field("parse_error"),
                 "tokens_used":   tokens,
             }
         return {
@@ -324,6 +337,8 @@ def call_text(client, reel: dict, model: str) -> dict:
             "reshenie":      parsed.get("reshenie",      _not_found_field("missing_key")),
             "cta":           parsed.get("cta",           _not_found_field("missing_key")),
             "rol_v_voronke": parsed.get("rol_v_voronke", _not_found_field("missing_key")),
+            "kryuchok":      parsed.get("kryuchok",      _not_found_field("missing_key")),
+            "struktura":     parsed.get("struktura",     _not_found_field("missing_key")),
             "tokens_used":   tokens,
         }
     except Exception as e:
@@ -336,6 +351,8 @@ def call_text(client, reel: dict, model: str) -> dict:
             "reshenie":      _not_found_field("openai_error"),
             "cta":           _not_found_field("openai_error"),
             "rol_v_voronke": _not_found_field("openai_error"),
+            "kryuchok":      _not_found_field("openai_error"),
+            "struktura":     _not_found_field("openai_error"),
             "tokens_used":   0,
         }
 
@@ -366,6 +383,8 @@ def build_reel_result(reel: dict, vision: dict, text: dict) -> dict:
         "reshenie":         text.get("reshenie"),
         "cta":              text.get("cta"),
         "rol_v_voronke":    text.get("rol_v_voronke"),
+        "kryuchok":         text.get("kryuchok"),
+        "struktura":        text.get("struktura"),
         # Diagnostics
         "tokens_vision":    vision.get("tokens_used", 0),
         "tokens_text":      text.get("tokens_used", 0),

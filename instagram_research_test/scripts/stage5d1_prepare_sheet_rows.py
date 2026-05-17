@@ -1296,7 +1296,8 @@ def build_bot_rows(sources, headers) -> tuple[list, list]:
 V2_REELS_HEADERS = [
     "Конкурент", "Ссылка", "Тема", "Хук визуальный", "Формат подачи",
     "Просмотры", "Лайки", "CTA", "Роль в воронке", "Боль", "Решение",
-    "Закреплён", "Дата",
+    "Крючок", "Структура",
+    "Закреплён", "Дата", "Хэштеги", "День недели",
 ]
 
 
@@ -1366,13 +1367,18 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
         is_pinned  = _c1.get("is_pinned")     if _c1 else r.get("is_pinned")
         published  = _fmt_date(_c1.get("timestamp") if _c1 else r.get("published_at"))
 
-        hook_val   = _field_ok(r.get("hook"))
-        fmt_val    = _field_ok(r.get("vizual_format"))
-        tema_val   = _field_ok(r.get("tema"))
-        cta_val    = _field_ok(r.get("cta"))
-        role_val   = _field_ok(r.get("rol_v_voronke"))
-        bol_val    = _field_ok(r.get("bol"))
-        res_val    = _field_ok(r.get("reshenie"))
+        hook_val      = _field_ok(r.get("hook"))
+        fmt_val       = _field_ok(r.get("vizual_format"))
+        tema_val      = _field_ok(r.get("tema"))
+        cta_val       = _field_ok(r.get("cta"))
+        role_val      = _field_ok(r.get("rol_v_voronke"))
+        bol_val       = _field_ok(r.get("bol"))
+        res_val       = _field_ok(r.get("reshenie"))
+        kryuchok_val  = _field_ok(r.get("kryuchok"))
+        struktura_val = _field_ok(r.get("struktura"))
+
+        hashtags_val  = _c1.get("hashtags", "")   if _c1 else ""
+        dow_val       = _c1.get("day_of_week", "") if _c1 else ""
 
         pinned_str = "да" if is_pinned else "нет"
         views_str  = str(views) if views is not None else ""
@@ -1381,17 +1387,21 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
         row = {
             "Конкурент":      _competitor,
             "Ссылка":         _redact_url(url) if url else "",
-            "Тема":           tema_val  or "не найдено",
-            "Хук визуальный": hook_val  or "не найдено",
-            "Формат подачи":  fmt_val   or "не найдено",
+            "Тема":           tema_val      or "не найдено",
+            "Хук визуальный": hook_val      or "не найдено",
+            "Формат подачи":  fmt_val       or "не найдено",
             "Просмотры":      views_str,
             "Лайки":          likes_str,
-            "CTA":            cta_val   or "не найдено",
-            "Роль в воронке": role_val  or "не найдено",
-            "Боль":           bol_val   or "не найдено",
-            "Решение":        res_val   or "не найдено",
+            "CTA":            cta_val       or "не найдено",
+            "Роль в воронке": role_val      or "не найдено",
+            "Боль":           bol_val       or "не найдено",
+            "Решение":        res_val       or "не найдено",
+            "Крючок":         kryuchok_val  or "не найдено",
+            "Структура":      struktura_val or "не найдено",
             "Закреплён":      pinned_str,
             "Дата":           published,
+            "Хэштеги":        hashtags_val  or "",
+            "День недели":    dow_val       or "",
         }
         rows.append(_make_row(V2_REELS_HEADERS, row))
 

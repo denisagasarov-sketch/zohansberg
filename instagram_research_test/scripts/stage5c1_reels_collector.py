@@ -13,12 +13,15 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 BASE       = Path(__file__).parent.parent
 ACTOR_ID   = "apify/instagram-reel-scraper"
+
+_RU_DAYS = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
 STAGE      = "stage5c1"
 MAX_SELECTED = 10   # max reels in normalized output
 
@@ -70,6 +73,24 @@ def _extract_reel(item: dict, position: int) -> dict:
             out["url"] = _build_reel_url(item)
         else:
             out[norm_key] = _pick(item, aliases)
+
+    # Derived: hashtags extracted from caption
+    caption_raw = out.get("caption") or ""
+    out["hashtags"] = ", ".join(re.findall(r"#\w+", caption_raw))
+
+    # Derived: day_of_week from timestamp
+    ts = out.get("timestamp")
+    out["day_of_week"] = ""
+    if ts:
+        try:
+            if isinstance(ts, (int, float)):
+                dt = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+            else:
+                dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            out["day_of_week"] = _RU_DAYS[dt.weekday()]
+        except Exception:
+            pass
+
     return out
 
 
