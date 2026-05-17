@@ -19,14 +19,12 @@ START_ROW      = 3
 
 
 def _account_label(sources: dict) -> str:
-    """Return '@username https://www.instagram.com/username/' from profile_summary if available."""
+    """Return 'https://www.instagram.com/{username}/' from profile_summary if available."""
     ps = sources.get("profile_summary") or {}
-    _raw_url  = ps.get("profile_url", {})
-    _url      = (_raw_url.get("value") if isinstance(_raw_url, dict) else _raw_url) \
-                or f"https://www.instagram.com/{ACCOUNT}/"
-    _raw_user = ps.get("username", {})
-    _user     = (_raw_user.get("value") if isinstance(_raw_user, dict) else _raw_user) or ACCOUNT
-    return f"@{_user} {_url}"
+    _raw_url = ps.get("profile_url", {})
+    _url     = (_raw_url.get("value") if isinstance(_raw_url, dict) else _raw_url) \
+               or f"https://www.instagram.com/{ACCOUNT}/"
+    return _url
 
 EXPECTED_TOTAL_COLUMNS = 79
 EXCEL_TEMPLATE = BASE / "input/competitor_analysis_template.xlsx"
@@ -328,6 +326,22 @@ def _pinned_hooks_index(sources: dict) -> dict:
     return result
 
 
+def _pinned_carousel_index(sources: dict) -> dict:
+    """Return {position: {"carousel_narrative": str, "carousel_cta": str}} from stage5a2d_pinned_hooks.json."""
+    raw = sources.get("pinned_hooks")
+    if not raw or not isinstance(raw, dict):
+        return {}
+    result = {}
+    for p in raw.get("posts", []):
+        pos = p.get("position")
+        if pos and not p.get("skipped") and not p.get("parse_error"):
+            result[int(pos)] = {
+                "carousel_narrative": (p.get("carousel_narrative") or "").strip(),
+                "carousel_cta":       (p.get("carousel_cta") or "").strip(),
+            }
+    return result
+
+
 def _apply_hooks(rows: list, headers: list, hooks_index: dict) -> list:
     """Fill 'Хук / первый экран' from stage5a2d hooks_index where cell is empty."""
     if not hooks_index or "Хук / первый экран" not in headers:
@@ -438,7 +452,7 @@ def build_profile_rows(sources, headers) -> tuple[list, list]:
     row = {}
     _username = _fval(ps, "username", "userName") or ACCOUNT
     _profile_url = _profile_url_val or f"https://www.instagram.com/{_username}/"
-    row["Конкурент"] = f"@{_username} {_profile_url}"
+    row["Конкурент"] = _profile_url
 
     _product_keywords = ["курс", "наставничество", "клуб", "консультац", "обучени"]
     _niche_line = next(
@@ -759,6 +773,7 @@ V2_PINNED_HEADERS = [
     "Почему закреплен", "Хук / первый экран", "Хук обложки (визуал)",
     "Что в тексте поста", "Ключевые смыслы", "Какой CTA",
     "Куда ведет CTA", "Роль в воронке", "Слайды карусели", "Противоречия",
+    "Нарратив карусели", "CTA последнего слайда",
 ]
 
 
@@ -798,10 +813,11 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
     Uses stage5a2c semantic rows as base; adds hook cover, carousel count, contradiction.
     Does NOT raise — caller wraps in try/except.
     """
-    warnings       = []
-    hooks_index    = _pinned_hooks_index(sources)
-    carousel_index = _carousel_count_index()
-    _competitor    = _account_label(sources)
+    warnings          = []
+    hooks_index       = _pinned_hooks_index(sources)
+    carousel_index    = _carousel_count_index()
+    carousel_ai_index = _pinned_carousel_index(sources)
+    _competitor       = _account_label(sources)
 
     # Find source rows — same priority as build_pinned_rows
     src_headers = None
@@ -841,21 +857,25 @@ def build_v2_pinned_rows(sources: dict) -> tuple[list, list, list]:
         cta  = _get(row, "Какой CTA")
         role = _get(row, "Роль в воронке")
 
+        _carousel_ai = carousel_ai_index.get(pos, {}) if pos else {}
+
         v2_fields = {
-            "Конкурент":            _competitor,
-            "Ссылка на пост":       _nf(_get(row, "Ссылка на пост")),
-            "Позиция закрепа":      _nf(position_str),
-            "Тема поста":           _nf(_get(row, "Тема поста")),
-            "Почему закреплен":     _nf(_get(row, "Почему закреплен")),
-            "Хук / первый экран":   _nf(_get(row, "Хук / первый экран")),
-            "Хук обложки (визуал)": _nf(hooks_index.get(pos, "") if pos else ""),
-            "Что в тексте поста":   _nf(_get(row, "Что в тексте поста")),
-            "Ключевые смыслы":      _nf(_get(row, "Ключевые смыслы")),
-            "Какой CTA":            _nf(cta),
-            "Куда ведет CTA":       _nf(_get(row, "Куда ведет CTA")),
-            "Роль в воронке":       _nf(role),
-            "Слайды карусели":      _nf(carousel_index.get(pos, "") if pos else ""),
-            "Противоречия":         _contradiction_check(role, cta),
+            "Конкурент":               _competitor,
+            "Ссылка на пост":          _nf(_get(row, "Ссылка на пост")),
+            "Позиция закрепа":         _nf(position_str),
+            "Тема поста":              _nf(_get(row, "Тема поста")),
+            "Почему закреплен":        _nf(_get(row, "Почему закреплен")),
+            "Хук / первый экран":      _nf(_get(row, "Хук / первый экран")),
+            "Хук обложки (визуал)":    _nf(hooks_index.get(pos, "") if pos else ""),
+            "Что в тексте поста":      _nf(_get(row, "Что в тексте поста")),
+            "Ключевые смыслы":         _nf(_get(row, "Ключевые смыслы")),
+            "Какой CTA":               _nf(cta),
+            "Куда ведет CTA":          _nf(_get(row, "Куда ведет CTA")),
+            "Роль в воронке":          _nf(role),
+            "Слайды карусели":         _nf(carousel_index.get(pos, "") if pos else ""),
+            "Противоречия":            _contradiction_check(role, cta),
+            "Нарратив карусели":       _carousel_ai.get("carousel_narrative", ""),
+            "CTA последнего слайда":   _carousel_ai.get("carousel_cta", ""),
         }
         rows.append(_make_row(V2_PINNED_HEADERS, v2_fields))
 

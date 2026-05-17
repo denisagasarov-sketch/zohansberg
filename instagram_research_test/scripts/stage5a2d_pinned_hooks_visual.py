@@ -79,6 +79,30 @@ SYSTEM_PROMPT = """\
   }
 }"""
 
+CAROUSEL_SYSTEM_PROMPT = """\
+Ты — аналитик Instagram-контента. Тебе показывают несколько слайдов карусели из Instagram.
+Слайд 1 — обложка, которую видит человек при скролле. Последний слайд часто содержит CTA.
+
+ПРАВИЛА:
+1. hook — главный элемент первого слайда, который останавливает скролл.
+   Формат: [что именно на обложке] → [маркетинговая интерпретация]. Максимум 80 символов.
+   data_status: "not_found" если на первом слайде нет явного хука.
+2. carousel_narrative — одним предложением: что рассказывает карусель целиком, какова её логика или последовательность.
+   "не найдено" если слайды не складываются в нарратив.
+3. carousel_cta — дословный текст CTA с последнего слайда. "не найдено" если CTA нет.
+4. Не додумывай содержание вне показанных слайдов. Отвечай строго в JSON.
+
+ФОРМАТ ОТВЕТА (строго JSON):
+{
+  "hook": {
+    "value": "...",
+    "data_status": "ok|not_found",
+    "notes": "1 предложение — что именно видно на первом слайде"
+  },
+  "carousel_narrative": "...",
+  "carousel_cta": "..."
+}"""
+
 
 def build_user_prompt(position: int, post_type: str) -> str:
     return (
@@ -86,6 +110,44 @@ def build_user_prompt(position: int, post_type: str) -> str:
         "Извлеки хук — что человек видит первым на этом кадре.\n"
         "Отвечай только JSON."
     )
+
+
+def build_carousel_user_prompt(n_total: int, n_shown: int, position: int, post_type: str) -> str:
+    return (
+        f"Закреп №{position} (тип: {post_type}).\n"
+        f"Карусель из {n_total} слайдов. Показано {n_shown} "
+        f"(первый слайд + последние + средние).\n"
+        "Извлеки hook с первого слайда, narrative карусели и CTA с последнего слайда.\n"
+        "Отвечай только JSON."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Carousel image selection
+# ---------------------------------------------------------------------------
+
+def select_carousel_images(post: dict) -> tuple[list, int]:
+    """Return (selected_urls, total_count) for carousel posts.
+
+    Selects up to 5 images: first + last 2 + up to 2 evenly spaced middle slides.
+    """
+    carousel = post.get("carousel_items") or []
+    urls = [item.get("display_url", "") for item in carousel if item.get("display_url")]
+    n = len(urls)
+    if n == 0:
+        return [], 0
+    if n <= 5:
+        return urls, n
+    # First + up to 2 middle + last 2
+    selected = [urls[0]]
+    middle_pool = urls[1:n - 2]
+    if len(middle_pool) >= 2:
+        mid = len(middle_pool) // 2
+        selected += [middle_pool[0], middle_pool[mid]]
+    elif len(middle_pool) == 1:
+        selected.append(middle_pool[0])
+    selected += urls[-2:]
+    return selected, n
 
 
 # ---------------------------------------------------------------------------
@@ -228,44 +290,124 @@ def _call_vision(client, data_uri: str, position: int, post_type: str, model: st
 
 
 # ---------------------------------------------------------------------------
+# Carousel Vision call
+# ---------------------------------------------------------------------------
+
+def _call_vision_carousel(
+    client, data_uris: list, n_total: int, position: int, post_type: str, model: str
+) -> dict:
+    user_prompt = build_carousel_user_prompt(n_total, len(data_uris), position, post_type)
+    image_blocks = [
+        {"type": "image_url", "image_url": {"url": uri, "detail": IMAGE_DETAIL}}
+        for uri in data_uris
+    ]
+    image_blocks.append({"type": "text", "text": user_prompt})
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": CAROUSEL_SYSTEM_PROMPT},
+                {"role": "user", "content": image_blocks},
+            ],
+        )
+        raw = response.choices[0].message.content or ""
+        parsed, err = _parse_json(raw)
+        if err:
+            return {
+                "status":       "parse_error",
+                "parse_error":  True,
+                "raw_response": raw[:300],
+                "tokens_used":  getattr(response.usage, "total_tokens", None),
+            }
+        return {
+            "status":             "ok",
+            "hook":               parsed.get("hook") or {},
+            "carousel_narrative": parsed.get("carousel_narrative", ""),
+            "carousel_cta":       parsed.get("carousel_cta", ""),
+            "tokens_used":        getattr(response.usage, "total_tokens", None),
+        }
+    except Exception as e:
+        return {"status": "openai_error", "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
 # Single-post processing
 # ---------------------------------------------------------------------------
 
 def _process_post(post: dict, client, model: str) -> dict:
     position  = post.get("position", 0)
     post_type = post.get("media_type", "")
-    img_info  = select_image_info(post)
-    url       = img_info["displayUrl_used"]
+    carousel  = post.get("carousel_items") or []
 
     base_record = {
-        "position":        position,
-        "post_type":       post_type,
-        "image_source":    img_info["image_source"],
-        "displayUrl_used": url,
-        "skipped":         False,
+        "position":           position,
+        "post_type":          post_type,
+        "carousel_narrative": "",
+        "carousel_cta":       "",
     }
+
+    # --- Carousel branch ---
+    if post_type == "Sidecar" and carousel:
+        selected_urls, n_total = select_carousel_images(post)
+        print(
+            f"[INFO] Post {position}: Sidecar carousel — "
+            f"{n_total} slides total, {len(selected_urls)} selected"
+        )
+        record = {**base_record, "image_source": "carousel",
+                  "displayUrl_used": selected_urls[0] if selected_urls else "", "skipped": False}
+
+        if not selected_urls:
+            print(f"[WARN] Post {position}: carousel_items present but no display_url found")
+            return {**record, "skipped": True, "skip_reason": "carousel_no_urls"}
+
+        data_uris = []
+        for i, url in enumerate(selected_urls):
+            data_uri, reason = download_and_encode(url, position)
+            if data_uri is None:
+                print(f"[WARN] Post {position}: slide {i + 1} download failed: {reason}")
+            else:
+                data_uris.append(data_uri)
+
+        if not data_uris:
+            return {**record, "skipped": True, "skip_reason": "carousel_all_downloads_failed"}
+
+        print(f"[INFO] Post {position}: calling Vision carousel ({model}), {len(data_uris)} images...")
+        result = _call_vision_carousel(client, data_uris, n_total, position, post_type, model)
+
+        if result["status"] == "ok":
+            return {**record, "hook": result["hook"],
+                    "carousel_narrative": result.get("carousel_narrative", ""),
+                    "carousel_cta":       result.get("carousel_cta", ""),
+                    "tokens_used":        result.get("tokens_used")}
+        if result.get("parse_error"):
+            return {**record, "parse_error": True, "raw_response": result.get("raw_response", ""),
+                    "tokens_used": result.get("tokens_used")}
+        return {**record, "skipped": True, "skip_reason": result.get("error", "openai_error")}
+
+    # --- Single-image branch ---
+    img_info = select_image_info(post)
+    url      = img_info["displayUrl_used"]
+    record   = {**base_record, "image_source": img_info["image_source"],
+                "displayUrl_used": url, "skipped": False}
 
     if not url:
         print(f"[WARN] Post {position}: no displayUrl available — skipping")
-        return {**base_record, "skipped": True, "skip_reason": "no_url"}
+        return {**record, "skipped": True, "skip_reason": "no_url"}
 
     data_uri, skip_reason = download_and_encode(url, position)
     if data_uri is None:
-        return {**base_record, "skipped": True, "skip_reason": skip_reason}
+        return {**record, "skipped": True, "skip_reason": skip_reason}
 
     print(f"[INFO] Post {position}: calling Vision ({model})...")
     result = _call_vision(client, data_uri, position, post_type, model)
 
     if result["status"] == "ok":
-        return {**base_record, "hook": result["hook"], "tokens_used": result.get("tokens_used")}
+        return {**record, "hook": result["hook"], "tokens_used": result.get("tokens_used")}
     if result.get("parse_error"):
-        return {
-            **base_record,
-            "parse_error":  True,
-            "raw_response": result.get("raw_response", ""),
-            "tokens_used":  result.get("tokens_used"),
-        }
-    return {**base_record, "skipped": True, "skip_reason": result.get("error", "openai_error")}
+        return {**record, "parse_error": True, "raw_response": result.get("raw_response", ""),
+                "tokens_used": result.get("tokens_used")}
+    return {**record, "skipped": True, "skip_reason": result.get("error", "openai_error")}
 
 
 # ---------------------------------------------------------------------------
@@ -422,10 +564,15 @@ def main():
         elif rec.get("parse_error"):
             print(f"  Post {pos}: PARSE_ERROR — {rec.get('raw_response', '')[:80]}")
         else:
-            hook  = rec.get("hook") or {}
-            htype = hook.get("type", "?")
-            val   = (hook.get("value") or "")[:80] or "(empty)"
-            print(f"  Post {pos}: [{htype}] {val}")
+            hook = rec.get("hook") or {}
+            val  = (hook.get("value") or "")[:80] or "(empty)"
+            print(f"  Post {pos}: hook = {val}")
+            narrative = rec.get("carousel_narrative", "")
+            if narrative:
+                print(f"    carousel_narrative = {narrative[:100]}")
+            cta = rec.get("carousel_cta", "")
+            if cta:
+                print(f"    carousel_cta       = {cta[:80]}")
 
 
 if __name__ == "__main__":
