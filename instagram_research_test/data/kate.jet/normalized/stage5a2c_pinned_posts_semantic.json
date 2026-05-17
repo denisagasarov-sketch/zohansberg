@@ -1,7 +1,7 @@
 {
   "account": "kate.jet",
   "stage": "stage5a2c",
-  "run_timestamp": "2026-05-17T10:41:58.044787+00:00",
+  "run_timestamp": "2026-05-17T10:44:39.670596+00:00",
   "model": "gpt-4o-mini",
   "prompt_version": "v4",
   "total_posts": 2,
@@ -9,12 +9,12 @@
   "visual_analyzed": false,
   "ocr_analyzed": false,
   "cache_summary": {
-    "hits": 0,
-    "new": 2,
+    "hits": 2,
+    "new": 0,
     "failed": 0
   },
   "total_tokens_used": 5730,
-  "estimated_cost_usd": 0.0008,
+  "estimated_cost_usd": 0.0,
   "posts": [
     {
       "position": 1,
@@ -26,7 +26,7 @@
       "source": "caption_only",
       "visual_analyzed": false,
       "ocr_analyzed": false,
-      "cache_status": "miss",
+      "cache_status": "hit",
       "tokens_used": 2950,
       "openai_status": "analyzed",
       "google_sheet_fields": {
@@ -76,7 +76,7 @@
       "source": "caption_only",
       "visual_analyzed": false,
       "ocr_analyzed": false,
-      "cache_status": "miss",
+      "cache_status": "hit",
       "tokens_used": 2780,
       "openai_status": "analyzed",
       "google_sheet_fields": {
