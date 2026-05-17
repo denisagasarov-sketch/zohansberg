@@ -3,37 +3,37 @@
   "stage": "stage5a2d",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T10:45:02.371073+00:00",
+  "generated_at": "2026-05-17T11:02:20.509890+00:00",
   "posts": [
     {
       "position": 1,
       "post_type": "Sidecar",
-      "carousel_narrative": "Курс описывает этапы и преимущества обучения SMM.",
-      "carousel_cta": "Хочешь вырасти как спец, ощутить контроль над ситуацией в SMM, получить признание и увеличить свой доход?",
+      "carousel_narrative": "Курс по SMM охватывает процессные карты, тестирование гипотез и управление командой.",
+      "carousel_cta": "Узнай детали курса по ссылке в шапке профиля.",
       "image_source": "carousel",
       "displayUrl_used": "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gG3BsRKa7tlERzqrne9RetN7JKQfTnjyLh8qXcym3cLxM1LgXIWawi110XVTyomt9Q&_nc_ohc=9A3fUoCAFkEQ7kNvwFZ1vYn&_nc_gid=Tn4XwdNZn6HXAEOARF88hQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6E9dP8_DDN4g5QUyE1rK46pR_WD2VyK5hx2zGAYGtrAg&oe=6A0D9BF6&_nc_sid=10d13b",
       "skipped": false,
       "hook": {
-        "value": "Программа курса «Системный SMM» → Управляемый процесс обучения",
+        "value": "Программа курса «Системный SMM»",
         "data_status": "ok",
-        "notes": "На первом слайде изображение с женщиной на фоне моря, текст о программе курса."
+        "notes": "Женщина на пляже и текст 'Программа курса «Системный SMM»'"
       },
-      "tokens_used": 1017
+      "tokens_used": 1009
     },
     {
       "position": 2,
       "post_type": "Sidecar",
-      "carousel_narrative": "Кейс об успешной системе аналитики и контента в SMM для увеличения выручки.",
+      "carousel_narrative": "Описание стратегии и результатов SMM для увеличения выручки.",
       "carousel_cta": "Эта система работает на каждом проекте, в который ее внедряют.",
       "image_source": "carousel",
       "displayUrl_used": "https://scontent-fml1-1.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-fml1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHKUbgO8QzFQd5zi-uTQGftg8SnhRKdsYrYg5F-j1i5IY5yCZBM34PaI7B6Bkn7M80&_nc_ohc=Uq7FxGdoZVAQ7kNvwFtsJHi&_nc_gid=5HJ3kulQiJ_vuz0OO-XNIQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af5uzjOk5-sdCBED7GTgxDUanyDjDpa3XBvEGbOzzjH1xA&oe=6A0D7965&_nc_sid=10d13b",
       "skipped": false,
       "hook": {
-        "value": "Как выстроить SMM на $1 млн → кейс успеха от эксперта",
+        "value": "Как выстроить SMM на $1 млн",
         "data_status": "ok",
-        "notes": "На обложке изображение женщины в солнечных очках и текст про SMM на $1 млн"
+        "notes": "Первый слайд с фото человека и текстом о выстраивании SMM."
       },
-      "tokens_used": 1019
+      "tokens_used": 1000
     }
   ]
 }
