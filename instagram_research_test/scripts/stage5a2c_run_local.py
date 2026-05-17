@@ -375,12 +375,21 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
         for e in r_errors:
             print(f"  {e}")
 
-    # Write fixed output if requested (always write when _fixed file is absent or stale)
+    # Write fixed output if requested
+    # Always write when: pp changes exist, _fixed absent, or _fixed has older prompt version
     fixed_absent = not SEMANTIC_FIXED_PATH.exists()
-    if write_fixed and (any_pp_changes or fixed_absent):
+    fixed_stale = False
+    if not fixed_absent:
+        try:
+            import json as _json
+            fixed_pv = _json.loads(SEMANTIC_FIXED_PATH.read_text(encoding="utf-8")).get("prompt_version", "")
+            fixed_stale = fixed_pv != semantic_output.get("prompt_version", "")
+        except Exception:
+            fixed_stale = True
+    if write_fixed and (any_pp_changes or fixed_absent or fixed_stale):
         _write_fixed_outputs(semantic_output, fixed_posts, overwrite)
-    elif write_fixed and not any_pp_changes:
-        print("\n[SKIP] No postprocessing fixes needed and _fixed file exists; skipped.")
+    elif write_fixed:
+        print("\n[SKIP] No postprocessing fixes needed and _fixed file is up-to-date; skipped.")
 
 
 def _write_fixed_outputs(original_output: dict, fixed_posts: list[dict], overwrite: bool):

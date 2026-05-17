@@ -66,6 +66,7 @@
       "validation_warnings": [
         "Какой CTA: explicit CTA not found; cleared",
         "Куда ведет CTA: cleared because CTA was invalid",
+        "Противоречие: роль продажа/лидогенерация но CTA не найден — проверить вручную",
         "Противоречие: роль продажа/лидогенерация но CTA не найден — проверить вручную"
       ],
       "postprocessing_notes": [
@@ -133,6 +134,7 @@
       "validation_warnings": [
         "Какой CTA: explicit CTA not found; cleared",
         "Куда ведет CTA: cleared because CTA was invalid",
+        "Противоречие: роль продажа/лидогенерация но CTA не найден — проверить вручную",
         "Противоречие: роль продажа/лидогенерация но CTA не найден — проверить вручную"
       ],
       "postprocessing_notes": [
@@ -150,5 +152,6 @@
         }
       ]
     }
-  ]
+  ],
+  "fixed_at": "2026-05-17T10:08:16.609951+00:00"
 }
