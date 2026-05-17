@@ -591,18 +591,18 @@ function _restoreHeaderStyle(sheet, numCols) {
   var cols = numCols || sheet.getLastColumn();
   if (cols < 1) return;
 
-  // Row 1: bold, dark background, white text, wrap
+  // Row 1: bold, pink background, black text, wrap
   var r1 = sheet.getRange(1, 1, 1, cols);
   r1.setFontWeight("bold");
-  r1.setBackground("#1a1a1a");
-  r1.setFontColor("#ffffff");
+  r1.setBackground("#f4c7cd");
+  r1.setFontColor("#000000");
   r1.setWrap(true);
 
-  // Row 2: italic, light background, grey text, wrap, 40px height
+  // Row 2: italic, green background, black text, wrap, 40px height
   var r2 = sheet.getRange(2, 1, 1, cols);
   r2.setFontStyle("italic");
-  r2.setBackground("#f5f5f5");
-  r2.setFontColor("#888888");
+  r2.setBackground("#d9ead3");
+  r2.setFontColor("#000000");
   r2.setWrap(true);
   sheet.setRowHeight(2, 40);
 
