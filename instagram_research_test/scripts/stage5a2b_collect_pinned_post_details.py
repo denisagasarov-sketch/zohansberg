@@ -61,7 +61,7 @@ CANDIDATE_DISPLAY_URL_FIELDS  = ["displayUrl", "displaySrc", "display_url"]
 CANDIDATE_THUMBNAIL_FIELDS    = ["thumbnailSrc", "thumbnailUrl", "thumbnail_src", "thumbnail_url"]
 CANDIDATE_VIDEO_URL_FIELDS    = ["videoUrl", "video_url", "videoSrc"]
 CANDIDATE_CAROUSEL_FIELDS     = ["carouselMedia", "sidecar", "sidecars", "carousel_media",
-                                  "edge_sidecar_to_children"]
+                                  "edge_sidecar_to_children", "childPosts"]
 CANDIDATE_LIKES_FIELDS        = ["likesCount", "likes_count"]
 CANDIDATE_COMMENTS_FIELDS     = ["commentsCount", "comments_count"]
 CANDIDATE_DATE_FIELDS         = ["takenAt", "taken_at", "date"]
@@ -603,6 +603,20 @@ def normalize_from_existing_raw(pinned_refs: list[dict]) -> tuple[dict | None, s
         or i.get("isPinned") is True
     ]
 
+    # If pinned_refs is empty but isPinned=True items exist in raw, build synthetic refs
+    # so match_items_to_pinned can drive the loop (it iterates refs, not items)
+    if not pinned_refs and filtered:
+        pinned_refs = [
+            {
+                "position":  idx + 1,
+                "shortcode": item.get("shortCode") or item.get("shortcode"),
+                "post_id":   str(item.get("id") or ""),
+                "permalink": item.get("url") or item.get("permalink") or "",
+                "media_type": item.get("type") or item.get("mediaType"),
+            }
+            for idx, item in enumerate(filtered)
+        ]
+
     schema  = inspect_schema(filtered)
     matched = match_items_to_pinned(filtered, pinned_refs)
     output  = build_normalized_output(
@@ -685,15 +699,23 @@ def run_from_existing_raw() -> dict:
     index, errors = load_pinned_index()
     hard_errors = [e for e in errors if not e.startswith("WARNING")]
     if hard_errors:
-        if NORM_OUTPUT_PATH.exists():
+        # Index has 0 pinned posts — try to fall through to raw file anyway;
+        # normalize_from_existing_raw will pick up isPinned=True items directly.
+        if STAGE5A1_RAW_POSTS.exists():
             print(
-                f"  [INFO] pinned_posts_index has 0 posts but "
-                f"{NORM_OUTPUT_PATH.name} already exists — reusing."
+                f"  [INFO] pinned_posts_index has 0 posts — "
+                f"falling back to isPinned=True scan of {STAGE5A1_RAW_POSTS.name}"
+            )
+        elif NORM_OUTPUT_PATH.exists():
+            print(
+                f"  [INFO] pinned_posts_index has 0 posts and raw not found — "
+                f"reusing existing {NORM_OUTPUT_PATH.name}"
             )
             return json.loads(NORM_OUTPUT_PATH.read_text(encoding="utf-8"))
-        raise ValueError("\n".join(hard_errors))
+        else:
+            raise ValueError("\n".join(hard_errors))
 
-    pinned_refs = extract_pinned_refs(index)
+    pinned_refs = extract_pinned_refs(index)  # empty list when index has 0 posts
     output, err = normalize_from_existing_raw(pinned_refs)
     if err:
         raise ValueError(err)
