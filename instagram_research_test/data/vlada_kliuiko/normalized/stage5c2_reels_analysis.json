@@ -3,11 +3,11 @@
   "stage": "stage5c2",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T13:37:07.515124+00:00",
+  "generated_at": "2026-05-17T13:51:53.348966+00:00",
   "reels_analyzed": 3,
   "reels_ok": 3,
   "reels_skipped": 0,
-  "total_tokens": 6310,
+  "total_tokens": 6382,
   "reels": [
     {
       "position": 1,
@@ -20,7 +20,7 @@
       "engagement_rate": "11.44%",
       "vision_status": "ok",
       "hook": {
-        "value": "надпись на красной стене среди разноцветной керамики — визуальный акцент на",
+        "value": "декоративная стена с посудой и крупный белый текст — визуальный интерес",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -30,7 +30,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "История каблуков и их трансформация от военного атрибута к символу сексуальности",
+        "value": "История каблуков от военной технологии до символа сексуальности",
         "data_status": "ok"
       },
       "bol": {
@@ -54,16 +54,16 @@
         "data_status": "ok"
       },
       "struktura": {
-        "value": "факт → история → вывод",
+        "value": "неожиданный факт → история → заключение",
         "data_status": "ok"
       },
       "hook_type": {
         "value": "факт",
         "data_status": "ok"
       },
-      "tokens_vision": 613,
-      "tokens_text": 1587,
-      "tokens_total": 2200
+      "tokens_vision": 610,
+      "tokens_text": 1616,
+      "tokens_total": 2226
     },
     {
       "position": 2,
@@ -76,7 +76,7 @@
       "engagement_rate": "2.59%",
       "vision_status": "ok",
       "hook": {
-        "value": "фигура человека с телефоном на фоне роскошного здания — вызывает любопытство к",
+        "value": "человек фотографирует здание — вызывает любопытство о месте",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -86,7 +86,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "Важность влюбленности маркетолога в продукт клиента",
+        "value": "Как маркетологу влюбиться в продукт клиента для успешных продаж",
         "data_status": "ok"
       },
       "bol": {
@@ -94,8 +94,8 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "не найдено",
-        "data_status": "not_found"
+        "value": "Продукт клиента должен продавать сам клиент маркетологу для созданий эмоциональной связи",
+        "data_status": "ok"
       },
       "cta": {
         "value": "не найдено",
@@ -106,20 +106,20 @@
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "Дорогой клиент, продайте нам свой продукт.",
+        "value": "Дорогой клиент, продайте нам свой продукт",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "личный опыт → теория → аналогия",
+        "value": "тезис → аналогия → вывод",
         "data_status": "ok"
       },
       "hook_type": {
-        "value": "факт",
+        "value": "провокация",
         "data_status": "ok"
       },
-      "tokens_vision": 597,
-      "tokens_text": 1317,
-      "tokens_total": 1914
+      "tokens_vision": 591,
+      "tokens_text": 1375,
+      "tokens_total": 1966
     },
     {
       "position": 3,
@@ -132,7 +132,7 @@
       "engagement_rate": "6.67%",
       "vision_status": "ok",
       "hook": {
-        "value": "женщина с игрушечной птицей в руках на фоне комнаты — привлекает внимание",
+        "value": "женщина с игрушечной голубкой в руках — вызывает интерес и любопытство",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -142,7 +142,7 @@
       "text_status": "ok",
       "text_source": "transcript",
       "tema": {
-        "value": "История попкорна в кинотеатрах",
+        "value": "История появления попкорна в кинотеатрах",
         "data_status": "ok"
       },
       "bol": {
@@ -150,23 +150,23 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Иногда, чтобы увеличить прибыль, нужно пересмотреть продуктовую линейку",
+        "value": "пересмотреть продуктовую линейку для увеличения прибыли",
         "data_status": "ok"
       },
       "cta": {
-        "value": "Подписывайся, чтобы не пропустить",
+        "value": "Подписывайся, чтобы не пропустить.",
         "data_status": "ok"
       },
       "rol_v_voronke": {
-        "value": "прогрев",
+        "value": "знакомство",
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "вы знаете, что виновата в этом Великая Депрессия",
+        "value": "виновата в этом Великая Депрессия",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "история → анализ рынка → вывод",
+        "value": "история → вывод → CTA",
         "data_status": "ok"
       },
       "hook_type": {
@@ -174,8 +174,8 @@
         "data_status": "ok"
       },
       "tokens_vision": 603,
-      "tokens_text": 1593,
-      "tokens_total": 2196
+      "tokens_text": 1587,
+      "tokens_total": 2190
     }
   ]
 }

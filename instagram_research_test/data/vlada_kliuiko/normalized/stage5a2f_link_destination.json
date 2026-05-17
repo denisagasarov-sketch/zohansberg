@@ -12,12 +12,12 @@
   "description": "Научим делать стратегии уровня топ-агентств и получать за них, как в топ-агентствах",
   "server_hint": "tilda",
   "classification_method": "openai",
-  "tokens_used": 690,
-  "generated_at": "2026-05-17T13:35:28.911105+00:00",
+  "tokens_used": 700,
+  "generated_at": "2026-05-17T13:50:19.352646+00:00",
   "result": {
     "destination_type": "лендинг_курса",
     "confidence": "high",
-    "reasoning": "Описание содержит 'научим', что указывает на обучающий курс.",
+    "reasoning": "Title и description содержат слова 'научим' и 'стратегии', что указывает на обучающий курс.",
     "data_status": "ok"
   }
 }

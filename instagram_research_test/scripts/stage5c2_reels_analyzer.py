@@ -293,7 +293,7 @@ def call_vision(client, reel: dict, model: str) -> dict:
                 "tokens_used":   tokens,
             }
         hook = _apply_length_limit(
-            parsed.get("hook", _not_found_field("missing_key")), 80
+            parsed.get("hook", _not_found_field("missing_key")), 120
         )
         # Postprocessing: if model returned a hashtag despite prompt instruction, clear it
         if "#" in (hook.get("value") or ""):
