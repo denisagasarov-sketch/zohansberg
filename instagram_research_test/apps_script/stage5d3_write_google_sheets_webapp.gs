@@ -572,7 +572,42 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
     result.written_rows  = 0;
   }
 
+  // Restore header/hint row styles after any write operation
+  try {
+    _restoreHeaderStyle(sheet, headers.length);
+  } catch (styleErr) {
+    result.warnings.push("Could not restore header style: " + styleErr.message);
+  }
+
   return result;
+}
+
+
+// ---------------------------------------------------------------------------
+// Header style restorer
+// ---------------------------------------------------------------------------
+
+function _restoreHeaderStyle(sheet, numCols) {
+  var cols = numCols || sheet.getLastColumn();
+  if (cols < 1) return;
+
+  // Row 1: bold, dark background, white text, wrap
+  var r1 = sheet.getRange(1, 1, 1, cols);
+  r1.setFontWeight("bold");
+  r1.setBackground("#1a1a1a");
+  r1.setFontColor("#ffffff");
+  r1.setWrap(true);
+
+  // Row 2: italic, light background, grey text, wrap, 40px height
+  var r2 = sheet.getRange(2, 1, 1, cols);
+  r2.setFontStyle("italic");
+  r2.setBackground("#f5f5f5");
+  r2.setFontColor("#888888");
+  r2.setWrap(true);
+  sheet.setRowHeight(2, 40);
+
+  // Freeze first 2 rows
+  sheet.setFrozenRows(2);
 }
 
 
