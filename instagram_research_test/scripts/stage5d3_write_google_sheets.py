@@ -144,19 +144,32 @@ def load_and_validate_payload(
 # ---------------------------------------------------------------------------
 
 def _extract_account_label(payload: dict) -> str:
+    """Return the Instagram username for this payload (e.g. 'kate.jet').
+
+    Uses --account arg as the primary source (always reliable).
+    Falls back to scanning 'Конкурент' cells and extracting the username
+    from whatever URL/text format was written there historically.
+    """
+    # Primary: use the --account argument that was passed to this script
+    if ACCOUNT:
+        return ACCOUNT.strip()
+    # Fallback: scan Конкурент column and extract username from the URL
+    import re as _re
     sheets = payload.get("sheets", {})
     for sheet_name, sheet_data in sheets.items():
         headers = sheet_data.get("headers", [])
         rows    = sheet_data.get("rows", [])
-        if not rows:
-            continue
-        if "Конкурент" not in headers:
+        if not rows or "Конкурент" not in headers:
             continue
         idx = headers.index("Конкурент")
         for row in rows:
-            val = row[idx] if len(row) > idx else ""
-            if val and str(val).strip():
-                return str(val).strip()
+            val = str(row[idx] if len(row) > idx else "").strip()
+            if not val:
+                continue
+            m = _re.search(r"instagram\.com/([^/\s]+)", val)
+            if m:
+                return m.group(1)
+            return val
     return ""
 
 

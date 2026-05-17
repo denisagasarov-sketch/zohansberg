@@ -509,7 +509,9 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
 
     for (var ri = 0; ri < colAValues.length; ri++) {
       var cellVal = String(colAValues[ri][0] || "").trim();
-      if (cellVal === accountLabel.trim()) {
+      // Use indexOf so we match regardless of historical format:
+      // "kate.jet", "https://www.instagram.com/kate.jet/", "@kate.jet https://..."
+      if (cellVal !== "" && cellVal.indexOf(accountLabel.trim()) !== -1) {
         if (firstMatchRow === -1) firstMatchRow = REQUIRED_START_ROW + ri;
         lastMatchRow = REQUIRED_START_ROW + ri;
       }
