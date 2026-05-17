@@ -31,7 +31,7 @@ GS_ROWS_OUTPUT_PATH   = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows.jso
 SEMANTIC_FIXED_PATH   = NORM_DIR / "stage5a2c_pinned_posts_semantic_fixed.json"
 GS_ROWS_FIXED_PATH    = NORM_DIR / "stage5a2c_pinned_posts_google_sheet_rows_fixed.json"
 EXPECTED_POSTS  = 3
-PROMPT_VERSION  = "v2"           # bumped for quality fix
+PROMPT_VERSION  = "v3"           # bumped to invalidate caches missing "Хук / первый экран"
 DEFAULT_MODEL   = "gpt-4o-mini"
 
 # Conservative cost estimate per call (~1500 input + ~300 output tokens)

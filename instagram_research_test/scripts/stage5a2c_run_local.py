@@ -375,11 +375,12 @@ def run_validate_existing_output(write_fixed: bool = False, overwrite: bool = Fa
         for e in r_errors:
             print(f"  {e}")
 
-    # Write fixed output if requested
-    if write_fixed and any_pp_changes:
+    # Write fixed output if requested (always write when _fixed file is absent or stale)
+    fixed_absent = not SEMANTIC_FIXED_PATH.exists()
+    if write_fixed and (any_pp_changes or fixed_absent):
         _write_fixed_outputs(semantic_output, fixed_posts, overwrite)
     elif write_fixed and not any_pp_changes:
-        print("\n[SKIP] No postprocessing fixes needed; --write-fixed skipped.")
+        print("\n[SKIP] No postprocessing fixes needed and _fixed file exists; skipped.")
 
 
 def _write_fixed_outputs(original_output: dict, fixed_posts: list[dict], overwrite: bool):
