@@ -59,10 +59,8 @@ export default function App() {
     getNext()
   }, [getNext])
 
-  // Check morning checkin
+  // Show checkin modal if no checkin recorded today
   useEffect(() => {
-    const now = new Date()
-    if (now.getHours() >= 12) return
     api.getTodayCheckin().then(r => {
       if (!r.exists) setShowCheckin(true)
     }).catch(() => {})
@@ -178,6 +176,7 @@ export default function App() {
                 tasks={tasks}
                 onTaskClick={handleTaskClick}
                 recommendation={recommendation}
+                onReorder={reorderTasks}
               />
               <div className="flex-1" />
               <RecBar

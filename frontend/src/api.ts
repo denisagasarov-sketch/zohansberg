@@ -104,4 +104,6 @@ export const api = {
     isTauri ? invoke<any>('get_stats', { period }) : req<any>('GET', `/stats?period=${period}`),
   getWorklog: (period: string) =>
     req<any>('GET', `/sessions/worklog?period=${period}`),
+  getStatsDashboard: (period: string) =>
+    req<any>('GET', `/stats/dashboard?period=${period}`),
 }

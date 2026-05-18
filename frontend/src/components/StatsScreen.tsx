@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
 
 interface Props {
@@ -7,114 +7,415 @@ interface Props {
 
 type Period = 'week' | 'month' | 'all'
 
-const MOOD_EMOJI: Record<number, string> = { 1: '😔', 2: '😐', 3: '🙂', 4: '😄', 5: '🚀' }
-
-interface StatsData {
-  tasks_total?: number
-  tasks_by_direction?: Array<{ direction_name: string | null; count: number }>
-  time_total?: number
-  time_by_day?: Array<{ date: string; total: number }>
-  time_by_direction?: Array<{ direction_name: string | null; total: number }>
-  mood_by_day?: Array<{ date: string; mood: number }>
-  mood_average?: number
-  journal_count?: number
-  checkin_count?: number
-  top_words?: string[]
+interface DashboardData {
+  total_seconds: number
+  tasks_done_count: number
+  top_direction: { direction_name: string; total_seconds: number } | null
+  sessions: Array<{
+    id: number
+    started_at: string
+    ended_at: string
+    duration_actual: number
+    direction_id: number | null
+    direction_name: string
+  }>
+  time_by_direction: Array<{
+    direction_id: number | null
+    direction_name: string
+    total_seconds: number
+  }>
+  time_by_day_direction: Array<{
+    day: string
+    direction_id: number | null
+    direction_name: string
+    total_seconds: number
+  }>
+  directions: Array<{ id: number; name: string }>
 }
 
-interface WorklogData {
-  heatmap: Array<{ day: string; seconds: number }>
-  top_tasks: Array<{ id: number; title: string; direction_name: string; total_seconds: number; first_day: string }>
-  log_text: string
-  period_label: string
+const PALETTE = [
+  '#5060a0', '#a05060', '#50a070', '#a07050',
+  '#5090a0', '#8050a0', '#a09050', '#50a0a0',
+]
+
+function buildColorMap(directions: Array<{ id: number }>): Map<number | null, string> {
+  const map = new Map<number | null, string>()
+  map.set(null, '#383838')
+  directions.forEach((d, i) => {
+    map.set(d.id, PALETTE[i % PALETTE.length])
+  })
+  return map
 }
 
-function formatHours(s: number) {
-  const h = s / 3600
-  return h < 1 ? `${Math.round(h * 60)}м` : `${h.toFixed(1)}ч`
+function fmtDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0 && m > 0) return `${h}ч ${m}м`
+  if (h > 0) return `${h}ч`
+  if (m > 0) return `${m}м`
+  return `${Math.round(seconds)}с`
 }
 
-// GitHub-style heatmap: fills a grid of days for the period
-function buildHeatmapGrid(heatmap: WorklogData['heatmap'], period: Period): Array<{ day: string; seconds: number }> {
-  const map = new Map(heatmap.map(d => [d.day, d.seconds]))
-  const days: Array<{ day: string; seconds: number }> = []
-  const count = period === 'week' ? 7 : period === 'month' ? 30 : 90
-  for (let i = count - 1; i >= 0; i--) {
+function minutesFromMidnight(isoStr: string): number {
+  const d = new Date(isoStr)
+  return d.getHours() * 60 + d.getMinutes()
+}
+
+// ─── Block 1 ──────────────────────────────────────────────────────────────────
+
+function MetricsBlock({ data }: { data: DashboardData }) {
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Время в работе</div>
+        <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(data.total_seconds)}</div>
+      </div>
+      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Задач завершено</div>
+        <div className="text-2xl font-bold text-[#f0f0f0]">{data.tasks_done_count}</div>
+      </div>
+      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Топ направление</div>
+        {data.top_direction ? (
+          <>
+            <div className="text-sm font-semibold text-[#f0f0f0] truncate">{data.top_direction.direction_name}</div>
+            <div className="text-xs text-[#666] mt-1">{fmtDuration(data.top_direction.total_seconds)}</div>
+          </>
+        ) : (
+          <div className="text-sm text-[#383838]">—</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Block 2 ──────────────────────────────────────────────────────────────────
+
+const TIMELINE_START = 6 * 60
+const TIMELINE_END = 24 * 60
+const TIMELINE_SPAN = TIMELINE_END - TIMELINE_START
+
+function getWeekDays(): string[] {
+  const days: string[] = []
+  for (let i = 6; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    days.push({ day: key, seconds: map.get(key) ?? 0 })
+    days.push(d.toISOString().slice(0, 10))
   }
   return days
 }
 
-function heatColor(seconds: number): string {
-  if (seconds === 0) return '#1c1c1c'
-  const h = seconds / 3600
-  if (h < 1) return '#2a3060'
-  if (h < 2) return '#3a4880'
-  if (h < 3) return '#4a58a0'
-  if (h < 4) return '#5060a0'
-  return '#8090c8'
+function getDayLabel(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  const names = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+  return `${names[d.getDay()]} ${d.getDate()}`
 }
 
-function formatDayLabel(iso: string) {
-  const d = new Date(iso)
-  const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
-  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
-  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`
+function TimelineBlock({
+  sessions,
+  colorMap,
+}: {
+  sessions: DashboardData['sessions']
+  colorMap: Map<number | null, string>
+}) {
+  const weekDays = getWeekDays()
+  const sessionsByDay = new Map<string, typeof sessions>()
+  for (const s of sessions) {
+    const day = s.started_at.slice(0, 10)
+    if (!sessionsByDay.has(day)) sessionsByDay.set(day, [])
+    sessionsByDay.get(day)!.push(s)
+  }
+
+  const hourTicks = [6, 9, 12, 15, 18, 21, 24]
+
+  return (
+    <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+      <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Временна́я шкала недели</div>
+
+      <div className="flex mb-1 ml-12">
+        <div className="flex-1 relative h-3">
+          {hourTicks.map(h => {
+            const pct = ((h * 60 - TIMELINE_START) / TIMELINE_SPAN) * 100
+            if (pct < 0 || pct > 100) return null
+            return (
+              <span
+                key={h}
+                className="absolute text-[9px] text-[#383838] -translate-x-1/2"
+                style={{ left: `${pct}%` }}
+              >
+                {h === 24 ? '00' : `${h}`}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {weekDays.map(day => {
+          const daySessions = sessionsByDay.get(day) ?? []
+          const isToday = day === new Date().toISOString().slice(0, 10)
+          return (
+            <div key={day} className="flex items-center gap-2">
+              <span className={`text-[10px] w-10 shrink-0 text-right ${isToday ? 'text-[#8090c8]' : 'text-[#383838]'}`}>
+                {getDayLabel(day)}
+              </span>
+              <div className="flex-1 relative h-5 bg-[#141414] rounded overflow-hidden">
+                {hourTicks.slice(1, -1).map(h => {
+                  const pct = ((h * 60 - TIMELINE_START) / TIMELINE_SPAN) * 100
+                  return (
+                    <div
+                      key={h}
+                      className="absolute top-0 bottom-0 w-px bg-[#252525]"
+                      style={{ left: `${pct}%` }}
+                    />
+                  )
+                })}
+                {daySessions.map(s => {
+                  const startMin = minutesFromMidnight(s.started_at)
+                  const endMin = minutesFromMidnight(s.ended_at)
+                  const left = Math.max(0, ((startMin - TIMELINE_START) / TIMELINE_SPAN) * 100)
+                  const right = Math.min(100, ((endMin - TIMELINE_START) / TIMELINE_SPAN) * 100)
+                  const width = Math.max(0.5, right - left)
+                  const color = colorMap.get(s.direction_id) ?? '#5060a0'
+                  return (
+                    <div
+                      key={s.id}
+                      title={`${s.direction_name}: ${fmtDuration(s.duration_actual)}`}
+                      className="absolute top-0.5 bottom-0.5 rounded-sm opacity-90"
+                      style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
+
+// ─── Block 3a: Donut ─────────────────────────────────────────────────────────
+
+function DonutChart({
+  data,
+  colorMap,
+}: {
+  data: DashboardData['time_by_direction']
+  colorMap: Map<number | null, string>
+}) {
+  const total = data.reduce((s, d) => s + d.total_seconds, 0)
+  if (total === 0) {
+    return <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных</div>
+  }
+
+  const R = 48
+  const cx = 62
+  const cy = 62
+  const strokeW = 16
+
+  let cumAngle = -Math.PI / 2
+  const arcs = data.map(d => {
+    const frac = d.total_seconds / total
+    const angle = frac * 2 * Math.PI
+    const x1 = cx + R * Math.cos(cumAngle)
+    const y1 = cy + R * Math.sin(cumAngle)
+    cumAngle += angle
+    const x2 = cx + R * Math.cos(cumAngle)
+    const y2 = cy + R * Math.sin(cumAngle)
+    const large = angle > Math.PI ? 1 : 0
+    const color = colorMap.get(d.direction_id) ?? '#5060a0'
+    return { x1, y1, x2, y2, large, color, angle }
+  })
+
+  return (
+    <div className="flex gap-4 items-start">
+      <svg width={124} height={124} className="shrink-0">
+        {arcs.map((arc, i) => {
+          if (arc.angle < 0.02) return null
+          const path = `M ${arc.x1} ${arc.y1} A ${R} ${R} 0 ${arc.large} 1 ${arc.x2} ${arc.y2}`
+          return (
+            <path
+              key={i}
+              d={path}
+              fill="none"
+              stroke={arc.color}
+              strokeWidth={strokeW}
+              strokeLinecap="butt"
+            />
+          )
+        })}
+        <circle cx={cx} cy={cy} r={R - strokeW / 2 - 1} fill="#1c1c1c" />
+        <text x={cx} y={cy - 4} textAnchor="middle" fill="#f0f0f0" fontSize={10} fontWeight="bold">
+          {fmtDuration(total)}
+        </text>
+        <text x={cx} y={cy + 9} textAnchor="middle" fill="#555" fontSize={8}>всего</text>
+      </svg>
+
+      <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+        {data.slice(0, 6).map((d, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div
+              className="w-2.5 h-2.5 rounded-sm shrink-0"
+              style={{ backgroundColor: colorMap.get(d.direction_id) ?? '#5060a0' }}
+            />
+            <span className="text-xs text-[#666] flex-1 truncate">{d.direction_name}</span>
+            <span className="text-xs font-mono text-[#f0f0f0] shrink-0">{fmtDuration(d.total_seconds)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Block 3b: Bar chart ──────────────────────────────────────────────────────
+
+interface TooltipState {
+  x: number
+  y: number
+  day: string
+  total: number
+  items: Array<{ name: string; seconds: number; color: string }>
+}
+
+function BarChart({
+  data,
+  period,
+  colorMap,
+}: {
+  data: DashboardData['time_by_day_direction']
+  period: Period
+  colorMap: Map<number | null, string>
+}) {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const dayCount = period === 'week' ? 7 : period === 'month' ? 30 : 60
+  const days: string[] = []
+  for (let i = dayCount - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    days.push(d.toISOString().slice(0, 10))
+  }
+
+  const byDay = new Map<string, Array<{ direction_id: number | null; direction_name: string; total_seconds: number }>>()
+  for (const row of data) {
+    if (!byDay.has(row.day)) byDay.set(row.day, [])
+    byDay.get(row.day)!.push(row)
+  }
+
+  const dayTotals = days.map(d => (byDay.get(d) ?? []).reduce((s, r) => s + r.total_seconds, 0))
+  const maxTotal = Math.max(...dayTotals, 1)
+  const barH = 88
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-end gap-[2px]" style={{ height: barH }}>
+        {days.map((day, idx) => {
+          const rows = byDay.get(day) ?? []
+          const total = dayTotals[idx]
+          const segH = total > 0 ? Math.max(3, (total / maxTotal) * (barH - 4)) : 0
+          const items = rows.map(r => ({
+            name: r.direction_name,
+            seconds: r.total_seconds,
+            color: colorMap.get(r.direction_id) ?? '#5060a0',
+          }))
+
+          return (
+            <div
+              key={day}
+              className="flex-1 flex flex-col justify-end cursor-default min-w-0"
+              style={{ height: '100%' }}
+              onMouseEnter={e => {
+                if (total === 0) return
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                const containerRect = containerRef.current!.getBoundingClientRect()
+                setTooltip({
+                  x: rect.left - containerRect.left,
+                  y: rect.top - containerRect.top,
+                  day,
+                  total,
+                  items,
+                })
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              {segH > 0 && (
+                <div
+                  className="w-full rounded-t-sm overflow-hidden"
+                  style={{ height: segH, display: 'flex', flexDirection: 'column-reverse' }}
+                >
+                  {items.map((item, i) => {
+                    const h = (item.seconds / total) * segH
+                    return (
+                      <div key={i} style={{ height: h, backgroundColor: item.color, flexShrink: 0 }} />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Labels */}
+      <div className="flex gap-[2px] mt-1">
+        {days.map((day, idx) => {
+          const showL = period === 'week' ? true : period === 'month' ? idx % 5 === 0 : idx % 7 === 0
+          const d = new Date(day + 'T12:00:00')
+          return (
+            <div key={day} className="flex-1 min-w-0 text-center">
+              {showL && <span className="text-[8px] text-[#383838]">{d.getDate()}</span>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div
+          className="absolute bg-[#141414] border border-[#333] rounded p-2.5 text-xs shadow-lg pointer-events-none z-20"
+          style={{
+            top: Math.max(0, tooltip.y - 120),
+            left: Math.min(tooltip.x, 160),
+            minWidth: 140,
+          }}
+        >
+          <div className="text-[#666] mb-1">
+            {new Date(tooltip.day + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+          </div>
+          <div className="font-semibold text-[#f0f0f0] mb-1.5">{fmtDuration(tooltip.total)}</div>
+          <div className="space-y-1">
+            {tooltip.items.map((item, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                <span className="text-[#666] truncate flex-1">{item.name}</span>
+                <span className="text-[#f0f0f0] font-mono shrink-0">{fmtDuration(item.seconds)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function StatsScreen({ onClose }: Props) {
   const [period, setPeriod] = useState<Period>('week')
-  const [stats, setStats] = useState<StatsData | null>(null)
-  const [worklog, setWorklog] = useState<WorklogData | null>(null)
+  const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [gptResult, setGptResult] = useState<string | null>(null)
-  const [gptLoading, setGptLoading] = useState(false)
-  const [hasApiKey, setHasApiKey] = useState(false)
-
-  useEffect(() => {
-    setHasApiKey(!!localStorage.getItem('openai_api_key'))
-  }, [])
 
   useEffect(() => {
     setLoading(true)
-    setGptResult(null)
-    Promise.all([
-      api.getStats(period),
-      api.getWorklog(period),
-    ]).then(([s, w]) => {
-      setStats(s as StatsData)
-      setWorklog(w as WorklogData)
+    api.getStatsDashboard(period).then(d => {
+      setData(d as DashboardData)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [period])
 
-  const handleGptAnalyze = async () => {
-    if (!worklog) return
-    setGptLoading(true)
-    setGptResult(null)
-    try {
-      const prompt = worklog.log_text +
-        '\n\nПроанализируй: когда я наиболее продуктивен, на что трачу больше всего времени, какие паттерны видишь, что посоветуешь изменить? Отвечай по-русски, кратко и по делу.'
-      const resp = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: prompt }),
-      })
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error ?? 'Ошибка сервера')
-      setGptResult(data.result ?? '')
-    } catch (e) {
-      setGptResult(e instanceof Error ? e.message : 'Ошибка при обращении к AI')
-    } finally {
-      setGptLoading(false)
-    }
-  }
-
-  const maxDayTime = stats?.time_by_day ? Math.max(...stats.time_by_day.map(d => d.total), 1) : 1
-  const heatGrid = worklog ? buildHeatmapGrid(worklog.heatmap, period) : []
+  const colorMap = data ? buildColorMap(data.directions) : new Map()
 
   return (
     <div className="h-full flex flex-col bg-[#181818] text-[#f0f0f0]">
@@ -136,166 +437,39 @@ export default function StatsScreen({ onClose }: Props) {
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {loading && <div className="text-[#666] text-sm">Загрузка…</div>}
-        {!loading && stats && (
+
+        {!loading && !data && (
+          <div className="text-[#666] text-sm">Не удалось загрузить данные</div>
+        )}
+
+        {!loading && data && (
           <>
+            <MetricsBlock data={data} />
+            <TimelineBlock sessions={data.sessions} colorMap={colorMap} />
+
             <div className="grid grid-cols-2 gap-4">
-              {/* Tasks */}
               <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Задачи</div>
-                <div className="text-3xl font-bold text-[#f0f0f0] mb-3">{stats.tasks_total ?? 0}</div>
-                {stats.tasks_by_direction && stats.tasks_by_direction.length > 0 && (
-                  <div className="space-y-1.5">
-                    {stats.tasks_by_direction.slice(0, 5).map((d, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-[#666] flex-1 truncate">{d.direction_name ?? 'Без направления'}</span>
-                        <span className="text-[#f0f0f0] font-mono">{d.count}</span>
+                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По направлениям</div>
+                <DonutChart data={data.time_by_direction} colorMap={colorMap} />
+              </div>
+
+              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По дням</div>
+                {data.time_by_day_direction.length === 0 ? (
+                  <div className="flex items-center justify-center h-24 text-[#383838] text-sm">Нет данных</div>
+                ) : (
+                  <BarChart data={data.time_by_day_direction} period={period} colorMap={colorMap} />
+                )}
+                {data.time_by_direction.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+                    {data.time_by_direction.slice(0, 6).map((d, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: colorMap.get(d.direction_id) ?? '#5060a0' }} />
+                        <span className="text-[10px] text-[#383838]">{d.direction_name}</span>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Time */}
-              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Время</div>
-                <div className="text-3xl font-bold text-[#f0f0f0] mb-3">{formatHours(stats.time_total ?? 0)}</div>
-                {stats.time_by_day && stats.time_by_day.length > 0 && (
-                  <div className="flex items-end gap-0.5 h-12 mb-2">
-                    {stats.time_by_day.slice(-14).map((d, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 bg-[#5060a0] rounded-sm min-w-0 transition-all"
-                        style={{ height: `${Math.max(2, (d.total / maxDayTime) * 100)}%` }}
-                        title={`${d.date}: ${formatHours(d.total)}`}
-                      />
-                    ))}
-                  </div>
-                )}
-                {stats.time_by_direction && stats.time_by_direction.length > 0 && (
-                  <div className="space-y-1">
-                    {stats.time_by_direction.slice(0, 4).map((d, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-[#666] flex-1 truncate">{d.direction_name ?? 'Без направления'}</span>
-                        <span className="text-[#5060a0] font-mono">{formatHours(d.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Mood */}
-              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Настроение</div>
-                {stats.mood_average != null && (
-                  <div className="text-3xl mb-3">{MOOD_EMOJI[Math.round(stats.mood_average)] ?? '—'} <span className="text-lg font-mono text-[#666]">{stats.mood_average.toFixed(1)}</span></div>
-                )}
-                {stats.mood_by_day && stats.mood_by_day.length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    {stats.mood_by_day.slice(-14).map((d, i) => (
-                      <span key={i} className="text-base" title={d.date}>{MOOD_EMOJI[d.mood] ?? '·'}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Journal */}
-              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Дневник</div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[#666]">Записей</span>
-                    <span className="text-[#f0f0f0] font-mono">{stats.journal_count ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#666]">Чекинов</span>
-                    <span className="text-[#f0f0f0] font-mono">{stats.checkin_count ?? 0}</span>
-                  </div>
-                </div>
-                {stats.top_words && stats.top_words.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-[10px] text-[#383838] mb-1">Топ слова</div>
-                    <div className="flex flex-wrap gap-1">
-                      {stats.top_words.slice(0, 5).map((w, i) => (
-                        <span key={i} className="text-xs bg-[#252525] px-1.5 py-0.5 rounded text-[#666]">{w}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Рабочий журнал ── */}
-            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Рабочий журнал</div>
-
-              <div className="flex gap-6">
-                {/* Left: heatmap + top tasks */}
-                <div className="flex-1 min-w-0">
-                  {/* Heatmap */}
-                  <div className="mb-1">
-                    <div className="flex flex-wrap gap-[3px]">
-                      {heatGrid.map(({ day, seconds }) => (
-                        <div
-                          key={day}
-                          title={`${formatDayLabel(day)}: ${seconds > 0 ? formatHours(seconds) : '0'}`}
-                          style={{ backgroundColor: heatColor(seconds), width: 12, height: 12, borderRadius: 2, flexShrink: 0 }}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <span className="text-[10px] text-[#383838]">0ч</span>
-                      {[0, 3600, 7200, 10800, 14400].map(s => (
-                        <div key={s} style={{ backgroundColor: heatColor(s), width: 10, height: 10, borderRadius: 2 }} />
-                      ))}
-                      <span className="text-[10px] text-[#383838]">4ч+</span>
-                    </div>
-                  </div>
-
-                  {/* Top tasks */}
-                  {worklog && worklog.top_tasks.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-[10px] text-[#383838] mb-2">Топ задачи</div>
-                      <div className="space-y-1.5">
-                        {worklog.top_tasks.slice(0, 3).map((t) => (
-                          <div key={t.id} className="flex items-baseline gap-2 text-xs">
-                            <span className="text-[#5060a0] font-mono shrink-0 w-10 text-right">{formatHours(t.total_seconds)}</span>
-                            <span className="flex-1 text-[#f0f0f0] truncate">{t.title}</span>
-                            <span className="text-[#666] shrink-0 truncate max-w-[100px]">{t.direction_name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: GPT analysis */}
-                <div className="w-64 shrink-0">
-                  <button
-                    onClick={handleGptAnalyze}
-                    disabled={!hasApiKey || gptLoading || !worklog || worklog.top_tasks.length === 0}
-                    className="w-full px-3 py-2 bg-[#5060a0] hover:bg-[#8090c8] disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs text-white transition-colors mb-2"
-                  >
-                    {gptLoading ? 'Анализирую…' : 'Проанализировать с GPT'}
-                  </button>
-
-                  {!hasApiKey && (
-                    <p className="text-[10px] text-[#666] mb-2">Добавьте OpenAI API-ключ в настройках</p>
-                  )}
-
-                  {gptLoading && (
-                    <div className="flex gap-1 mb-2">
-                      {[0, 1, 2].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 bg-[#5060a0] rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                      ))}
-                    </div>
-                  )}
-
-                  {gptResult && (
-                    <div className="bg-[#141414] border border-[#252525] rounded p-3 text-xs text-[#f0f0f0] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
-                      {gptResult}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </>

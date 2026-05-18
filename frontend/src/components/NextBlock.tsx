@@ -1,9 +1,11 @@
+import { useRef, useState } from 'react'
 import type { Task, Recommendation } from '../types'
 
 interface Props {
   tasks: Task[]
   onTaskClick: (task: Task) => void
   recommendation: Recommendation | null
+  onReorder: (slot: string, orderedIds: number[]) => void
 }
 
 function priorityBorder(p: string) {
@@ -24,8 +26,38 @@ function priorityLabel(p: string) {
   return 'Низкий'
 }
 
-export default function NextBlock({ tasks, onTaskClick, recommendation }: Props) {
-  const nextTasks = (tasks ?? []).filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 3)
+export default function NextBlock({ tasks, onTaskClick, recommendation, onReorder }: Props) {
+  const nextTasks = (tasks ?? []).filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 5)
+  const draggingIdRef = useRef<number | null>(null)
+  const [draggingId, setDraggingId] = useState<number | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, taskId: number) => {
+    e.stopPropagation()
+    draggingIdRef.current = taskId
+    setDraggingId(taskId)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault()
+    const sourceId = draggingIdRef.current
+    draggingIdRef.current = null
+    setDraggingId(null)
+    if (!sourceId || sourceId === targetId) return
+    const ids = nextTasks.map(t => t.id).filter(id => id !== sourceId)
+    const targetIdx = ids.indexOf(targetId)
+    if (targetIdx === -1) ids.push(sourceId)
+    else ids.splice(targetIdx, 0, sourceId)
+    onReorder('next', ids)
+  }
+
+  const handleDragEnd = () => {
+    draggingIdRef.current = null
+    setDraggingId(null)
+  }
 
   return (
     <div>
@@ -53,9 +85,15 @@ export default function NextBlock({ tasks, onTaskClick, recommendation }: Props)
             {nextTasks.map((task, idx) => (
               <li
                 key={task.id}
-                className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-3 ${priorityBorder(task.priority)} border-l-[3px]`}
+                draggable
+                onDragStart={e => handleDragStart(e, task.id)}
+                onDragOver={handleDragOver}
+                onDrop={e => handleDrop(e, task.id)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${priorityBorder(task.priority)} ${draggingId === task.id ? 'opacity-40' : ''}`}
                 onClick={() => onTaskClick(task)}
               >
+                <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                 <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
                 <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
                 <span className={`text-[10px] ${priorityText(task.priority)} shrink-0`}>{priorityLabel(task.priority)}</span>

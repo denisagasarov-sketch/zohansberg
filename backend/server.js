@@ -260,9 +260,29 @@ app.patch('/api/tasks/:id', (req, res) => {
       evictNowTask(id)
     }
 
+    // Status → slot auto-move (if slot not explicitly set in this request)
+    if (req.body.status !== undefined && !('slot' in req.body)) {
+      const newStatus = req.body.status
+      if (newStatus === 'in_progress' && existing.slot !== 'now') {
+        evictNowTask(id)
+        fields.push('slot = ?'); vals.push('now')
+      } else if (newStatus === 'frozen' && existing.slot !== 'someday') {
+        fields.push('slot = ?'); vals.push('someday')
+      } else if ((newStatus === 'todo') && existing.status !== 'todo') {
+        // Restore from done/frozen → move to later unless already in next/now
+        if (existing.slot === 'someday' || existing.slot === 'later') {
+          fields.push('slot = ?'); vals.push('later')
+        }
+      }
+    }
+
     // done_at management
     if (req.body.status === 'done' && existing.status !== 'done') {
       fields.push('done_at = ?'); vals.push(nowIso())
+      // Move done task out of 'now'/'next' slots
+      if (!('slot' in req.body) && (existing.slot === 'now' || existing.slot === 'next')) {
+        fields.push('slot = ?'); vals.push('later')
+      }
     } else if (req.body.status !== undefined && req.body.status !== 'done' && existing.status === 'done') {
       fields.push('done_at = ?'); vals.push(null)
     }
@@ -722,6 +742,97 @@ app.get('/api/sessions/worklog', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// GET /api/stats/dashboard?period=week|month|all
+// New unified endpoint for the dashboard stats screen
+app.get('/api/stats/dashboard', (req, res) => {
+  try {
+    const { period } = req.query
+    let dateFilter = ''
+    let taskDateFilter = ''
+    if (period === 'week') {
+      dateFilter = `AND date(ws.started_at) >= date('now', '-7 days')`
+      taskDateFilter = `AND date(t.done_at) >= date('now', '-7 days')`
+    } else if (period === 'month') {
+      dateFilter = `AND date(ws.started_at) >= date('now', '-30 days')`
+      taskDateFilter = `AND date(t.done_at) >= date('now', '-30 days')`
+    }
+
+    // Raw sessions for timeline (only completed sessions with end time)
+    const sessions = db.prepare(`
+      SELECT ws.id, ws.started_at, ws.ended_at, ws.duration_actual,
+             t.direction_id,
+             COALESCE(d.name, 'Без направления') AS direction_name
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE ws.ended_at IS NOT NULL AND ws.duration_actual > 0 ${dateFilter}
+      ORDER BY ws.started_at ASC
+    `).all()
+
+    // Time by direction (for donut chart)
+    const timeByDirection = db.prepare(`
+      SELECT t.direction_id,
+             COALESCE(d.name, 'Без направления') AS direction_name,
+             SUM(ws.duration_actual) AS total_seconds
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE ws.duration_actual IS NOT NULL AND ws.duration_actual > 0 ${dateFilter}
+      GROUP BY t.direction_id
+      ORDER BY total_seconds DESC
+    `).all()
+
+    // Time by day and direction (for stacked bar chart)
+    const timeByDayDirection = db.prepare(`
+      SELECT date(ws.started_at) AS day,
+             t.direction_id,
+             COALESCE(d.name, 'Без направления') AS direction_name,
+             SUM(ws.duration_actual) AS total_seconds
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE ws.duration_actual IS NOT NULL AND ws.duration_actual > 0 ${dateFilter}
+      GROUP BY date(ws.started_at), t.direction_id
+      ORDER BY day ASC
+    `).all()
+
+    // Total time
+    const totalSeconds = timeByDirection.reduce((s, r) => s + (r.total_seconds || 0), 0)
+
+    // Tasks done count
+    const tasksDoneCount = db.prepare(`
+      SELECT COUNT(*) AS c FROM tasks
+      WHERE status = 'done' AND deleted_at IS NULL ${taskDateFilter}
+    `).get().c
+
+    // Top direction
+    const topDirection = timeByDirection[0] ?? null
+
+    // All non-archived directions (for consistent color assignment)
+    const directions = db.prepare(`SELECT id, name FROM directions WHERE archived = 0 ORDER BY id ASC`).all()
+
+    res.json({
+      total_seconds: totalSeconds,
+      tasks_done_count: tasksDoneCount,
+      top_direction: topDirection,
+      sessions,
+      time_by_direction: timeByDirection,
+      time_by_day_direction: timeByDayDirection,
+      directions,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── Frontend static (SPA) ───────────────────────────────────────────────────
+
+const _path = require('path')
+app.use(express.static(_path.join(__dirname, '..', 'frontend', 'dist')))
+app.use((_req, res) => {
+  res.sendFile(_path.join(__dirname, '..', 'frontend', 'dist', 'index.html'))
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
