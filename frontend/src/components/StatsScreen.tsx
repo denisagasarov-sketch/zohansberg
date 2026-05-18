@@ -126,6 +126,11 @@ function TimelineBlock({
     sessionsByDay.get(day)!.push(s)
   }
 
+  // Only render days that have at least one session
+  const activeDays = weekDays.filter(day => sessionsByDay.has(day))
+
+  if (activeDays.length === 0) return null
+
   const hourTicks = [6, 9, 12, 15, 18, 21, 24]
 
   return (
@@ -151,8 +156,8 @@ function TimelineBlock({
       </div>
 
       <div className="space-y-1">
-        {weekDays.map(day => {
-          const daySessions = sessionsByDay.get(day) ?? []
+        {activeDays.map(day => {
+          const daySessions = sessionsByDay.get(day)!
           const isToday = day === new Date().toISOString().slice(0, 10)
           return (
             <div key={day} className="flex items-center gap-2">
@@ -209,10 +214,10 @@ function DonutChart({
     return <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных</div>
   }
 
-  const R = 48
-  const cx = 62
-  const cy = 62
-  const strokeW = 16
+  const R = 62
+  const cx = 80
+  const cy = 80
+  const strokeW = 22
 
   let cumAngle = -Math.PI / 2
   const arcs = data.map(d => {
@@ -230,7 +235,7 @@ function DonutChart({
 
   return (
     <div className="flex gap-4 items-start">
-      <svg width={124} height={124} className="shrink-0">
+      <svg width={160} height={160} className="shrink-0">
         {arcs.map((arc, i) => {
           if (arc.angle < 0.02) return null
           const path = `M ${arc.x1} ${arc.y1} A ${R} ${R} 0 ${arc.large} 1 ${arc.x2} ${arc.y2}`
@@ -246,10 +251,10 @@ function DonutChart({
           )
         })}
         <circle cx={cx} cy={cy} r={R - strokeW / 2 - 1} fill="#1c1c1c" />
-        <text x={cx} y={cy - 4} textAnchor="middle" fill="#f0f0f0" fontSize={10} fontWeight="bold">
+        <text x={cx} y={cy - 5} textAnchor="middle" fill="#f0f0f0" fontSize={12} fontWeight="bold">
           {fmtDuration(total)}
         </text>
-        <text x={cx} y={cy + 9} textAnchor="middle" fill="#555" fontSize={8}>всего</text>
+        <text x={cx} y={cy + 11} textAnchor="middle" fill="#555" fontSize={9}>всего</text>
       </svg>
 
       <div className="flex flex-col gap-1.5 min-w-0 flex-1">
@@ -277,6 +282,8 @@ interface TooltipState {
   total: number
   items: Array<{ name: string; seconds: number; color: string }>
 }
+
+const DAY_NAMES = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 
 function BarChart({
   data,
@@ -306,15 +313,22 @@ function BarChart({
 
   const dayTotals = days.map(d => (byDay.get(d) ?? []).reduce((s, r) => s + r.total_seconds, 0))
   const maxTotal = Math.max(...dayTotals, 1)
-  const barH = 88
+  const BAR_H = 96
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-end gap-[2px]" style={{ height: barH }}>
+      {/* Y-axis label */}
+      <div className="absolute -left-1 top-0 flex flex-col justify-between" style={{ height: BAR_H }}>
+        <span className="text-[8px] text-[#383838]">{fmtDuration(maxTotal)}</span>
+        <span className="text-[8px] text-[#383838]">0</span>
+      </div>
+
+      {/* Bars */}
+      <div className="flex items-end gap-[3px] ml-6" style={{ height: BAR_H }}>
         {days.map((day, idx) => {
           const rows = byDay.get(day) ?? []
           const total = dayTotals[idx]
-          const segH = total > 0 ? Math.max(3, (total / maxTotal) * (barH - 4)) : 0
+          const segH = total > 0 ? Math.max(3, (total / maxTotal) * (BAR_H - 2)) : 0
           const items = rows.map(r => ({
             name: r.direction_name,
             seconds: r.total_seconds,
@@ -358,14 +372,20 @@ function BarChart({
         })}
       </div>
 
-      {/* Labels */}
-      <div className="flex gap-[2px] mt-1">
+      {/* X-axis labels */}
+      <div className="flex gap-[3px] mt-1 ml-6">
         {days.map((day, idx) => {
-          const showL = period === 'week' ? true : period === 'month' ? idx % 5 === 0 : idx % 7 === 0
           const d = new Date(day + 'T12:00:00')
+          let label: string
+          if (period === 'week') {
+            label = DAY_NAMES[d.getDay()]
+          } else {
+            const show = period === 'month' ? idx % 5 === 0 : idx % 7 === 0
+            label = show ? String(d.getDate()) : ''
+          }
           return (
             <div key={day} className="flex-1 min-w-0 text-center">
-              {showL && <span className="text-[8px] text-[#383838]">{d.getDate()}</span>}
+              {label && <span className="text-[8px] text-[#383838]">{label}</span>}
             </div>
           )
         })}
@@ -377,7 +397,7 @@ function BarChart({
           className="absolute bg-[#141414] border border-[#333] rounded p-2.5 text-xs shadow-lg pointer-events-none z-20"
           style={{
             top: Math.max(0, tooltip.y - 120),
-            left: Math.min(tooltip.x, 160),
+            left: Math.min(tooltip.x + 24, 160),
             minWidth: 140,
           }}
         >
