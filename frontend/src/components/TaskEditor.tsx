@@ -13,7 +13,6 @@ interface Props {
 }
 
 type Priority = 'high' | 'medium' | 'low'
-type Status = 'todo' | 'in_progress' | 'done' | 'frozen'
 type Slot = 'next' | 'later' | 'someday'
 
 function Btn({ active, onClick, children, cls = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; cls?: string }) {
@@ -35,7 +34,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [title, setTitle] = useState(task?.title ?? '')
   const [directionId, setDirectionId] = useState<number | null>(task?.direction_id ?? null)
   const [priority, setPriority] = useState<Priority>(task?.priority ?? 'medium')
-  const [status, setStatus] = useState<Status>(task?.status ?? 'todo')
   const [slot, setSlot] = useState<Slot>((task?.slot === 'now' ? 'next' : task?.slot) as Slot ?? 'later')
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
@@ -49,13 +47,12 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       title !== (task?.title ?? '') ||
       directionId !== (task?.direction_id ?? null) ||
       priority !== (task?.priority ?? 'medium') ||
-      status !== (task?.status ?? 'todo') ||
       slot !== ((task?.slot === 'now' ? 'next' : task?.slot) ?? 'later') ||
       deadline !== (task?.deadline?.slice(0, 10) ?? '') ||
       durationPlan !== (task?.duration_plan?.toString() ?? '') ||
       notes !== (task?.notes ?? '')
     )
-  }, [title, directionId, priority, status, slot, deadline, durationPlan, notes, task])
+  }, [title, directionId, priority, slot, deadline, durationPlan, notes, task])
 
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 50)
@@ -83,7 +80,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         title: title.trim(),
         direction_id: directionId,
         priority,
-        status,
         slot: task?.slot === 'now' ? 'now' : slot,
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
@@ -177,17 +173,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               <Btn active={priority === 'high'} onClick={() => setPriority('high')} cls="text-[#b07070]">Высокий</Btn>
               <Btn active={priority === 'medium'} onClick={() => setPriority('medium')} cls="text-[#a08850]">Средний</Btn>
               <Btn active={priority === 'low'} onClick={() => setPriority('low')} cls="text-[#555]">Низкий</Btn>
-            </div>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Статус</label>
-            <div className="flex flex-wrap gap-1.5">
-              <Btn active={status === 'todo'} onClick={() => setStatus('todo')}>Не начата</Btn>
-              <Btn active={status === 'in_progress'} onClick={() => setStatus('in_progress')}>В работе</Btn>
-              <Btn active={status === 'done'} onClick={() => setStatus('done')}>Готово</Btn>
-              <Btn active={status === 'frozen'} onClick={() => setStatus('frozen')}>Заморожена</Btn>
             </div>
           </div>
 

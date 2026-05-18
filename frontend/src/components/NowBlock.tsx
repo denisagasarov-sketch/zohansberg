@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { Task, Direction } from '../types'
 import type { TimerState } from '../hooks/useTimer'
+import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 
 interface Props {
   task: Task | null
@@ -11,6 +13,8 @@ interface Props {
   onDone: () => void
   onTaskClick: (task: Task) => void
   onAddTask: () => void
+  onDropTask: (taskId: number) => void
+  onDragTask?: (taskId: number, e: React.DragEvent) => void
 }
 
 function padZ(n: number) { return String(n).padStart(2, '0') }
@@ -35,23 +39,56 @@ function priorityLabel(p: string) {
   return { label: 'Низкий', cls: 'text-[#555] bg-[#222]/60' }
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onPause, onDone, onTaskClick, onAddTask }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onPause, onDone, onTaskClick, onAddTask, onDropTask, onDragTask }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const progress = timer.sessionDuration > 0 ? Math.min(1, timer.elapsed / (timer.sessionDuration * 60)) : 0
   const pri = task ? priorityLabel(task.priority) : null
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = () => setIsDragOver(false)
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const raw = e.dataTransfer.getData(DRAG_TASK_KEY)
+    const id = parseInt(raw, 10)
+    if (!isNaN(id) && id !== task?.id) onDropTask(id)
+  }
 
   return (
-    <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4 select-none">
+    <div
+      className={`bg-[#1c1c1c] border rounded-lg p-4 select-none transition-colors ${isDragOver ? 'border-[#5060a0]' : 'border-[#252525]'}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] mb-3 uppercase">Сейчас</div>
 
       {!task ? (
         <div className="flex flex-col items-center gap-3 py-4">
-          <p className="text-[#666] text-sm">Ничего в работе — добавьте задачу</p>
-          <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Добавить задачу</button>
+          {isDragOver
+            ? <p className="text-[#5060a0] text-sm">Отпустите, чтобы взять в работу</p>
+            : <p className="text-[#666] text-sm">Ничего в работе — добавьте задачу</p>
+          }
+          {!isDragOver && (
+            <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Добавить задачу</button>
+          )}
         </div>
       ) : (
         <>
           <div
+            draggable
+            onDragStart={e => {
+              e.dataTransfer.setData(DRAG_TASK_KEY, String(task.id))
+              e.dataTransfer.effectAllowed = 'move'
+              onDragTask?.(task.id, e)
+            }}
             className="cursor-pointer hover:opacity-80 transition-opacity mb-3"
             onClick={() => onTaskClick(task)}
           >
@@ -75,7 +112,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             </div>
             <div className="h-0.5 bg-[#252525] rounded-full overflow-hidden mb-1">
               <div
-                className="h-full bg-[#5060a0] transition-all duration-1000"
+                className="h-full bg-[#5060a0] transition-all duration-500"
                 style={{ width: `${progress * 100}%` }}
               />
             </div>

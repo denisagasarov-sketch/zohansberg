@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react'
 import type { Task, Direction } from '../types'
+import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 
 interface Props {
   tasks: Task[]
   directions: Direction[]
   onTaskClick: (task: Task) => void
   onReorder: (slot: string, orderedIds: number[]) => void
+  onMoveToLater: (taskId: number) => void
 }
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
@@ -68,48 +70,52 @@ function TaskRow({ task, onClick, onDragStart, onDragOver, onDrop, draggingId }:
   )
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onMoveToLater }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
 
   const activeTasks = (tasks ?? []).filter(t => !t.done_at && !t.deleted_at && t.slot !== 'someday')
 
-  const handleDragStart = (_e: React.DragEvent, taskId: number) => {
+  const handleDragStart = (e: React.DragEvent, taskId: number) => {
     draggingIdRef.current = taskId
     setDraggingId(taskId)
+    e.dataTransfer.setData(DRAG_TASK_KEY, String(taskId))
+    e.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragOver = (e: React.DragEvent, _taskId: number) => {
     e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
   }
 
   const handleDrop = (e: React.DragEvent, targetId: number) => {
     e.preventDefault()
-    const sourceId = draggingIdRef.current
-    if (!sourceId || sourceId === targetId) {
-      draggingIdRef.current = null
-      setDraggingId(null)
-      return
-    }
+    const raw = e.dataTransfer.getData(DRAG_TASK_KEY)
+    const sourceId = parseInt(raw, 10) || draggingIdRef.current
+    draggingIdRef.current = null
+    setDraggingId(null)
+    if (!sourceId || sourceId === targetId) return
+
     const sourceTask = tasks.find(t => t.id === sourceId)
     const targetTask = tasks.find(t => t.id === targetId)
-    if (!sourceTask || !targetTask || sourceTask.slot !== targetTask.slot) {
-      draggingIdRef.current = null
-      setDraggingId(null)
+    if (!sourceTask || !targetTask) return
+
+    // Cross-slot drop from now/next → move to later
+    if (sourceTask.slot !== targetTask.slot) {
+      if (sourceTask.slot === 'now' || sourceTask.slot === 'next') {
+        onMoveToLater(sourceId)
+      }
       return
     }
+
+    // Same-slot reorder within the same direction
     const slotTasks = activeTasks.filter(t => t.slot === sourceTask.slot && t.direction_id === sourceTask.direction_id)
     const sorted = sortTasks(slotTasks)
     const ids = sorted.map(t => t.id).filter(id => id !== sourceId)
     const targetIdx = ids.indexOf(targetId)
-    if (targetIdx === -1) {
-      ids.push(sourceId)
-    } else {
-      ids.splice(targetIdx, 0, sourceId)
-    }
+    if (targetIdx === -1) ids.push(sourceId)
+    else ids.splice(targetIdx, 0, sourceId)
     onReorder(sourceTask.slot, ids)
-    draggingIdRef.current = null
-    setDraggingId(null)
   }
 
   const somedayTasks = (tasks ?? []).filter(t => t.slot === 'someday' && !t.done_at && !t.deleted_at)

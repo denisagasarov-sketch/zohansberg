@@ -25,6 +25,11 @@ export function useTimer(onComplete?: () => void) {
   const stateRef = useRef(state)
   stateRef.current = state
 
+  // Wall-clock reference for accurate elapsed (avoids setInterval drift)
+  const startedAtMsRef = useRef<number | null>(null)
+  // Session ID set async after API responds; read in pause/stop
+  const sessionIdRef = useRef<number | null>(null)
+
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current)
@@ -39,43 +44,66 @@ export function useTimer(onComplete?: () => void) {
   const start = useCallback(async (taskId: number, sessionDuration?: number) => {
     clearTimer()
     const duration = sessionDuration ?? stateRef.current.sessionDuration
-    const now = new Date().toISOString()
-    let sessionId: number | null = null
-    try {
-      const session = await api.startSession(taskId, now)
-      sessionId = session.id
-    } catch (e) {
-      console.error('Failed to start session', e)
-    }
+    const nowMs = Date.now()
+    const nowIso = new Date(nowMs).toISOString()
+
+    startedAtMsRef.current = nowMs
+    sessionIdRef.current = null
+
+    // Start displaying immediately — do not wait for the API round-trip
     setState(prev => ({
       ...prev,
       isRunning: true,
       elapsed: 0,
-      sessionId,
+      sessionId: null,
       taskId,
       sessionDuration: duration,
     }))
     playSound('start')
+
+    // Poll every 500 ms; compute elapsed from wall clock, not tick count
     intervalRef.current = setInterval(() => {
+      const elapsed = startedAtMsRef.current !== null
+        ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+        : 0
+
       setState(prev => {
-        const next = prev.elapsed + 1
-        if (next >= prev.sessionDuration * 60) {
+        if (!prev.isRunning) return prev
+        if (elapsed >= prev.sessionDuration * 60) {
           clearTimer()
-          if (prev.sessionId !== null) {
-            api.endSession(prev.sessionId, new Date().toISOString(), next).catch(console.error)
+          const sid = sessionIdRef.current
+          if (sid !== null) {
+            api.endSession(sid, new Date().toISOString(), elapsed).catch(console.error)
+            sessionIdRef.current = null
           }
+          startedAtMsRef.current = null
           playSound('timer_end')
           onComplete?.()
-          return { ...prev, isRunning: false, elapsed: next, sessionId: null }
+          return { ...prev, isRunning: false, elapsed, sessionId: null }
         }
-        return { ...prev, elapsed: next }
+        return { ...prev, elapsed }
       })
-    }, 1000)
+    }, 500)
+
+    // Register session in DB async; update state when we have the ID
+    try {
+      const session = await api.startSession(taskId, nowIso)
+      sessionIdRef.current = session.id
+      setState(prev => ({ ...prev, sessionId: session.id }))
+    } catch (e) {
+      console.error('Failed to start session', e)
+    }
   }, [clearTimer, onComplete])
 
   const pause = useCallback(async () => {
     clearTimer()
-    const { sessionId, elapsed } = stateRef.current
+    const elapsed = startedAtMsRef.current !== null
+      ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+      : stateRef.current.elapsed
+    const sessionId = sessionIdRef.current
+    sessionIdRef.current = null
+    startedAtMsRef.current = null
+
     if (sessionId !== null) {
       try {
         await api.endSession(sessionId, new Date().toISOString(), elapsed)
@@ -84,12 +112,18 @@ export function useTimer(onComplete?: () => void) {
       }
     }
     playSound('pause')
-    setState(prev => ({ ...prev, isRunning: false, sessionId: null }))
+    setState(prev => ({ ...prev, isRunning: false, elapsed, sessionId: null }))
   }, [clearTimer])
 
   const stop = useCallback(async () => {
     clearTimer()
-    const { sessionId, elapsed } = stateRef.current
+    const elapsed = startedAtMsRef.current !== null
+      ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+      : stateRef.current.elapsed
+    const sessionId = sessionIdRef.current
+    sessionIdRef.current = null
+    startedAtMsRef.current = null
+
     if (sessionId !== null) {
       try {
         await api.endSession(sessionId, new Date().toISOString(), elapsed)

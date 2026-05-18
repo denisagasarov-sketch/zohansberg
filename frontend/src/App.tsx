@@ -141,6 +141,19 @@ export default function App() {
     await getNext()
   }, [setAsNext, refresh, getNext])
 
+  // DnD handlers — cross-section slot moves
+  const handleDropToNow = useCallback(async (taskId: number) => {
+    await handleTakeNow(taskId)
+  }, [handleTakeNow])
+
+  const handleDropToNext = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { slot: 'next' })
+  }, [updateTask])
+
+  const handleMoveToLater = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { slot: 'later' })
+  }, [updateTask])
+
   const handleGetNext = useCallback((skipId?: number) => {
     getNext(skipId)
   }, [getNext])
@@ -171,12 +184,14 @@ export default function App() {
                 onDone={handleDoneNow}
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
+                onDropTask={handleDropToNow}
               />
               <NextBlock
                 tasks={tasks}
                 onTaskClick={handleTaskClick}
                 recommendation={recommendation}
                 onReorder={reorderTasks}
+                onDropFromOutside={handleDropToNext}
               />
               <div className="flex-1" />
               <RecBar
@@ -194,6 +209,7 @@ export default function App() {
                 directions={directions}
                 onTaskClick={handleTaskClick}
                 onReorder={reorderTasks}
+                onMoveToLater={handleMoveToLater}
               />
             </div>
           </div>
