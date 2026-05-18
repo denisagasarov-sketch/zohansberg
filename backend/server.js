@@ -539,11 +539,11 @@ app.get('/api/stats', (req, res) => {
     let journalFilter = ''
 
     if (period === 'week') {
-      taskDateFilter = `AND date(t.done_at) >= date('now', '-7 days')`
+      taskDateFilter = `AND date(done_at) >= date('now', '-7 days')`
       wsDateFilter = `AND date(ws.started_at) >= date('now', '-7 days')`
       journalFilter = `AND date(created_at) >= date('now', '-7 days')`
     } else if (period === 'month') {
-      taskDateFilter = `AND date(t.done_at) >= date('now', '-30 days')`
+      taskDateFilter = `AND date(done_at) >= date('now', '-30 days')`
       wsDateFilter = `AND date(ws.started_at) >= date('now', '-30 days')`
       journalFilter = `AND date(created_at) >= date('now', '-30 days')`
     }
@@ -753,10 +753,10 @@ app.get('/api/stats/dashboard', (req, res) => {
     let taskDateFilter = ''
     if (period === 'week') {
       dateFilter = `AND date(ws.started_at) >= date('now', '-7 days')`
-      taskDateFilter = `AND date(t.done_at) >= date('now', '-7 days')`
+      taskDateFilter = `AND date(done_at) >= date('now', '-7 days')`
     } else if (period === 'month') {
       dateFilter = `AND date(ws.started_at) >= date('now', '-30 days')`
-      taskDateFilter = `AND date(t.done_at) >= date('now', '-30 days')`
+      taskDateFilter = `AND date(done_at) >= date('now', '-30 days')`
     }
 
     // Raw sessions for timeline (only completed sessions with end time)
