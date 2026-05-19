@@ -9,7 +9,7 @@ interface Props {
   timer: TimerState
   todayTime: number
   onStart: () => void
-  onPause: () => void
+  onStop: () => void
   onDone: () => void
   onTaskClick: (task: Task) => void
   onAddTask: () => void
@@ -39,9 +39,8 @@ function priorityLabel(p: string) {
   return { label: 'Низкий', cls: 'text-[#555] bg-[#222]/60' }
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onPause, onDone, onTaskClick, onAddTask, onDropTask, onDragTask }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onDone, onTaskClick, onAddTask, onDropTask, onDragTask }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
-  const progress = timer.sessionDuration > 0 ? Math.min(1, timer.elapsed / (timer.sessionDuration * 60)) : 0
   const pri = task ? priorityLabel(task.priority) : null
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -107,14 +106,8 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
           </div>
 
           <div className="mb-2">
-            <div className="text-4xl font-mono font-bold text-[#f0f0f0] tabular-nums mb-2">
+            <div className="text-4xl font-mono font-bold text-[#f0f0f0] tabular-nums mb-1">
               {formatElapsed(timer.elapsed)}
-            </div>
-            <div className="h-0.5 bg-[#252525] rounded-full overflow-hidden mb-1">
-              <div
-                className="h-full bg-[#5060a0] transition-all duration-500"
-                style={{ width: `${progress * 100}%` }}
-              />
             </div>
             <div className="text-xs text-[#666]">{formatTodayTime(todayTime)}</div>
           </div>
@@ -122,10 +115,10 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
           <div className="flex items-center gap-2 mt-3">
             {timer.isRunning ? (
               <button
-                onClick={onPause}
+                onClick={onStop}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#252525] hover:bg-[#383838] transition-colors rounded text-sm text-[#f0f0f0]"
               >
-                ⏸ Пауза
+                ⏹ Стоп
               </button>
             ) : (
               <button
