@@ -74,6 +74,8 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
   }
 
   return (
+    <div>
+      <div className="border-t border-[#252525] border-dashed my-3" />
     <div
       className={`bg-[#1c1c1c] border rounded-lg overflow-hidden transition-colors ${isDragOver ? 'border-[#5060a0]' : 'border-[#252525]'}`}
       onDragOver={handleDragOver}
@@ -138,6 +140,7 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
           })}
         </ul>
       )}
+    </div>
     </div>
   )
 }
