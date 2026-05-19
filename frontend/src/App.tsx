@@ -215,6 +215,7 @@ export default function App() {
           const t = tasks.find(x => x.id === id)
           if (t) setSelectedTask(t)
         }}
+        onEndDay={() => setShowEveningSummary(true)}
         isTimerActive={timerState.isRunning || timerState.isPaused}
       />
 
