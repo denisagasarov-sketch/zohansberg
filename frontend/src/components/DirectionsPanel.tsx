@@ -67,21 +67,23 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
   )
 }
 
-function loadCollapsed(): Set<number | 'none'> {
+type CollapseKey = number | 'none' | 'someday'
+
+function loadCollapsed(): Set<CollapseKey> {
   try { return new Set(JSON.parse(localStorage.getItem('collapsed_dirs') ?? '[]')) }
   catch { return new Set() }
 }
 
-function saveCollapsed(s: Set<number | 'none'>) {
+function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
 export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
-  const [collapsed, setCollapsed] = useState<Set<number | 'none'>>(loadCollapsed)
+  const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
 
-  const toggleCollapse = useCallback((key: number | 'none') => {
+  const toggleCollapse = useCallback((key: CollapseKey) => {
     setCollapsed(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -91,8 +93,9 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     })
   }, [])
 
-  // Only show tasks not in queue (and not done/deleted)
-  const activeTasks = (tasks ?? []).filter(t => !t.in_queue && !t.done_at && !t.deleted_at)
+  // Only show tasks not in queue, not someday (and not done/deleted)
+  const activeTasks = (tasks ?? []).filter(t => !t.in_queue && !t.someday && !t.done_at && !t.deleted_at)
+  const somedayTasks = (tasks ?? []).filter(t => t.someday && !t.done_at && !t.deleted_at)
 
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
     draggingIdRef.current = taskId
@@ -222,6 +225,42 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       nowTaskId={nowTaskId}
                     />
                   ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+        {/* Someday section */}
+        {(() => {
+          if (somedayTasks.length === 0) return null
+          const isCollapsed = collapsed.has('someday')
+          return (
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
+              <div
+                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                onClick={() => toggleCollapse('someday')}
+              >
+                <span className="text-xs font-medium text-[#555]">☁ Когда-нибудь</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[#383838]">{somedayTasks.length}</span>
+                  <span className="text-[10px] text-[#383838]">{isCollapsed ? '▶' : '▼'}</span>
+                </div>
+              </div>
+              {!isCollapsed && (
+                <div className="divide-y divide-[#252525]/50">
+                  {somedayTasks.map(task => {
+                    const dir = task.direction_id != null ? directions.find(d => d.id === task.direction_id) : null
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => onTaskClick(task)}
+                        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors"
+                      >
+                        <span className="flex-1 text-[12px] italic text-[#f0f0f0] opacity-60 truncate">{task.title}</span>
+                        {dir && <span className="text-[10px] text-[#555] shrink-0">{dir.name}</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
