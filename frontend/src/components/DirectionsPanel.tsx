@@ -51,7 +51,7 @@ function PriorityPicker({ current, onChange, onClose }: {
       {PRIORITY_OPTIONS.map(o => (
         <button
           key={o.value}
-          onClick={() => { onChange(o.value); onClose() }}
+          onClick={e => { e.stopPropagation(); onChange(o.value); onClose() }}
           className={`flex items-center justify-center w-full px-3 py-1 text-xs hover:bg-[#252525] transition-colors ${current === o.value ? 'bg-[#252525]' : ''}`}
           style={{ color: o.color }}
         >
