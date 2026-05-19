@@ -172,6 +172,21 @@ def _build_stages_summary(username: str) -> str:
     if hi:
         total = len(hi.get("highlights") or [])
         if b2s:
+            # Check if stage5b2 summary is from a previous pipeline run
+            def _parse_ts(s):
+                if not s:
+                    return None
+                try:
+                    from datetime import datetime
+                    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+                except Exception:
+                    return None
+            hi_ts  = _parse_ts(hi.get("run_timestamp"))
+            b2s_ts = _parse_ts(b2s.get("run_timestamp"))
+            stale_marker = ""
+            if hi_ts and b2s_ts and b2s_ts < hi_ts:
+                stale_marker = " (данные из предыдущего запуска)"
+
             ok_results  = [r for r in (b2s.get("results") or []) if r.get("status") == "OK"]
             n_in_table  = len(ok_results)
             titles      = [r.get("title", "?") for r in ok_results[:5]]
@@ -179,7 +194,7 @@ def _build_stages_summary(username: str) -> str:
             n_not       = total - n_in_table
             if n_not > 0:
                 table_str += f" (+{n_not} не вошли)"
-            lines.append(f"9. Хайлайты — ✅ {total} штук\n   В таблице: {table_str}")
+            lines.append(f"9. Хайлайты — ✅ {total} штук{stale_marker}\n   В таблице: {table_str}")
         else:
             lines.append(f"9. Хайлайты — ✅ {total} штук, названия и порядок")
     else:

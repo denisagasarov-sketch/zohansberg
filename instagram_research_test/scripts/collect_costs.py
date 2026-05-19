@@ -97,8 +97,23 @@ def _apify_run_cost(run_id: str, token: str) -> float | None:
         return None
 
 
-def collect_apify_costs(account: str) -> dict:
+def _parse_ts(ts_str: str | None) -> datetime | None:
+    """Parse ISO timestamp string to datetime (UTC-aware). Returns None on failure."""
+    if not ts_str:
+        return None
+    try:
+        s = ts_str.replace("Z", "+00:00")
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def collect_apify_costs(account: str, pipeline_start: str | None = None) -> dict:
     """Return {stage: {"run_ids": [...], "cost_usd": float}} for Apify stages.
+
+    If pipeline_start (ISO string) is given, run_ids from files whose
+    run_timestamp predates the pipeline start are skipped — they belong to a
+    previous run and should not be counted in this run's cost report.
 
     Returns empty dict if APIFY_TOKEN is not set or no run IDs found.
     """
@@ -113,6 +128,7 @@ def collect_apify_costs(account: str) -> dict:
     if not token:
         return {}
 
+    pipeline_start_dt = _parse_ts(pipeline_start)
     norm_dir = BASE / "data" / account / "normalized"
     result = {}
 
@@ -124,6 +140,12 @@ def collect_apify_costs(account: str) -> dict:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
+
+        # Skip stale data from a previous pipeline run
+        if pipeline_start_dt is not None:
+            file_ts = _parse_ts(data.get("run_timestamp"))
+            if file_ts is not None and file_ts < pipeline_start_dt:
+                continue
 
         run_ids = data.get("apify_run_ids") or []
         if not run_ids:
@@ -227,7 +249,7 @@ def estimate_next_run(account: str) -> dict:
     }
 
 
-def collect(account: str) -> dict:
+def collect(account: str, pipeline_start: str | None = None) -> dict:
     norm_dir = BASE / "data" / account / "normalized"
     stages = {}
 
@@ -256,7 +278,7 @@ def collect(account: str) -> dict:
     total_tokens = sum(v["tokens"] for v in stages.values())
     total_cost   = round(sum(v["cost_usd"] for v in stages.values()), 4)
 
-    apify_stages = collect_apify_costs(account)
+    apify_stages = collect_apify_costs(account, pipeline_start=pipeline_start)
     apify_total  = round(sum(v["cost_usd"] for v in apify_stages.values()), 4) if apify_stages else None
 
     next_run = estimate_next_run(account)
@@ -331,11 +353,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="Aggregate real OpenAI token costs from pipeline outputs"
     )
-    parser.add_argument("--account",  required=True, help="Instagram account to process")
-    parser.add_argument("--summary",  action="store_true", help="Print only the total line")
+    parser.add_argument("--account",        required=True, help="Instagram account to process")
+    parser.add_argument("--summary",        action="store_true", help="Print only the total line")
+    parser.add_argument("--pipeline-start", default=None,
+                        help="ISO timestamp of pipeline start; Apify run_ids from files older "
+                             "than this are excluded (they belong to a previous run)")
     args = parser.parse_args()
 
-    result = collect(args.account)
+    result = collect(args.account, pipeline_start=args.pipeline_start)
 
     print_report(result, summary_only=args.summary)
 

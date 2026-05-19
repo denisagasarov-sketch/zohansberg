@@ -1,0 +1,573 @@
+{
+  "account": "kate.jet",
+  "stage": "stage5c2",
+  "prompt_version": "v2",
+  "model": "gpt-4o",
+  "generated_at": "2026-05-17T14:18:47.123324+00:00",
+  "reels_analyzed": 10,
+  "reels_ok": 10,
+  "reels_skipped": 0,
+  "total_tokens": 17886,
+  "reels": [
+    {
+      "position": 1,
+      "reel_id": "3774456417253256519",
+      "url": "https://www.instagram.com/p/DRhkB0Sku1H/",
+      "view_count": 4222,
+      "likes_count": 153,
+      "is_pinned": true,
+      "published_at": "2025-11-26T15:19:58.000Z",
+      "engagement_rate": "3.62%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "яркое сочетание золотых ботфортов и красных шорт — необычный стиль привлекает внимание",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Перезапуск курса по SMM с обновлениями",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "Запись в список early birds для получения спецусловий и скидки",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "сделайте репост поста",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "продажа",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Средняя оценка моего предыдущего курса 9,3 из 10",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "анонс → предложение → призыв",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "факт",
+        "data_status": "ok"
+      },
+      "tokens_vision": 608,
+      "tokens_text": 1234,
+      "tokens_total": 1842
+    },
+    {
+      "position": 2,
+      "reel_id": "3177176790116446711",
+      "url": "https://www.instagram.com/p/CwXmXULgbH3/",
+      "view_count": 74312,
+      "likes_count": 443,
+      "is_pinned": true,
+      "published_at": "2023-08-25T13:14:50.000Z",
+      "engagement_rate": "0.60%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "девушка с телефоном в руке крупным планом — эмоциональный контакт",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "текст на экране",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "История успеха в СММ и личной жизни",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "доверие",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "История о начале с нуля после развода и потери бизнеса",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "история → достижения → вывод",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "история",
+        "data_status": "ok"
+      },
+      "tokens_vision": 597,
+      "tokens_text": 1214,
+      "tokens_total": 1811
+    },
+    {
+      "position": 3,
+      "reel_id": "3178581700955474968",
+      "url": "https://www.instagram.com/p/CwclzdXAgwY/",
+      "view_count": 21770,
+      "likes_count": 198,
+      "is_pinned": true,
+      "published_at": "2023-08-27T11:45:48.000Z",
+      "engagement_rate": "0.91%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "крупный белый текст на фоне кафе — перечень книг вызывает интерес",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Лучшие книги для контент-маркетинга",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "Книги, которые помогут прокачаться в контент-маркетинге",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "Подписывайся на меня, и я научу тебя продавать через контент.",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "доверие",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Ильяхов курит в сторонке.",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "представление → список книг → призыв подписаться",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "провокация",
+        "data_status": "ok"
+      },
+      "tokens_vision": 601,
+      "tokens_text": 1252,
+      "tokens_total": 1853
+    },
+    {
+      "position": 4,
+      "reel_id": "3843230595707754618",
+      "url": "https://www.instagram.com/p/DVV5d1PEth6/",
+      "view_count": 4690,
+      "likes_count": -1,
+      "is_pinned": false,
+      "published_at": "2026-03-01T12:41:44.000Z",
+      "engagement_rate": "-0.02%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "женщина в золотых сапогах на фоне бамбука — необычный стиль привлекает внимание",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Системный подход к SMM для управления результатами",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "Контент выходит, а заявки то есть, то нет, и это выматывает",
+        "data_status": "ok"
+      },
+      "reshenie": {
+        "value": "Система, связывающая контент и цифры, для понимания, что работает",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "Регистрируйся по ссылке в био моего профиля",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "продажа",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Если ты делаешь SMM по чуйке, то ты не управляешь результатом",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "проблема → решение → призыв зарегистрироваться",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "провокация",
+        "data_status": "ok"
+      },
+      "tokens_vision": 608,
+      "tokens_text": 1313,
+      "tokens_total": 1921
+    },
+    {
+      "position": 5,
+      "reel_id": "3754050050944334674",
+      "url": "https://www.instagram.com/p/DQZEKGrkvtS/",
+      "view_count": 4675,
+      "likes_count": 193,
+      "is_pinned": false,
+      "published_at": "2025-10-29T11:36:56.000Z",
+      "engagement_rate": "4.13%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "человек держит двух кошек на фоне простой стены — вызывает интерес и умиление",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "caption",
+      "tema": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "kryuchok": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "struktura": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "hook_type": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "tokens_vision": 598,
+      "tokens_text": 1017,
+      "tokens_total": 1615
+    },
+    {
+      "position": 6,
+      "reel_id": "3767838273910771270",
+      "url": "https://www.instagram.com/p/DRKDPJ_ko5G/",
+      "view_count": 1840,
+      "likes_count": 105,
+      "is_pinned": false,
+      "published_at": "2025-11-17T12:12:27.000Z",
+      "engagement_rate": "5.71%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "лицо с необычным украшением на зубах крупным планом — необычный образ привлекает внимание",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Музыка и самовыражение",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "знакомство",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Pack it up, pack it in, let me begin",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "вступление → рифмы и вызов",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "обещание",
+        "data_status": "ok"
+      },
+      "tokens_vision": 602,
+      "tokens_text": 1186,
+      "tokens_total": 1788
+    },
+    {
+      "position": 7,
+      "reel_id": "3797517866133276547",
+      "url": "https://www.instagram.com/p/DSzfmEPEseD/",
+      "view_count": 1810,
+      "likes_count": 45,
+      "is_pinned": false,
+      "published_at": "2025-12-28T10:58:50.000Z",
+      "engagement_rate": "2.49%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "человек сидит на дереве с видом на море — необычное место привлекает внимание",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Личная тревога и стресс из-за финансовых обязательств",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "Накопились напряжение и тревога из-за необходимости заработать деньги для помощи близким",
+        "data_status": "ok"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "знакомство",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Ребят, знаете, у меня что-то так поплохело в последнее время",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "личный опыт → выражение тревоги",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "история",
+        "data_status": "ok"
+      },
+      "tokens_vision": 600,
+      "tokens_text": 1398,
+      "tokens_total": 1998
+    },
+    {
+      "position": 8,
+      "reel_id": "3781455125274617151",
+      "url": "https://www.instagram.com/p/DR6bWbEEuU_/",
+      "view_count": 1547,
+      "likes_count": 76,
+      "is_pinned": false,
+      "published_at": "2025-12-06T07:06:03.000Z",
+      "engagement_rate": "4.91%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "человек в спортивной одежде с микрофоном — вызывает интерес",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "transcript",
+      "tema": {
+        "value": "Перезапуск программы",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "Крутые обновления в программе",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "прогрев",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "struktura": {
+        "value": "вступление → анонс обновлений",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "tokens_vision": 594,
+      "tokens_text": 1273,
+      "tokens_total": 1867
+    },
+    {
+      "position": 9,
+      "reel_id": "3822049483476352283",
+      "url": "https://www.instagram.com/p/DUKpcFQkr0b/",
+      "view_count": 1012,
+      "likes_count": 66,
+      "is_pinned": false,
+      "published_at": "2026-01-31T07:19:01.000Z",
+      "engagement_rate": "6.52%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "дорога с красочным закатом на заднем плане — притягивает взгляд",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "b-roll",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "caption",
+      "tema": {
+        "value": "Мой Koh Phangan",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "знакомство",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "struktura": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "hook_type": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "tokens_vision": 593,
+      "tokens_text": 1003,
+      "tokens_total": 1596
+    },
+    {
+      "position": 10,
+      "reel_id": "3804079009789723915",
+      "url": "https://www.instagram.com/p/DTKzbRcCUUL/",
+      "view_count": 567,
+      "likes_count": 24,
+      "is_pinned": false,
+      "published_at": "2026-01-06T12:15:09.000Z",
+      "engagement_rate": "4.23%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "человек на мотоцикле на изгибающейся дороге — вызывает интерес и волнение",
+        "data_status": "ok"
+      },
+      "vizual_format": {
+        "value": "b-roll",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "caption",
+      "tema": {
+        "value": "Koh Phangan ride",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "знакомство",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "struktura": {
+        "value": "описание поездки",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "tokens_vision": 596,
+      "tokens_text": 999,
+      "tokens_total": 1595
+    }
+  ]
+}

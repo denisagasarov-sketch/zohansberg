@@ -16,36 +16,39 @@
 
 ## Run metadata
 
-- account: `vlada_kliuiko`
+- account: `kate.jet`
 - actor: `automation-lab/instagram-stories-scraper`
-- run_timestamp: `2026-05-16T03:47:06.350674+00:00`
+- run_timestamp: `2026-05-17T14:14:49.157743+00:00`
 - planned_apify_calls: 1
 - actual_apify_calls: 1
-- apify_run_ids: ['et6LgwJBWbBIFvYf8']
+- apify_run_ids: ['yRDmrCwoqB9fR6HfN']
 
 ## Collection stats
 
-- highlights_total: 32
-- highlights_processed: 2
-- highlights_ok: 2
-- highlights_empty: 0
+- highlights_total: 5
+- highlights_processed: 5
+- highlights_ok: 0
+- highlights_empty: 5
 - highlights_fail: 0
 - highlights_invalid: 0
-- highlights_skipped: 30
-- total_stories_count: 77
+- highlights_skipped: 0
+- total_stories_count: 0
 - highlights_with_media: 0
-- can_analyze_highlights: **True**
+- can_analyze_highlights: **False**
 
 ## Per-highlight results
 
 | # | highlight_id | title | status | stories | imageUrl | videoUrl |
 |---|---|---|---|---|---|---|
-| 1 | 17874797856565339 | отзывы курс | OK | 60 | no | no |
-| 2 | 18110898391654002 | GEO | OK | 17 | no | no |
+| 1 | 18048529088454532 | Отзывы | EMPTY_OR_INACCESSIBLE | 0 | no | no |
+| 2 | 18136644298466967 | Публикации | EMPTY_OR_INACCESSIBLE | 0 | no | no |
+| 3 | 18145835785306063 | Мой путь | EMPTY_OR_INACCESSIBLE | 0 | no | no |
+| 4 | 18036274999576186 | Обо мне | EMPTY_OR_INACCESSIBLE | 0 | no | no |
+| 5 | 17919926188005828 | КНИГИ | EMPTY_OR_INACCESSIBLE | 0 | no | no |
 
 ## Warnings
 
-- 30 highlights not processed (limit applied)
+- 5 highlights returned 0 stories (EMPTY_OR_INACCESSIBLE)
 
 ## Output files
 
@@ -58,11 +61,9 @@ report/stage_5b2_highlights_stories_report.md            ← this report (not co
 
 ## Final verdict
 
-**OK** — все 2 highlights вернули stories.
-- can_analyze_highlights: True
+**FAIL** — нет highlights со stories. Stage 5C заблокирован.
+- can_analyze_highlights: False
 
 ## Recommendation
 
-→ Stage 5C (анализ highlights через OpenAI Vision) можно запускать.
-  Использовать `data/normalized/stage5b2_stories_index.json` для списка highlights.
-  Raw stories в `data/raw/stage5b2_stories_{id}_raw.json`.
+→ Stage 5C заблокирован — исправить ошибки выше перед продолжением.

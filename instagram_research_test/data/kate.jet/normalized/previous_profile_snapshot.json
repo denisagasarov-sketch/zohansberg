@@ -1,10 +1,13 @@
 {
   "account": "kate.jet",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "run_timestamp": "2026-05-17T13:58:38.069368+00:00",
   "planned_apify_calls": 2,
-  "actual_apify_calls": 0,
-  "apify_run_ids": [],
+  "actual_apify_calls": 2,
+  "apify_run_ids": [
+    "VaDLCGZookb9WQYxS",
+    "YLuWxySVHwL3ENHVl"
+  ],
   "profile_url": {
     "value": "https://www.instagram.com/kate.jet/",
     "data_status": "ok",
@@ -13,60 +16,60 @@
     "notes": ""
   },
   "username": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "username not returned by actor"
+    "value": "kate.jet",
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "full_name": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "fullName not returned by actor"
+    "value": "Кейт Семёнова | SMM Adviser",
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "bio_text": {
     "value": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн\n📰 US Forbes писали о моей стратегии в SMM\n⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
     "data_status": "ok",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "biography not returned by actor"
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "external_url": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "externalUrl not in actor output"
+    "value": "https://t.me/SMMworkshopBot",
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "external_url_type": {
-    "value": null,
-    "data_status": "missing",
-    "source_ref": "none",
-    "confidence": null,
-    "notes": "external_url empty or not matched"
+    "value": "telegram",
+    "data_status": "ok",
+    "source_ref": "rule_based",
+    "confidence": "high",
+    "notes": ""
   },
   "followers_count": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "followersCount not returned by actor"
+    "value": 2523,
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "following_count": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "followsCount/followingCount not returned by actor"
+    "value": 1421,
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "posts_count": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "postsCount not returned by actor"
+    "value": 1220,
+    "data_status": "ok",
+    "source_ref": "details_actor.apify/instagram-scraper",
+    "confidence": "high",
+    "notes": ""
   },
   "raw_source": "data/raw/stage5a1_profile_details_raw.json"
 }

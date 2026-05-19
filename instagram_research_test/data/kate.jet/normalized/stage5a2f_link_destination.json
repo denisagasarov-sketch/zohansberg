@@ -13,7 +13,7 @@
   "server_hint": "nginx",
   "classification_method": "heuristic",
   "tokens_used": null,
-  "generated_at": "2026-05-16T01:11:05.219098+00:00",
+  "generated_at": "2026-05-17T14:14:23.245015+00:00",
   "result": {
     "destination_type": "бот",
     "confidence": "high",

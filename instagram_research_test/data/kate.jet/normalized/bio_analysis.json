@@ -1,63 +1,65 @@
 {
   "account": "kate.jet",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-16T02:17:13.195317+00:00",
+  "run_timestamp": "2026-05-17T14:12:58.202330+00:00",
   "analysis_method": "rule_based",
   "source_ref": "profile_summary.bio_text",
   "niche": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "value": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн",
+    "data_status": "partial",
+    "source_ref": "profile_summary.bio_text",
+    "confidence": "medium",
+    "notes": "First bio line — may be role/niche, rule-based"
   },
   "target_audience": {
     "value": null,
     "data_status": "manual_needed",
     "source_ref": "manual_input",
     "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "notes": "Cannot extract target_audience from bio automatically"
   },
   "result_promise": {
     "value": null,
     "data_status": "manual_needed",
     "source_ref": "manual_input",
     "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "notes": "Cannot extract result_promise from bio automatically"
   },
   "positioning": {
     "value": null,
     "data_status": "manual_needed",
     "source_ref": "manual_input",
     "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "notes": "Positioning requires human interpretation — use OpenAI in Stage 5D or fill manually"
   },
   "social_proof": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "value": [
+      "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн"
+    ],
+    "data_status": "partial",
+    "source_ref": "profile_summary.bio_text",
+    "confidence": "medium",
+    "notes": "Lines with digits or social_proof keywords — rule-based"
   },
   "trust_arguments": {
     "value": null,
     "data_status": "manual_needed",
     "source_ref": "manual_input",
     "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "notes": "Trust arguments require human or OpenAI interpretation"
   },
   "cta_text": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "bio_text missing — cannot analyse"
+    "value": "⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
+    "data_status": "partial",
+    "source_ref": "profile_summary.bio_text",
+    "confidence": "medium",
+    "notes": "Arrow or CTA-keyword line — rule-based"
   },
   "cta_destination": {
-    "value": null,
-    "data_status": "manual_needed",
-    "source_ref": "manual_input",
-    "confidence": null,
-    "notes": "No external_url in profile — fill manually"
+    "value": "https://t.me/SMMworkshopBot",
+    "data_status": "ok",
+    "source_ref": "profile_summary.external_url",
+    "confidence": "high",
+    "notes": ""
   }
 }

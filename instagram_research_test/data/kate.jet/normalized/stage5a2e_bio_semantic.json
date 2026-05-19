@@ -3,10 +3,10 @@
   "stage": "stage5a2e",
   "prompt_version": "v6",
   "model": "gpt-4o-mini",
-  "generated_at": "2026-05-17T13:22:01.195377+00:00",
+  "generated_at": "2026-05-17T14:14:21.785378+00:00",
   "bio_text": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн\n📰 US Forbes писали о моей стратегии в SMM\n⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
   "openai_status": "ok",
-  "tokens_used": 2171,
+  "tokens_used": 2165,
   "fields": {
     "niche": {
       "value": "SMM",
@@ -24,7 +24,7 @@
       "value": "научиться систематизировать SMM с помощью курса",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Обещание результата связано с курсом по систематизации SMM."
+      "notes": "Обещание результата связано с обучением систематизации SMM."
     },
     "positioning": {
       "value": "Ex-Head of SMM Refocus",
@@ -39,10 +39,10 @@
       "notes": "Указана должность, что является аргументом доверия."
     },
     "social_proof": {
-      "value": "$1 млн выручки; US Forbes писали о моей стратегии в SMM",
+      "value": "$1 млн выручки; US Forbes писали",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Упомянуты результаты и публикация в Forbes."
+      "notes": "Упомянуты результаты и упоминание в СМИ."
     },
     "cta_text": {
       "value": "Систематизируй SMM с помощью курса | занять место",

@@ -19,10 +19,10 @@
 
 - account: `kate.jet`
 - actor: `singhera07/instagram-scraper`
-- run_timestamp: `2026-05-16T00:42:52.114197+00:00`
+- run_timestamp: `2026-05-17T14:14:27.245781+00:00`
 - planned_apify_calls: 1
 - actual_apify_calls: 1
-- apify_run_ids: ['lyIxmQ5BItHf60h0y']
+- apify_run_ids: ['syclQiH65mDGqvOCg']
 - requested_limit: 12
 - returned_highlights_count: 5
 - unique_highlights_count: 5

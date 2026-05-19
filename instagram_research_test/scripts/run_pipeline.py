@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -93,6 +94,7 @@ STAGE_ORDER = [
         "requires_openai": False,
         "cost_estimate": "$0.10–2.00",
         "extra_args": ["--limit", "5"],  # overridden dynamically by --highlights-limit
+        "optional": True,
     },
     {
         "name": "5B-2V: Vision для хайлайтов",
@@ -245,6 +247,13 @@ def main():
     completed  = 0
     failed     = 0
     start_time = time.time()
+    pipeline_start_iso = datetime.fromtimestamp(start_time, tz=timezone.utc).isoformat()
+
+    # Pass pipeline start time to collect_costs so it can ignore stale Apify run_ids
+    for _stage in STAGE_ORDER:
+        if _stage["script"] == "collect_costs.py":
+            _stage["extra_args"] = ["--pipeline-start", pipeline_start_iso]
+            break
 
     for i, stage in enumerate(STAGE_ORDER):
         print(f"\n{'='*60}")

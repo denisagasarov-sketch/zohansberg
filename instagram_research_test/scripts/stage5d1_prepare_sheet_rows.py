@@ -407,7 +407,12 @@ def _vv_val(fields: dict, field: str) -> str:
 
 
 def _bio_url(sources) -> str | None:
-    """Extract bio external URL from profile_summary or bio_analysis."""
+    """Extract bio external URL. Priority: stage5a2f url_final → profile_summary → bio_analysis."""
+    ld = sources.get("link_destination")
+    if isinstance(ld, dict):
+        url = (ld.get("url_final") or "").strip()
+        if url:
+            return url
     ps  = sources.get("profile_summary")
     bio = sources.get("bio_analysis")
     url = _fval(ps,  "external_url", "externalUrl") if ps  else None
