@@ -142,12 +142,17 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     setAiError('')
     setAiSuggestions([])
     try {
-      const dirName = directions.find(d => d.id === directionId)?.name
-      const result = await api.improveTitle({ title: title.trim(), notes: notes || undefined, direction_name: dirName })
+      const direction = directions.find(d => d.id === directionId)?.name
+      const result = await api.suggestTitle({
+        title: title.trim(),
+        direction,
+        deadline: deadline || undefined,
+        notes: notes || undefined,
+      })
       setAiSuggestions(result.suggestions)
     } catch (e: any) {
       const msg = e?.message ?? ''
-      if (msg.includes('400') || msg.includes('not configured')) {
+      if (msg.includes('400')) {
         setAiError('Добавьте OpenAI API Key в настройках')
       } else {
         setAiError('Ошибка при обращении к AI')
