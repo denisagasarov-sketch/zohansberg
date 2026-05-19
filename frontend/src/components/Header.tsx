@@ -6,6 +6,7 @@ interface Props {
   onNavigate: (screen: Screen) => void
   onTaskCreated: () => void
   onOpenEditor: (taskId: number) => void
+  onEndDay: () => void
   isTimerActive?: boolean
 }
 
@@ -18,7 +19,7 @@ function formatDateTime() {
   return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} · ${padZ(now.getHours())}:${padZ(now.getMinutes())}`
 }
 
-export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTimerActive }: Props) {
+export default function Header({ onNavigate, onTaskCreated, onOpenEditor, onEndDay, isTimerActive }: Props) {
   const [inputValue, setInputValue] = useState('')
   const [pendingText, setPendingText] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
@@ -164,6 +165,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
       <div className="flex-1 text-center text-[#666] text-xs tabular-nums select-none">{datetime}</div>
 
       <nav className="flex items-center gap-1">
+        <button onClick={onEndDay} title="Завершить день" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🌆</button>
         <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📓</button>
         <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📊</button>
         <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📦</button>
