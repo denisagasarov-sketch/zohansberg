@@ -184,6 +184,11 @@ export default function App() {
     setPendingFocusTask(null)
   }, [pendingFocusTask])
 
+  const handleReorderInDirection = useCallback(async (directionId: number | null, orderedIds: number[]) => {
+    await api.reorderInDirection(directionId, orderedIds)
+    await refresh()
+  }, [refresh])
+
   const handleMoveToTomorrow = useCallback(async (taskId: number) => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -222,6 +227,7 @@ export default function App() {
               />
               <NextBlock
                 tasks={tasks}
+                directions={directions}
                 onTaskClick={handleTaskClick}
                 recommendation={recommendation}
                 onReorder={reorderTasks}
@@ -245,6 +251,7 @@ export default function App() {
                 directions={directions}
                 onTaskClick={handleTaskClick}
                 onReorder={reorderTasks}
+                onReorderInDirection={handleReorderInDirection}
                 onMoveToLater={handleMoveToLater}
                 focusMode={timerState.isRunning}
                 nowTaskId={nowTask?.id}

@@ -25,6 +25,7 @@ export interface Task {
   direction_name?: string
   is_important: number
   is_urgent: number
+  direction_order: number
 }
 
 export interface WorkSession {

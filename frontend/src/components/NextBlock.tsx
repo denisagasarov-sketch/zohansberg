@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react'
-import type { Task, Recommendation } from '../types'
+import type { Task, Direction, Recommendation } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getQuadrant } from '../utils/quadrant'
+import { getDirectionColor } from '../utils/directionColors'
 
 interface Props {
   tasks: Task[]
+  directions: Direction[]
   onTaskClick: (task: Task) => void
   recommendation: Recommendation | null
   onReorder: (slot: string, orderedIds: number[]) => void
@@ -13,7 +15,7 @@ interface Props {
   nowTaskId?: number
 }
 
-export default function NextBlock({ tasks, onTaskClick, recommendation, onReorder, onDropFromOutside, focusMode, nowTaskId }: Props) {
+export default function NextBlock({ tasks, directions, onTaskClick, recommendation, onReorder, onDropFromOutside, focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
   const nextTasks = (tasks ?? []).filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 5)
   const draggingIdRef = useRef<number | null>(null)
@@ -120,6 +122,19 @@ export default function NextBlock({ tasks, onTaskClick, recommendation, onReorde
                   <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                   <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
                   <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+                  {task.direction_id != null && (() => {
+                    const dir = directions.find(d => d.id === task.direction_id)
+                    if (!dir) return null
+                    const c = getDirectionColor(dir.id)
+                    return (
+                      <span
+                        className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                        style={{ color: c, backgroundColor: c + '28' }}
+                      >
+                        {dir.name}
+                      </span>
+                    )
+                  })()}
                   <span className="text-[10px] shrink-0" style={{ color: q.color }}>{q.short}</span>
                   {task.duration_plan && (
                     <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
