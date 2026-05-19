@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { api } from '../api'
-import { playSound, playTimerSound } from '../sound'
+import { playSound, playTimer5mSound, playTimer45mSound } from '../sound'
 
 export interface TimerState {
   isRunning: boolean
+  isPaused: boolean
   elapsed: number
   sessionId: number | null
   taskId: number | null
@@ -12,6 +13,7 @@ export interface TimerState {
 export function useTimer() {
   const [state, setState] = useState<TimerState>({
     isRunning: false,
+    isPaused: false,
     elapsed: 0,
     sessionId: null,
     taskId: null,
@@ -21,11 +23,8 @@ export function useTimer() {
   const stateRef = useRef(state)
   stateRef.current = state
 
-  // Wall-clock ref for drift-free elapsed
   const startedAtMsRef = useRef<number | null>(null)
-  // Async session ID — set after API responds
   const sessionIdRef = useRef<number | null>(null)
-  // Last 5-min mark at which tick sound was played (1 = 5 min, 2 = 10 min …)
   const lastTickMarkRef = useRef<number>(0)
 
   const clearTimer = useCallback(() => {
@@ -37,6 +36,26 @@ export function useTimer() {
 
   useEffect(() => () => clearTimer(), [clearTimer])
 
+  const startInterval = useCallback(() => {
+    intervalRef.current = setInterval(() => {
+      const elapsed = startedAtMsRef.current !== null
+        ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+        : 0
+
+      const tickMark = Math.floor(elapsed / 300)
+      if (tickMark > 0 && tickMark > lastTickMarkRef.current) {
+        lastTickMarkRef.current = tickMark
+        if (tickMark % 9 === 0) {
+          playTimer45mSound()
+        } else {
+          playTimer5mSound()
+        }
+      }
+
+      setState(prev => prev.isRunning ? { ...prev, elapsed } : prev)
+    }, 500)
+  }, [])
+
   const start = useCallback(async (taskId: number) => {
     clearTimer()
     const nowMs = Date.now()
@@ -46,26 +65,10 @@ export function useTimer() {
     sessionIdRef.current = null
     lastTickMarkRef.current = 0
 
-    setState(prev => ({ ...prev, isRunning: true, elapsed: 0, sessionId: null, taskId }))
+    setState({ isRunning: true, isPaused: false, elapsed: 0, sessionId: null, taskId })
     playSound('start')
+    startInterval()
 
-    // Poll every 500 ms; compute elapsed from wall clock to avoid drift
-    intervalRef.current = setInterval(() => {
-      const elapsed = startedAtMsRef.current !== null
-        ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
-        : 0
-
-      // Play selected timer sound at each 5-minute boundary
-      const tickMark = Math.floor(elapsed / 300)
-      if (tickMark > 0 && tickMark > lastTickMarkRef.current) {
-        lastTickMarkRef.current = tickMark
-        playTimerSound()
-      }
-
-      setState(prev => prev.isRunning ? { ...prev, elapsed } : prev)
-    }, 500)
-
-    // Register session in DB async; store ID for stop/done
     try {
       const session = await api.startSession(taskId, nowIso)
       sessionIdRef.current = session.id
@@ -73,10 +76,28 @@ export function useTimer() {
     } catch (e) {
       console.error('Failed to start session', e)
     }
+  }, [clearTimer, startInterval])
+
+  const pause = useCallback(() => {
+    clearTimer()
+    const elapsed = startedAtMsRef.current !== null
+      ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+      : stateRef.current.elapsed
+    startedAtMsRef.current = null
+    setState(prev => ({ ...prev, isRunning: false, isPaused: true, elapsed }))
+    playSound('pause')
   }, [clearTimer])
 
-  // Stop: saves elapsed to DB, resets counter to 0
-  const stop = useCallback(async () => {
+  const resume = useCallback(() => {
+    if (!stateRef.current.isPaused) return
+    const currentElapsed = stateRef.current.elapsed
+    startedAtMsRef.current = Date.now() - currentElapsed * 1000
+    setState(prev => ({ ...prev, isRunning: true, isPaused: false }))
+    playSound('start')
+    startInterval()
+  }, [startInterval])
+
+  const stop = useCallback(async (): Promise<{ sessionId: number | null }> => {
     clearTimer()
     const elapsed = startedAtMsRef.current !== null
       ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
@@ -94,8 +115,9 @@ export function useTimer() {
       }
     }
     playSound('pause')
-    setState({ isRunning: false, elapsed: 0, sessionId: null, taskId: null })
+    setState({ isRunning: false, isPaused: false, elapsed: 0, sessionId: null, taskId: null })
+    return { sessionId }
   }, [clearTimer])
 
-  return { timerState: state, start, stop }
+  return { timerState: state, start, pause, resume, stop }
 }

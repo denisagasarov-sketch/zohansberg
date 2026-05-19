@@ -23,14 +23,13 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** Move the current 'now' task (if any, excluding excludeId) to top of 'next'. */
+/** Move the current 'now' task (if any, excluding excludeId) back to 'queue'. */
 function evictNowTask(excludeId = null) {
   let q = `SELECT id FROM tasks WHERE slot = 'now' AND deleted_at IS NULL`
   if (excludeId != null) q += ` AND id != ${Number(excludeId)}`
   const current = db.prepare(q).get()
   if (current) {
-    db.prepare(`UPDATE tasks SET slot_order = slot_order + 1 WHERE slot = 'next' AND deleted_at IS NULL`).run()
-    db.prepare(`UPDATE tasks SET slot = 'next', slot_order = 0, updated_at = ? WHERE id = ?`)
+    db.prepare(`UPDATE tasks SET slot = 'queue', updated_at = ? WHERE id = ?`)
       .run(nowIso(), current.id)
   }
 }
@@ -143,7 +142,7 @@ app.get('/api/tasks/trash', (_req, res) => {
 app.get('/api/tasks/done', (req, res) => {
   try {
     const { direction_id, search } = req.query
-    const conditions = [`t.deleted_at IS NULL`, `t.status = 'done'`]
+    const conditions = [`t.deleted_at IS NULL`, `t.done_at IS NOT NULL`]
     const params = []
     if (direction_id) { conditions.push(`t.direction_id = ?`); params.push(Number(direction_id)) }
     if (search) { conditions.push(`t.title LIKE ?`); params.push(`%${search}%`) }
@@ -226,47 +225,25 @@ app.post('/api/tasks/reorder-direction', (req, res) => {
   }
 })
 
-// POST /api/tasks/recalculate-urgency — bulk-update is_urgent from deadline
-app.post('/api/tasks/recalculate-urgency', (_req, res) => {
-  try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    // Clear urgency for tasks without deadline
-    db.prepare(`UPDATE tasks SET is_urgent = 0 WHERE done_at IS NULL AND deleted_at IS NULL AND deadline IS NULL`).run()
-    // Update urgency for tasks with deadline
-    const tasks = db.prepare(`SELECT id, deadline FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND deadline IS NOT NULL`).all()
-    const update = db.prepare(`UPDATE tasks SET is_urgent = ? WHERE id = ?`)
-    for (const task of tasks) {
-      const d = new Date(task.deadline)
-      d.setHours(0, 0, 0, 0)
-      const diffDays = Math.floor((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-      update.run(diffDays <= 2 ? 1 : 0, task.id)
-    }
-    res.json({ ok: true, updated: tasks.length })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
 
 // POST /api/tasks — create task
 app.post('/api/tasks', (req, res) => {
   try {
-    const { title, direction_id, priority, slot, deadline, duration_plan, notes, is_important, is_urgent } = req.body
+    const { title, direction_id, priority, slot, deadline, duration_plan, notes } = req.body
     if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
-    if (slot === 'now') evictNowTask()
+    const safeSlot = slot === 'now' ? 'now' : 'queue'
+    if (safeSlot === 'now') evictNowTask()
     const result = db.prepare(`
-      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes, is_important, is_urgent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       direction_id ?? null,
       priority ?? 'medium',
-      slot ?? 'later',
+      safeSlot,
       deadline ?? null,
       duration_plan ?? null,
       notes ?? null,
-      is_important ?? 0,
-      is_urgent ?? 0,
     )
     res.status(201).json(db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(result.lastInsertRowid))
   } catch (err) {
@@ -281,16 +258,21 @@ app.patch('/api/tasks/:id', (req, res) => {
     const existing = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
-    const allowed = ['title', 'direction_id', 'priority', 'status', 'slot', 'slot_order',
-                     'deadline', 'duration_plan', 'duration_fact', 'notes', 'is_important', 'is_urgent',
-                     'direction_order']
+    const allowed = ['title', 'direction_id', 'priority', 'slot', 'slot_order',
+                     'deadline', 'duration_plan', 'duration_fact', 'notes',
+                     'direction_order', 'done_at']
     const fields = []
     const vals = []
 
     for (const key of allowed) {
       if (key in req.body) {
+        // Normalize slot values
+        if (key === 'slot') {
+          vals.push(req.body[key] === 'now' ? 'now' : 'queue')
+        } else {
+          vals.push(req.body[key])
+        }
         fields.push(`${key} = ?`)
-        vals.push(req.body[key])
       }
     }
 
@@ -299,31 +281,9 @@ app.patch('/api/tasks/:id', (req, res) => {
       evictNowTask(id)
     }
 
-    // Status → slot auto-move (if slot not explicitly set in this request)
-    if (req.body.status !== undefined && !('slot' in req.body)) {
-      const newStatus = req.body.status
-      if (newStatus === 'in_progress' && existing.slot !== 'now') {
-        evictNowTask(id)
-        fields.push('slot = ?'); vals.push('now')
-      } else if (newStatus === 'frozen' && existing.slot !== 'someday') {
-        fields.push('slot = ?'); vals.push('someday')
-      } else if ((newStatus === 'todo') && existing.status !== 'todo') {
-        // Restore from done/frozen → move to later unless already in next/now
-        if (existing.slot === 'someday' || existing.slot === 'later') {
-          fields.push('slot = ?'); vals.push('later')
-        }
-      }
-    }
-
-    // done_at management
-    if (req.body.status === 'done' && existing.status !== 'done') {
-      fields.push('done_at = ?'); vals.push(nowIso())
-      // Move done task out of 'now'/'next' slots
-      if (!('slot' in req.body) && (existing.slot === 'now' || existing.slot === 'next')) {
-        fields.push('slot = ?'); vals.push('later')
-      }
-    } else if (req.body.status !== undefined && req.body.status !== 'done' && existing.status === 'done') {
-      fields.push('done_at = ?'); vals.push(null)
+    // When marking done (done_at set) and task is currently 'now', move to queue
+    if ('done_at' in req.body && req.body.done_at && existing.slot === 'now' && !('slot' in req.body)) {
+      fields.push('slot = ?'); vals.push('queue')
     }
 
     // Always bump updated_at
@@ -387,11 +347,12 @@ app.patch('/api/sessions/:id', (req, res) => {
     const session = db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(id)
     if (!session) return res.status(404).json({ error: 'Not found' })
 
-    const { ended_at, duration_actual } = req.body
+    const { ended_at, duration_actual, note } = req.body
     const fields = []
     const vals = []
     if (ended_at !== undefined) { fields.push('ended_at = ?'); vals.push(ended_at) }
     if (duration_actual !== undefined) { fields.push('duration_actual = ?'); vals.push(duration_actual) }
+    if (note !== undefined) { fields.push('note = ?'); vals.push(note) }
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
 
     vals.push(id)
@@ -419,6 +380,22 @@ app.get('/api/sessions/today/:task_id', (req, res) => {
       WHERE task_id = ? AND date(started_at) = date('now')
     `).get(task_id)
     res.json({ total: row.total })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/sessions/task/:task_id — all sessions for a task
+app.get('/api/sessions/task/:task_id', (req, res) => {
+  try {
+    const task_id = Number(req.params.task_id)
+    const rows = db.prepare(`
+      SELECT id, started_at, ended_at, duration_actual, note
+      FROM work_sessions
+      WHERE task_id = ?
+      ORDER BY started_at DESC
+    `).all(task_id)
+    res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -519,53 +496,6 @@ app.patch('/api/settings', (req, res) => {
   }
 })
 
-// ─── Recommendation ───────────────────────────────────────────────────────────
-
-// GET /api/recommendation?skip_id=N
-app.get('/api/recommendation', (req, res) => {
-  try {
-    const skipId = req.query.skip_id ? Number(req.query.skip_id) : null
-    const today = todayStr()
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-    const skipClause = skipId != null ? ` AND id != ${skipId}` : ''
-
-    const base = `
-      FROM tasks
-      WHERE deleted_at IS NULL
-        AND slot != 'now'
-        AND status NOT IN ('done', 'frozen')
-    `
-
-    // 1. From slot 'next'
-    let task = db.prepare(`
-      SELECT * ${base} ${skipClause} AND slot = 'next'
-      ORDER BY slot_order ASC,
-               CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END ASC
-      LIMIT 1
-    `).get()
-    if (task) return res.json({ task, reason: 'следующая задача' })
-
-    // 2. Deadline today
-    task = db.prepare(`SELECT * ${base} ${skipClause} AND deadline = ? ORDER BY slot_order ASC LIMIT 1`).get(today)
-    if (task) return res.json({ task, reason: 'дедлайн сегодня' })
-
-    // 3. Deadline tomorrow
-    task = db.prepare(`SELECT * ${base} ${skipClause} AND deadline = ? ORDER BY slot_order ASC LIMIT 1`).get(tomorrow)
-    if (task) return res.json({ task, reason: 'дедлайн завтра' })
-
-    // 4. High priority
-    task = db.prepare(`SELECT * ${base} ${skipClause} AND priority = 'high' ORDER BY slot_order ASC LIMIT 1`).get()
-    if (task) return res.json({ task, reason: 'самая приоритетная' })
-
-    // 5. Longest without update
-    task = db.prepare(`SELECT * ${base} ${skipClause} ORDER BY updated_at ASC LIMIT 1`).get()
-    if (task) return res.json({ task, reason: 'давно не обновлялась' })
-
-    res.json({ task: null, reason: null })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -592,7 +522,7 @@ app.get('/api/stats', (req, res) => {
       SELECT t.direction_id, d.name AS direction_name, COUNT(*) AS count
       FROM tasks t
       LEFT JOIN directions d ON d.id = t.direction_id
-      WHERE t.status = 'done' AND t.deleted_at IS NULL ${taskDateFilter}
+      WHERE t.done_at IS NOT NULL AND t.deleted_at IS NULL ${taskDateFilter}
       GROUP BY t.direction_id
     `).all()
 
@@ -801,6 +731,54 @@ app.post('/api/ai/suggest-title', async (req, res) => {
     res.json({ suggestions })
   } catch (err) {
     console.error('[suggest-title] unexpected error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/ai/parse-task', async (req, res) => {
+  const key = getOpenAiKey()
+  if (!key) return res.status(400).json({ error: 'OpenAI API key not configured' })
+
+  const { text } = req.body
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' })
+
+  const directions = db.prepare(`SELECT id, name FROM directions WHERE archived = 0`).all()
+  const dirList = directions.map(d => `${d.id}: ${d.name}`).join(', ')
+  const today = new Date().toISOString().slice(0, 10)
+
+  const prompt = `Разбери текст задачи и верни JSON.
+
+Текст: "${text.trim()}"
+Сегодня: ${today}
+Доступные направления: ${dirList || 'нет'}
+
+Верни ТОЛЬКО JSON объект без объяснений:
+{
+  "title": "чёткое название задачи (глагол + результат)",
+  "direction_id": число или null,
+  "deadline": "YYYY-MM-DD" или null,
+  "duration_plan": число часов или null
+}
+
+Правила:
+- title: начни с глагола, максимум 10 слов, конкретный результат
+- direction_id: выбери подходящее направление из списка или null
+- deadline: парси "завтра", "в пятницу", "через неделю" и т.д.
+- duration_plan: только если явно упомянуто ("на час", "2 часа")`
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 150, messages: [{ role: 'user', content: prompt }] }),
+    })
+    if (!r.ok) return res.status(r.status).json({ error: 'OpenAI error' })
+    const data = await r.json()
+    const text2 = data.choices?.[0]?.message?.content ?? '{}'
+    const match = text2.match(/\{[\s\S]*\}/)
+    const parsed = match ? JSON.parse(match[0]) : {}
+    res.json(parsed)
+  } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })

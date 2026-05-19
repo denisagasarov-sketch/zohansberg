@@ -68,6 +68,10 @@ export const api = {
     isTauri ? invoke<any>('start_session', { taskId: task_id, startedAt: started_at }) : req<any>('POST', '/sessions', { task_id, started_at }),
   endSession: (id: number, ended_at: string, duration_actual: number) =>
     isTauri ? invoke('end_session', { id, endedAt: ended_at, durationActual: duration_actual }) : req('PATCH', `/sessions/${id}`, { ended_at, duration_actual }),
+  updateSessionNote: (id: number, note: string) =>
+    req('PATCH', `/sessions/${id}`, { note }),
+  getTaskSessions: (task_id: number) =>
+    req<any[]>('GET', `/sessions/task/${task_id}`),
   getTodayTime: (task_id: number) =>
     isTauri
       ? invoke<number>('get_today_time', { taskId: task_id }).then(total => ({ total }))
@@ -93,12 +97,6 @@ export const api = {
   updateSetting: (key: string, value: string) =>
     isTauri ? invoke('update_setting', { key, value }) : req('PATCH', '/settings', { key, value }),
 
-  // Recommendation
-  getRecommendation: (skip_id?: number) =>
-    isTauri
-      ? invoke<any>('get_recommendation', { skipId: skip_id })
-      : req<any>('GET', `/recommendation${skip_id ? '?skip_id=' + skip_id : ''}`),
-
   // Stats
   getStats: (period: string) =>
     isTauri ? invoke<any>('get_stats', { period }) : req<any>('GET', `/stats?period=${period}`),
@@ -110,10 +108,10 @@ export const api = {
     req<any>('GET', '/today-summary'),
 
   // AI
-  recalculateUrgency: () =>
-    req<any>('POST', '/tasks/recalculate-urgency'),
   reorderInDirection: (direction_id: number | null, ordered_ids: number[]) =>
     req('POST', '/tasks/reorder-direction', { direction_id, ordered_ids }),
   suggestTitle: (data: { title: string; direction?: string; deadline?: string; notes?: string; recentTasks?: string[] }) =>
     req<{ suggestions: string[] }>('POST', '/ai/suggest-title', data),
+  parseTask: (text: string) =>
+    req<{ title?: string; direction_id?: number | null; deadline?: string | null; duration_plan?: number | null }>('POST', '/ai/parse-task', { text }),
 }

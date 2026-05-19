@@ -23,6 +23,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
   const [pendingText, setPendingText] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [thoughtSaved, setThoughtSaved] = useState(false)
+  const [parsing, setParsing] = useState(false)
   const [datetime, setDatetime] = useState(formatDateTime())
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -56,7 +57,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
 
   const handleTask = useCallback(async () => {
     try {
-      const task = await api.createTask({ title: pendingText, slot: 'later' }) as { id: number }
+      const task = await api.createTask({ title: pendingText, slot: 'queue' }) as { id: number }
       onTaskCreated()
       onOpenEditor(task.id)
     } catch (e) {
@@ -81,6 +82,36 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
     setPendingText('')
   }, [pendingText])
 
+  const handleSmartTask = useCallback(async () => {
+    if (!pendingText) return
+    setParsing(true)
+    setShowTypeDropdown(false)
+    try {
+      const parsed = await api.parseTask(pendingText)
+      const task = await api.createTask({
+        title: parsed.title ?? pendingText,
+        direction_id: parsed.direction_id ?? null,
+        deadline: parsed.deadline ?? null,
+        duration_plan: parsed.duration_plan ?? null,
+        slot: 'queue',
+      }) as { id: number }
+      onTaskCreated()
+      onOpenEditor(task.id)
+    } catch (e) {
+      console.error(e)
+      // Fallback: create plain task
+      try {
+        const task = await api.createTask({ title: pendingText, slot: 'queue' }) as { id: number }
+        onTaskCreated()
+        onOpenEditor(task.id)
+      } catch {}
+    } finally {
+      setParsing(false)
+    }
+    setInputValue('')
+    setPendingText('')
+  }, [pendingText, onTaskCreated, onOpenEditor])
+
   const cancelAll = useCallback(() => {
     setInputValue('')
     setShowTypeDropdown(false)
@@ -104,14 +135,20 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
             ✓ Мысль записана
           </div>
         )}
+        {parsing && (
+          <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#252525] rounded px-3 py-1.5 text-xs text-[#8090c8] shadow-lg whitespace-nowrap">
+            ✨ Разбираю…
+          </div>
+        )}
         {showTypeDropdown && (
           <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#252525] rounded p-2 w-max text-sm shadow-lg">
             <div className="text-[#666] mb-2 truncate max-w-xs">&ldquo;{pendingText}&rdquo;</div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[#666] text-xs">Это:</span>
-              <button onClick={handleTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">📋 Задача</button>
+              <button onClick={handleSmartTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">✨ Умная задача</button>
+              <button onClick={handleTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#383838] transition-colors text-xs text-[#999]">📋 Просто задача</button>
               <button onClick={handleThought} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">💭 Мысль</button>
-              <span className="text-[#383838] text-xs">Escape — отмена</span>
+              <span className="text-[#383838] text-xs">Esc — отмена</span>
             </div>
           </div>
         )}
@@ -127,14 +164,6 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
       <div className="flex-1 text-center text-[#666] text-xs tabular-nums select-none">{datetime}</div>
 
       <nav className="flex items-center gap-1">
-        <button onClick={() => onNavigate('matrix')} title="Матрица" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] transition-colors text-[#999] hover:text-[#f0f0f0]">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            <rect x="0" y="0" width="6" height="6" rx="1"/>
-            <rect x="8" y="0" width="6" height="6" rx="1"/>
-            <rect x="0" y="8" width="6" height="6" rx="1"/>
-            <rect x="8" y="8" width="6" height="6" rx="1"/>
-          </svg>
-        </button>
         <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📓</button>
         <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📊</button>
         <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📦</button>

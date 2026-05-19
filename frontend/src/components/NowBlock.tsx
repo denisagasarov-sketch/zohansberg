@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Task, Direction } from '../types'
 import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
-import { getQuadrant } from '../utils/quadrant'
+import { getDirectionColor } from '../utils/directionColors'
 
 interface Props {
   task: Task | null
@@ -11,11 +11,12 @@ interface Props {
   todayTime: number
   onStart: () => void
   onStop: () => void
+  onPause: () => void
+  onResume: () => void
   onDone: () => void
   onTaskClick: (task: Task) => void
   onAddTask: () => void
   onDropTask: (taskId: number) => void
-  onDragTask?: (taskId: number, e: React.DragEvent) => void
 }
 
 function padZ(n: number) { return String(n).padStart(2, '0') }
@@ -26,18 +27,20 @@ function formatElapsed(s: number) {
   return `${padZ(m)}:${padZ(sec)}`
 }
 
-function formatTodayTime(s: number) {
-  if (s < 60) return `${s}с сегодня`
+function formatTime(s: number): string {
+  if (s < 60) return `${s}с`
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
-  if (h > 0) return `${h}ч ${m}м сегодня`
-  return `${m}м сегодня`
+  if (h > 0) return `${h}ч ${m}м`
+  return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onDone, onTaskClick, onAddTask, onDropTask, onDragTask }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onTaskClick, onAddTask, onDropTask }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
-  const q = task ? getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0) : null
+  const dirColor = direction ? getDirectionColor(direction.id) : null
   const [isDragOver, setIsDragOver] = useState(false)
+
+  const timerActive = timer.isRunning || timer.isPaused
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -76,44 +79,67 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
         </div>
       ) : (
         <>
+          {/* Task title row */}
           <div
             draggable
             onDragStart={e => {
               e.dataTransfer.setData(DRAG_TASK_KEY, String(task.id))
               e.dataTransfer.effectAllowed = 'move'
-              onDragTask?.(task.id, e)
             }}
-            className="cursor-pointer hover:opacity-80 transition-opacity mb-3"
+            className="cursor-pointer hover:opacity-80 transition-opacity mb-4"
             onClick={() => onTaskClick(task)}
           >
-            <h2 className="text-2xl font-bold text-[#f0f0f0] leading-tight mb-2">{task.title}</h2>
+            <h2 className="text-xl font-bold text-[#f0f0f0] leading-tight mb-1.5">{task.title}</h2>
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              {direction && (
-                <span className="text-[#666]">{direction.name}</span>
+              {direction && dirColor && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ color: dirColor, backgroundColor: dirColor + '28' }}>{direction.name}</span>
               )}
-              {q && <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ color: q.color, backgroundColor: q.border + '30' }}>{q.label}</span>}
+              {task.deadline && (
+                <span className="text-[#666]">до {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+              )}
               {task.duration_plan && (
                 <span className="text-[#666]">{task.duration_plan}ч план</span>
               )}
             </div>
           </div>
 
-          <div className="mb-2">
-            <div className="text-4xl font-mono font-bold text-[#f0f0f0] tabular-nums mb-1">
-              {formatElapsed(timer.elapsed)}
+          {/* Timer */}
+          <div className="mb-3">
+            {/* Counter + pulsing dot */}
+            <div className="flex items-center gap-2 mb-1">
+              {timer.isRunning && (
+                <span className="text-[#5060a0] text-xl animate-pulse leading-none">●</span>
+              )}
+              {timer.isPaused && (
+                <span className="text-[#383838] text-xl leading-none">●</span>
+              )}
+              <div className={`text-7xl font-mono font-bold tabular-nums leading-none ${timer.isPaused ? 'text-[#505050]' : 'text-[#f0f0f0]'}`}>
+                {formatElapsed(timer.elapsed)}
+              </div>
             </div>
-            <div className="text-xs text-[#666]">{formatTodayTime(todayTime)}</div>
+
+            {/* Progress bar (only when timer has been used and plan is set) */}
+            {task.duration_plan != null && timerActive && (
+              <div className="w-full h-0.5 bg-[#252525] rounded-full overflow-hidden mb-2">
+                <div
+                  className="h-full bg-[#5060a0] transition-all duration-500"
+                  style={{ width: `${Math.min(100, (timer.elapsed / (task.duration_plan * 3600)) * 100)}%` }}
+                />
+              </div>
+            )}
+
+            {/* Two time lines */}
+            <div className="text-xs text-[#666] mt-1">
+              {formatTime(todayTime + timer.elapsed)} сегодня
+            </div>
+            <div className="text-xs text-[#505050]">
+              Всего: {formatTime(Math.round((task.duration_fact ?? 0) + timer.elapsed))}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-3">
-            {timer.isRunning ? (
-              <button
-                onClick={onStop}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#252525] hover:bg-[#383838] transition-colors rounded text-sm text-[#f0f0f0]"
-              >
-                ⏹ Стоп
-              </button>
-            ) : (
+          {/* Buttons — 3 states */}
+          <div className="flex items-center gap-2">
+            {!timer.isRunning && !timer.isPaused && (
               <button
                 onClick={onStart}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white"
@@ -121,12 +147,52 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                 ▶ Старт
               </button>
             )}
-            <button
-              onClick={onDone}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] transition-colors rounded text-sm text-[#666]"
-            >
-              ✓ Готово
-            </button>
+
+            {timer.isRunning && (
+              <>
+                <button
+                  onClick={onPause}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#252525] hover:bg-[#383838] transition-colors rounded text-sm text-[#f0f0f0]"
+                >
+                  ⏸ Пауза
+                </button>
+                <button
+                  onClick={onStop}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#666] transition-colors rounded text-sm text-[#666]"
+                >
+                  ■ Стоп
+                </button>
+                <button
+                  onClick={onDone}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] transition-colors rounded text-sm text-[#666]"
+                >
+                  ✓ Готово
+                </button>
+              </>
+            )}
+
+            {timer.isPaused && (
+              <>
+                <button
+                  onClick={onResume}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white"
+                >
+                  ▶ Продолжить
+                </button>
+                <button
+                  onClick={onStop}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#666] transition-colors rounded text-sm text-[#666]"
+                >
+                  ■ Стоп
+                </button>
+                <button
+                  onClick={onDone}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] transition-colors rounded text-sm text-[#666]"
+                >
+                  ✓ Готово
+                </button>
+              </>
+            )}
           </div>
         </>
       )}

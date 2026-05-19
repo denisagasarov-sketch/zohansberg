@@ -71,6 +71,49 @@ function initSchema() {
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN direction_order INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE work_sessions ADD COLUMN note TEXT`) } catch {}
+
+  // Migrate slots: next/later/someday → queue, remove old CHECK constraint
+  const migrated = db.prepare(`SELECT value FROM settings WHERE key = 'slot_v2_queue'`).get()
+  if (!migrated) {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          title         TEXT NOT NULL,
+          direction_id  INTEGER REFERENCES directions(id),
+          priority      TEXT CHECK(priority IN ('high','medium','low')) DEFAULT 'medium',
+          slot          TEXT CHECK(slot IN ('now','queue')) DEFAULT 'queue',
+          slot_order    INTEGER DEFAULT 0,
+          direction_order INTEGER NOT NULL DEFAULT 0,
+          deadline      TEXT,
+          duration_plan REAL,
+          duration_fact REAL DEFAULT 0,
+          notes         TEXT,
+          created_at    TEXT DEFAULT (datetime('now')),
+          updated_at    TEXT DEFAULT (datetime('now')),
+          done_at       TEXT,
+          deleted_at    TEXT
+        )
+      `)
+      db.exec(`
+        INSERT INTO tasks_new
+          (id, title, direction_id, priority, slot, slot_order, direction_order,
+           deadline, duration_plan, duration_fact, notes, created_at, updated_at, done_at, deleted_at)
+        SELECT
+          id, title, direction_id, priority,
+          CASE WHEN slot = 'now' THEN 'now' ELSE 'queue' END AS slot,
+          slot_order,
+          COALESCE(direction_order, 0),
+          deadline, duration_plan, duration_fact, notes, created_at, updated_at, done_at, deleted_at
+        FROM tasks
+      `)
+      db.exec(`DROP TABLE tasks`)
+      db.exec(`ALTER TABLE tasks_new RENAME TO tasks`)
+      db.exec(`INSERT INTO settings (key, value) VALUES ('slot_v2_queue', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`)
+    })()
+    console.log('[startup] Migrated slots to v2 (now/queue)')
+  }
 }
 
 function cleanupTrash() {

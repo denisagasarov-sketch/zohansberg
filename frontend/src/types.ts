@@ -11,9 +11,9 @@ export interface Task {
   title: string
   direction_id: number | null
   priority: 'high' | 'medium' | 'low'
-  status: 'todo' | 'in_progress' | 'done' | 'frozen'
-  slot: 'now' | 'next' | 'later' | 'someday'
+  slot: 'now' | 'queue'
   slot_order: number
+  direction_order: number
   deadline: string | null
   duration_plan: number | null
   duration_fact: number
@@ -23,9 +23,6 @@ export interface Task {
   done_at: string | null
   deleted_at: string | null
   direction_name?: string
-  is_important: number
-  is_urgent: number
-  direction_order: number
 }
 
 export interface WorkSession {
@@ -53,9 +50,4 @@ export interface Settings {
   claude_api_key?: string
 }
 
-export interface Recommendation {
-  task: Task
-  reason: string
-}
-
-export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash' | 'matrix'
+export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash'
