@@ -9,10 +9,13 @@ import NowBlock from './components/NowBlock'
 import NextBlock from './components/NextBlock'
 import RecBar from './components/RecBar'
 import DirectionsPanel from './components/DirectionsPanel'
+import MatrixScreen from './components/MatrixScreen'
 import TaskEditor from './components/TaskEditor'
 import AfterDoneModal from './components/modals/AfterDoneModal'
 import TimerSwitchModal from './components/modals/TimerSwitchModal'
 import CheckinModal from './components/modals/CheckinModal'
+import FocusSwitchModal from './components/modals/FocusSwitchModal'
+import EveningSummaryModal from './components/modals/EveningSummaryModal'
 import SettingsScreen from './components/SettingsScreen'
 import ArchiveScreen from './components/ArchiveScreen'
 import TrashScreen from './components/TrashScreen'
@@ -26,6 +29,9 @@ export default function App() {
   const [showAfterDone, setShowAfterDone] = useState(false)
   const [showTimerSwitch, setShowTimerSwitch] = useState(false)
   const [pendingSwitchTaskId, setPendingSwitchTaskId] = useState<number | null>(null)
+  const [pendingFocusTask, setPendingFocusTask] = useState<Task | null>(null)
+  const [showFocusSwitch, setShowFocusSwitch] = useState(false)
+  const [showEveningSummary, setShowEveningSummary] = useState(false)
   const [todayTime, setTodayTime] = useState(0)
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -55,6 +61,21 @@ export default function App() {
     }).catch(() => {})
   }, [])
 
+  // Show evening summary after 19:00
+  useEffect(() => {
+    const check = () => {
+      const now = new Date()
+      if (now.getHours() < 19) return
+      const today = now.toISOString().slice(0, 10)
+      if (localStorage.getItem('evening_summary_date') === today) return
+      setShowEveningSummary(true)
+      localStorage.setItem('evening_summary_date', today)
+    }
+    check()
+    const id = setInterval(check, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   // Space shortcut for timer
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -70,8 +91,13 @@ export default function App() {
   }, [timerState.isRunning, nowTask, stop, start])
 
   const handleTaskClick = useCallback((task: Task) => {
+    if (timerState.isRunning && nowTask && task.id !== nowTask.id) {
+      setPendingFocusTask(task)
+      setShowFocusSwitch(true)
+      return
+    }
     setSelectedTask(task)
-  }, [])
+  }, [timerState.isRunning, nowTask])
 
   const handleStartTimer = useCallback(() => {
     if (!nowTask) return
@@ -147,6 +173,19 @@ export default function App() {
     getNext(skipId)
   }, [getNext])
 
+  const handleFocusSwitchConfirm = useCallback(() => {
+    setShowFocusSwitch(false)
+    if (pendingFocusTask) setSelectedTask(pendingFocusTask)
+    setPendingFocusTask(null)
+  }, [pendingFocusTask])
+
+  const handleMoveToTomorrow = useCallback(async (taskId: number) => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+    await updateTask(taskId, { deadline: tomorrowStr })
+  }, [updateTask])
+
   return (
     <div className="h-screen flex flex-col bg-[#181818] text-[#f0f0f0] overflow-hidden">
       <Header
@@ -156,6 +195,7 @@ export default function App() {
           const t = tasks.find(x => x.id === id)
           if (t) setSelectedTask(t)
         }}
+        isTimerActive={timerState.isRunning}
       />
 
       <div className="flex-1 overflow-hidden">
@@ -181,6 +221,8 @@ export default function App() {
                 recommendation={recommendation}
                 onReorder={reorderTasks}
                 onDropFromOutside={handleDropToNext}
+                focusMode={timerState.isRunning}
+                nowTaskId={nowTask?.id}
               />
               <div className="flex-1" />
               <RecBar
@@ -192,13 +234,15 @@ export default function App() {
             </div>
 
             {/* Right column */}
-            <div className="w-[42%] p-4 overflow-hidden">
+            <div className={`w-[42%] p-4 overflow-hidden transition-all ${timerState.isRunning ? 'opacity-30 blur-[3px] pointer-events-none' : ''}`}>
               <DirectionsPanel
                 tasks={tasks}
                 directions={directions}
                 onTaskClick={handleTaskClick}
                 onReorder={reorderTasks}
                 onMoveToLater={handleMoveToLater}
+                focusMode={timerState.isRunning}
+                nowTaskId={nowTask?.id}
               />
             </div>
           </div>
@@ -233,6 +277,10 @@ export default function App() {
 
         {screen === 'journal' && (
           <JournalScreen onClose={() => setScreen('main')} />
+        )}
+
+        {screen === 'matrix' && (
+          <MatrixScreen tasks={tasks} onClose={() => setScreen('main')} onTaskClick={handleTaskClick} />
         )}
       </div>
 
@@ -271,6 +319,23 @@ export default function App() {
         <CheckinModal
           onClose={() => setShowCheckin(false)}
           onSave={handleCheckinSave}
+        />
+      )}
+
+      {showFocusSwitch && pendingFocusTask && (
+        <FocusSwitchModal
+          taskTitle={pendingFocusTask.title}
+          onStay={() => { setShowFocusSwitch(false); setPendingFocusTask(null) }}
+          onSwitch={handleFocusSwitchConfirm}
+        />
+      )}
+
+      {showEveningSummary && (
+        <EveningSummaryModal
+          incompleteTasks={tasks.filter(t => !t.done_at && !t.deleted_at && t.slot !== 'someday')}
+          onClose={() => setShowEveningSummary(false)}
+          onLater={() => setShowEveningSummary(false)}
+          onMoveToTomorrow={handleMoveToTomorrow}
         />
       )}
     </div>

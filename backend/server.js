@@ -215,12 +215,12 @@ app.post('/api/tasks/cleanup-trash', (_req, res) => {
 // POST /api/tasks — create task
 app.post('/api/tasks', (req, res) => {
   try {
-    const { title, direction_id, priority, slot, deadline, duration_plan, notes } = req.body
+    const { title, direction_id, priority, slot, deadline, duration_plan, notes, is_important, is_urgent } = req.body
     if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
     if (slot === 'now') evictNowTask()
     const result = db.prepare(`
-      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes, is_important, is_urgent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       direction_id ?? null,
@@ -229,6 +229,8 @@ app.post('/api/tasks', (req, res) => {
       deadline ?? null,
       duration_plan ?? null,
       notes ?? null,
+      is_important ?? 0,
+      is_urgent ?? 0,
     )
     res.status(201).json(db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(result.lastInsertRowid))
   } catch (err) {
@@ -244,7 +246,7 @@ app.patch('/api/tasks/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
     const allowed = ['title', 'direction_id', 'priority', 'status', 'slot', 'slot_order',
-                     'deadline', 'duration_plan', 'duration_fact', 'notes']
+                     'deadline', 'duration_plan', 'duration_fact', 'notes', 'is_important', 'is_urgent']
     const fields = []
     const vals = []
 
@@ -825,6 +827,16 @@ app.get('/api/stats/dashboard', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// GET /api/today-summary
+app.get('/api/today-summary', (_req, res) => {
+  try {
+    const today = todayStr()
+    const done_count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(today).n
+    const time_row = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`).get(today)
+    res.json({ done_count, time_seconds: time_row.s })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // ─── Frontend static (SPA) ───────────────────────────────────────────────────

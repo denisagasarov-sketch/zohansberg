@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
+import { getQuadrant } from '../utils/quadrant'
 
 interface Props {
   tasks: Task[]
@@ -8,31 +9,17 @@ interface Props {
   onTaskClick: (task: Task) => void
   onReorder: (slot: string, orderedIds: number[]) => void
   onMoveToLater: (taskId: number) => void
+  focusMode?: boolean
+  nowTaskId?: number
 }
-
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 
 function sortTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
-    const po = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
-    if (po !== 0) return po
     if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
     if (a.deadline) return -1
     if (b.deadline) return 1
     return a.created_at.localeCompare(b.created_at)
   })
-}
-
-function priorityBorderColor(p: string) {
-  if (p === 'high') return '#6a3030'
-  if (p === 'medium') return '#4a3a1e'
-  return '#252525'
-}
-
-function priorityTextColor(p: string) {
-  if (p === 'high') return '#b07070'
-  if (p === 'medium') return '#a08850'
-  return '#555'
 }
 
 interface TaskRowProps {
@@ -42,9 +29,13 @@ interface TaskRowProps {
   onDragOver: (e: React.DragEvent, taskId: number) => void
   onDrop: (e: React.DragEvent, taskId: number) => void
   draggingId: number | null
+  focusMode?: boolean
+  nowTaskId?: number
 }
 
-function TaskRow({ task, onClick, onDragStart, onDragOver, onDrop, draggingId }: TaskRowProps) {
+function TaskRow({ task, onClick, onDragStart, onDragOver, onDrop, draggingId, focusMode, nowTaskId }: TaskRowProps) {
+  const q = getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0)
+  const dimmed = focusMode && task.id !== nowTaskId
   return (
     <div
       draggable
@@ -52,12 +43,12 @@ function TaskRow({ task, onClick, onDragStart, onDragOver, onDrop, draggingId }:
       onDragOver={e => onDragOver(e, task.id)}
       onDrop={e => onDrop(e, task.id)}
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${draggingId === task.id ? 'opacity-40' : ''}`}
-      style={{ borderLeftColor: priorityBorderColor(task.priority) }}
+      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${draggingId === task.id ? 'opacity-40' : ''} ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
+      style={{ borderLeftColor: q.border }}
     >
       <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
       {task.deadline && (
-        <span className="text-[10px] shrink-0" style={{ color: priorityTextColor(task.priority) }}>
+        <span className="text-[10px] shrink-0" style={{ color: q.color }}>
           {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
         </span>
       )}
@@ -70,7 +61,7 @@ function TaskRow({ task, onClick, onDragStart, onDragOver, onDrop, draggingId }:
   )
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onMoveToLater }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onMoveToLater, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
 
@@ -150,6 +141,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       draggingId={draggingId}
+                      focusMode={focusMode}
+                      nowTaskId={nowTaskId}
                     />
                   ))}
                 </div>
@@ -178,6 +171,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     draggingId={draggingId}
+                    focusMode={focusMode}
+                    nowTaskId={nowTaskId}
                   />
                 ))}
               </div>
@@ -201,6 +196,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                   draggingId={draggingId}
+                  focusMode={focusMode}
+                  nowTaskId={nowTaskId}
                 />
               ))}
             </div>

@@ -23,6 +23,8 @@ export interface Task {
   done_at: string | null
   deleted_at: string | null
   direction_name?: string
+  is_important: number
+  is_urgent: number
 }
 
 export interface WorkSession {
@@ -55,4 +57,4 @@ export interface Recommendation {
   reason: string
 }
 
-export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash'
+export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash' | 'matrix'

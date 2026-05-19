@@ -188,6 +188,20 @@ const ACTION_SOUNDS: Record<string, (ctx: AudioContext, vol: number) => void> = 
   },
   thought_saved: (ctx, vol) => beep(880, 0.1, 'sine', vol * 0.35, ctx, ctx.currentTime),
   task_delete: (ctx, vol) => beep(220, 0.2, 'sine', vol * 0.3, ctx, ctx.currentTime),
+  fanfare: (ctx, vol) => {
+    const t = ctx.currentTime
+    // 16-bit victory fanfare, ~2.5 seconds
+    const melody: [number, number][] = [
+      [523, 0], [659, 0.14], [784, 0.28], [1047, 0.42],
+      [1047, 0.62], [784, 0.76], [1047, 0.90], [1319, 1.1],
+      [1568, 1.35], [2093, 1.65],
+    ]
+    melody.forEach(([f, d]) => beep(f, 0.2, 'square', vol * 0.7, ctx, t + d))
+    // bass counterpoint
+    ;[[131,0],[131,0.42],[131,0.9],[131,1.65]].forEach(([f,d]) => beep(f,0.35,'square',vol*0.5,ctx,t+d))
+    // harmony
+    ;[[659,0],[784,0.42],[1047,0.9],[1319,1.65]].forEach(([f,d]) => beep(f,0.2,'square',vol*0.4,ctx,t+d))
+  },
 }
 
 function getVolume(): number {
