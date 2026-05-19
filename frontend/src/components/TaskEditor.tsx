@@ -53,6 +53,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
+  const [someday, setSomeday] = useState(!!task?.someday)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -70,7 +71,8 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       directionId !== (task?.direction_id ?? null) ||
       deadline !== (task?.deadline?.slice(0, 10) ?? '') ||
       durationPlan !== (task?.duration_plan?.toString() ?? '') ||
-      notes !== (task?.notes ?? '')
+      notes !== (task?.notes ?? '') ||
+      someday !== !!task?.someday
     )
   }, [title, directionId, deadline, durationPlan, notes, task])
 
@@ -119,6 +121,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
+        someday: someday as any,
       }
       if (task) {
         await api.updateTask(task.id, data)
@@ -283,6 +286,17 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               className="w-28 bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
             />
           </div>
+
+          {/* Someday */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={someday}
+              onChange={e => setSomeday(e.target.checked)}
+              className="w-3.5 h-3.5 accent-[#5060a0]"
+            />
+            <span className="text-xs text-[#666]">Когда-нибудь</span>
+          </label>
 
           {/* Tabs: Notes / Log */}
           {task && (

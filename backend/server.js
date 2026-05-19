@@ -260,7 +260,7 @@ app.patch('/api/tasks/:id', (req, res) => {
 
     const allowed = ['title', 'direction_id', 'priority', 'slot', 'slot_order',
                      'deadline', 'duration_plan', 'duration_fact', 'notes',
-                     'direction_order', 'done_at', 'in_queue']
+                     'direction_order', 'done_at', 'in_queue', 'someday']
     const fields = []
     const vals = []
 
@@ -269,7 +269,7 @@ app.patch('/api/tasks/:id', (req, res) => {
         // Normalize slot values
         if (key === 'slot') {
           vals.push(req.body[key] === 'now' ? 'now' : 'queue')
-        } else if (key === 'in_queue') {
+        } else if (key === 'in_queue' || key === 'someday') {
           vals.push(req.body[key] ? 1 : 0)
         } else {
           vals.push(req.body[key])
