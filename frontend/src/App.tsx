@@ -35,18 +35,7 @@ export default function App() {
   const nowTask = tasks.find(t => t.slot === 'now' && !t.done_at && !t.deleted_at) ?? null
   const nextTasks = tasks.filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at)
 
-  const handleTimerComplete = useCallback(() => {
-    setShowAfterDone(true)
-  }, [])
-
-  const { timerState, start, pause, stop, setDuration } = useTimer(handleTimerComplete)
-
-  // Load timer duration from settings
-  useEffect(() => {
-    api.getSettings().then((s: Record<string, string>) => {
-      if (s.timer_duration) setDuration(parseInt(s.timer_duration))
-    }).catch(() => {})
-  }, [setDuration])
+  const { timerState, start, stop } = useTimer()
 
   // Load today time for now task
   useEffect(() => {
@@ -72,13 +61,13 @@ export default function App() {
       if (e.key === ' ' && e.target === document.body) {
         e.preventDefault()
         if (!nowTask) return
-        if (timerState.isRunning) pause()
+        if (timerState.isRunning) stop()
         else start(nowTask.id)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [timerState.isRunning, nowTask, pause, start])
+  }, [timerState.isRunning, nowTask, stop, start])
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task)
@@ -89,16 +78,16 @@ export default function App() {
     start(nowTask.id)
   }, [nowTask, start])
 
-  const handlePauseTimer = useCallback(() => {
-    pause()
-  }, [pause])
+  const handleStopTimer = useCallback(() => {
+    stop()
+  }, [stop])
 
   const handleDoneNow = useCallback(async () => {
     if (!nowTask) return
-    if (timerState.isRunning) await pause()
+    if (timerState.isRunning) await stop()
     await updateTask(nowTask.id, { status: 'done', slot: 'later', done_at: new Date().toISOString() })
     setShowAfterDone(true)
-  }, [nowTask, timerState.isRunning, pause, updateTask])
+  }, [nowTask, timerState.isRunning, stop, updateTask])
 
   const handleTakeNow = useCallback(async (taskId: number) => {
     if (timerState.isRunning) {
@@ -180,7 +169,7 @@ export default function App() {
                 timer={timerState}
                 todayTime={todayTime}
                 onStart={handleStartTimer}
-                onPause={handlePauseTimer}
+                onStop={handleStopTimer}
                 onDone={handleDoneNow}
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
