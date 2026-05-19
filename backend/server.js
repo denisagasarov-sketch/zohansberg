@@ -706,15 +706,10 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 })
 
-// POST /api/ai/improve-title — generate 3 title suggestions via Anthropic
-function getAnthropicKey() {
-  const row = db.prepare(`SELECT value FROM settings WHERE key = 'anthropic_api_key'`).get()
-  return row?.value ?? null
-}
-
+// POST /api/ai/improve-title — generate 3 title suggestions via OpenAI
 app.post('/api/ai/improve-title', async (req, res) => {
-  const key = getAnthropicKey()
-  if (!key) return res.status(400).json({ error: 'Anthropic API key not configured' })
+  const key = getOpenAiKey()
+  if (!key) return res.status(400).json({ error: 'OpenAI API key not configured' })
 
   const { title, notes, direction_name } = req.body
   if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
@@ -740,25 +735,21 @@ ${doneContext}
 Ответь строго в формате JSON-массива строк: ["вариант 1", "вариант 2", "вариант 3"]`
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'gpt-4o-mini',
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
     if (!r.ok) {
       const errBody = await r.json().catch(() => ({}))
-      return res.status(r.status).json({ error: errBody?.error?.message ?? 'Anthropic request failed' })
+      return res.status(r.status).json({ error: errBody?.error?.message ?? 'OpenAI request failed' })
     }
     const data = await r.json()
-    const text = data.content?.[0]?.text ?? ''
+    const text = data.choices?.[0]?.message?.content ?? ''
     const match = text.match(/\[[\s\S]*?\]/)
     const suggestions = match ? JSON.parse(match[0]) : []
     res.json({ suggestions })
