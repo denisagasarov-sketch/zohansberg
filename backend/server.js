@@ -212,6 +212,20 @@ app.post('/api/tasks/cleanup-trash', (_req, res) => {
   }
 })
 
+// POST /api/tasks/reorder-direction — batch-update direction_order for tasks in a direction
+app.post('/api/tasks/reorder-direction', (req, res) => {
+  try {
+    const { direction_id, ordered_ids } = req.body
+    if (!Array.isArray(ordered_ids)) return res.status(400).json({ error: 'ordered_ids required' })
+    const update = db.prepare(`UPDATE tasks SET direction_order = ?, updated_at = ? WHERE id = ?`)
+    const now = nowIso()
+    db.transaction(() => { ordered_ids.forEach((id, idx) => update.run(idx, now, id)) })()
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /api/tasks/recalculate-urgency — bulk-update is_urgent from deadline
 app.post('/api/tasks/recalculate-urgency', (_req, res) => {
   try {
@@ -268,7 +282,8 @@ app.patch('/api/tasks/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
     const allowed = ['title', 'direction_id', 'priority', 'status', 'slot', 'slot_order',
-                     'deadline', 'duration_plan', 'duration_fact', 'notes', 'is_important', 'is_urgent']
+                     'deadline', 'duration_plan', 'duration_fact', 'notes', 'is_important', 'is_urgent',
+                     'direction_order']
     const fields = []
     const vals = []
 
