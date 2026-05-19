@@ -122,6 +122,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
         someday: someday as any,
+        ...(someday ? { in_queue: false as any } : {}),
       }
       if (task) {
         await api.updateTask(task.id, data)

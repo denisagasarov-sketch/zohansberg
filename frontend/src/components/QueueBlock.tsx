@@ -16,7 +16,7 @@ interface Props {
 
 export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
-  const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.done_at && !t.deleted_at && t.slot !== 'now')
+  const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.someday && !t.done_at && !t.deleted_at && t.slot !== 'now')
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
