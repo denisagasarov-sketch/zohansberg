@@ -3,19 +3,17 @@ import type { Task, Screen } from './types'
 import { api } from './api'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
-import { useRecommendation } from './hooks/useRecommendation'
 import Header from './components/Header'
 import NowBlock from './components/NowBlock'
-import NextBlock from './components/NextBlock'
-import RecBar from './components/RecBar'
+import QueueBlock from './components/QueueBlock'
 import DirectionsPanel from './components/DirectionsPanel'
-import MatrixScreen from './components/MatrixScreen'
 import TaskEditor from './components/TaskEditor'
 import AfterDoneModal from './components/modals/AfterDoneModal'
 import TimerSwitchModal from './components/modals/TimerSwitchModal'
 import CheckinModal from './components/modals/CheckinModal'
 import FocusSwitchModal from './components/modals/FocusSwitchModal'
 import EveningSummaryModal from './components/modals/EveningSummaryModal'
+import SessionNoteModal from './components/modals/SessionNoteModal'
 import SettingsScreen from './components/SettingsScreen'
 import ArchiveScreen from './components/ArchiveScreen'
 import TrashScreen from './components/TrashScreen'
@@ -32,32 +30,22 @@ export default function App() {
   const [pendingFocusTask, setPendingFocusTask] = useState<Task | null>(null)
   const [showFocusSwitch, setShowFocusSwitch] = useState(false)
   const [showEveningSummary, setShowEveningSummary] = useState(false)
+  const [postStopSessionId, setPostStopSessionId] = useState<number | null>(null)
   const [todayTime, setTodayTime] = useState(0)
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
-  const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks } = useTasks()
-  const { recommendation, getNext, setAsNext } = useRecommendation()
+  const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks, undo } = useTasks()
 
   const nowTask = tasks.find(t => t.slot === 'now' && !t.done_at && !t.deleted_at) ?? null
-  const nextTasks = tasks.filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at)
+  const queueTasks = tasks.filter(t => t.slot === 'queue' && !t.done_at && !t.deleted_at)
 
-  const { timerState, start, stop } = useTimer()
+  const { timerState, start, pause, resume, stop } = useTimer()
 
   // Load today time for now task
   useEffect(() => {
     if (!nowTask) { setTodayTime(0); return }
     api.getTodayTime(nowTask.id).then(r => setTodayTime(r.total)).catch(() => setTodayTime(0))
   }, [nowTask?.id])
-
-  // Recalculate urgency from deadlines on mount, then refresh
-  useEffect(() => {
-    api.recalculateUrgency().then(() => refresh()).catch(() => {})
-  }, [])
-
-  // Load recommendation on mount
-  useEffect(() => {
-    getNext()
-  }, [getNext])
 
   // Show checkin modal if no checkin recorded today
   useEffect(() => {
@@ -81,44 +69,61 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  // Space shortcut for timer
+  // Space shortcut for timer; Cmd+Z/Ctrl+Z for undo
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === ' ' && e.target === document.body) {
         e.preventDefault()
         if (!nowTask) return
-        if (timerState.isRunning) stop()
+        if (timerState.isRunning) pause()
+        else if (timerState.isPaused) resume()
         else start(nowTask.id)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+          e.preventDefault()
+          undo()
+        }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [timerState.isRunning, nowTask, stop, start])
+  }, [timerState.isRunning, timerState.isPaused, nowTask, stop, start, pause, resume, undo])
 
   const handleTaskClick = useCallback((task: Task) => {
-    if (timerState.isRunning && nowTask && task.id !== nowTask.id) {
+    if ((timerState.isRunning || timerState.isPaused) && nowTask && task.id !== nowTask.id) {
       setPendingFocusTask(task)
       setShowFocusSwitch(true)
       return
     }
     setSelectedTask(task)
-  }, [timerState.isRunning, nowTask])
+  }, [timerState.isRunning, timerState.isPaused, nowTask])
 
   const handleStartTimer = useCallback(() => {
     if (!nowTask) return
     start(nowTask.id)
   }, [nowTask, start])
 
-  const handleStopTimer = useCallback(() => {
-    stop()
+  const handlePauseTimer = useCallback(() => { pause() }, [pause])
+  const handleResumeTimer = useCallback(() => { resume() }, [resume])
+
+  const handleStopTimer = useCallback(async () => {
+    const { sessionId } = await stop()
+    if (sessionId !== null) setPostStopSessionId(sessionId)
   }, [stop])
 
   const handleDoneNow = useCallback(async () => {
     if (!nowTask) return
-    if (timerState.isRunning) await stop()
-    await updateTask(nowTask.id, { status: 'done', slot: 'later', done_at: new Date().toISOString() })
+    let stoppedSessionId: number | null = null
+    if (timerState.isRunning || timerState.isPaused) {
+      const { sessionId } = await stop()
+      stoppedSessionId = sessionId
+    }
+    await updateTask(nowTask.id, { slot: 'queue', done_at: new Date().toISOString() })
+    if (stoppedSessionId !== null) setPostStopSessionId(stoppedSessionId)
     setShowAfterDone(true)
-  }, [nowTask, timerState.isRunning, stop, updateTask])
+  }, [nowTask, timerState.isRunning, timerState.isPaused, stop, updateTask])
 
   const handleTakeNow = useCallback(async (taskId: number) => {
     if (timerState.isRunning) {
@@ -155,28 +160,18 @@ export default function App() {
     setSelectedTask(null)
   }, [])
 
-  const handleSetNext = useCallback(async (taskId: number) => {
-    await setAsNext(taskId)
-    await refresh()
-    await getNext()
-  }, [setAsNext, refresh, getNext])
-
-  // DnD handlers — cross-section slot moves
+  // DnD handlers
   const handleDropToNow = useCallback(async (taskId: number) => {
     await handleTakeNow(taskId)
   }, [handleTakeNow])
 
-  const handleDropToNext = useCallback(async (taskId: number) => {
-    await updateTask(taskId, { slot: 'next' })
+  const handleDropToQueue = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { slot: 'queue' })
   }, [updateTask])
 
-  const handleMoveToLater = useCallback(async (taskId: number) => {
-    await updateTask(taskId, { slot: 'later' })
+  const handleMoveToQueue = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { slot: 'queue' })
   }, [updateTask])
-
-  const handleGetNext = useCallback((skipId?: number) => {
-    getNext(skipId)
-  }, [getNext])
 
   const handleFocusSwitchConfirm = useCallback(() => {
     setShowFocusSwitch(false)
@@ -205,7 +200,7 @@ export default function App() {
           const t = tasks.find(x => x.id === id)
           if (t) setSelectedTask(t)
         }}
-        isTimerActive={timerState.isRunning}
+        isTimerActive={timerState.isRunning || timerState.isPaused}
       />
 
       <div className="flex-1 overflow-hidden">
@@ -219,41 +214,36 @@ export default function App() {
                 timer={timerState}
                 todayTime={todayTime}
                 onStart={handleStartTimer}
+                onPause={handlePauseTimer}
+                onResume={handleResumeTimer}
                 onStop={handleStopTimer}
                 onDone={handleDoneNow}
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
                 onDropTask={handleDropToNow}
               />
-              <NextBlock
+              <QueueBlock
                 tasks={tasks}
                 directions={directions}
                 onTaskClick={handleTaskClick}
-                recommendation={recommendation}
                 onReorder={reorderTasks}
-                onDropFromOutside={handleDropToNext}
-                focusMode={timerState.isRunning}
+                onDropFromOutside={handleDropToQueue}
+                focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
               <div className="flex-1" />
-              <RecBar
-                recommendation={recommendation}
-                onGetNext={handleGetNext}
-                onSetNext={handleSetNext}
-                onTaskClick={handleTaskClick}
-              />
             </div>
 
             {/* Right column */}
-            <div className={`w-[42%] p-4 overflow-hidden transition-all ${timerState.isRunning ? 'opacity-30 blur-[3px] pointer-events-none' : ''}`}>
+            <div className={`w-[42%] p-4 overflow-hidden transition-all ${(timerState.isRunning || timerState.isPaused) ? 'opacity-30 blur-[3px] pointer-events-none' : ''}`}>
               <DirectionsPanel
                 tasks={tasks}
                 directions={directions}
                 onTaskClick={handleTaskClick}
                 onReorder={reorderTasks}
                 onReorderInDirection={handleReorderInDirection}
-                onMoveToLater={handleMoveToLater}
-                focusMode={timerState.isRunning}
+                onMoveToQueue={handleMoveToQueue}
+                focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
             </div>
@@ -290,10 +280,6 @@ export default function App() {
         {screen === 'journal' && (
           <JournalScreen onClose={() => setScreen('main')} />
         )}
-
-        {screen === 'matrix' && (
-          <MatrixScreen tasks={tasks} onClose={() => setScreen('main')} onTaskClick={handleTaskClick} />
-        )}
       </div>
 
       {/* Task Editor */}
@@ -313,7 +299,7 @@ export default function App() {
       {/* Modals */}
       {showAfterDone && (
         <AfterDoneModal
-          nextTasks={nextTasks}
+          queueTasks={queueTasks}
           onStartNext={handleAfterDoneStartNext}
           onChoose={() => { setShowAfterDone(false); setSelectedTask(null) }}
           onLeaveEmpty={() => setShowAfterDone(false)}
@@ -344,10 +330,17 @@ export default function App() {
 
       {showEveningSummary && (
         <EveningSummaryModal
-          incompleteTasks={tasks.filter(t => !t.done_at && !t.deleted_at && t.slot !== 'someday')}
+          incompleteTasks={tasks.filter(t => !t.done_at && !t.deleted_at)}
           onClose={() => setShowEveningSummary(false)}
           onLater={() => setShowEveningSummary(false)}
           onMoveToTomorrow={handleMoveToTomorrow}
+        />
+      )}
+
+      {postStopSessionId !== null && (
+        <SessionNoteModal
+          sessionId={postStopSessionId}
+          onClose={() => setPostStopSessionId(null)}
         />
       )}
     </div>

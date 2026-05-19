@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Direction } from '../types'
 import { api } from '../api'
-import { TIMER_SOUNDS, getTimerSoundId, previewTimerSound } from '../sound'
+import { TIMER_SOUNDS, getTimer5mSoundId, getTimer45mSoundId, previewTimerSound } from '../sound'
 
 interface Props {
   directions: Direction[]
@@ -11,7 +11,8 @@ interface Props {
 }
 
 export default function SettingsScreen({ directions, onClose, onDirectionChange, onNavigate }: Props) {
-  const [timerSoundId, setTimerSoundId] = useState(getTimerSoundId())
+  const [timer5mSoundId, setTimer5mSoundId] = useState(getTimer5mSoundId())
+  const [timer45mSoundId, setTimer45mSoundId] = useState(getTimer45mSoundId())
   const [soundsEnabled, setSoundsEnabled] = useState(true)
   const [volume, setVolume] = useState(0.5)
   const [apiKey, setApiKey] = useState('')
@@ -43,9 +44,14 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
     localStorage.setItem(key, value)
   }
 
-  const handleSelectTimerSound = (id: number) => {
-    setTimerSoundId(id)
-    localStorage.setItem('timer_sound_id', String(id))
+  const handleSelect5mSound = (id: number) => {
+    setTimer5mSoundId(id)
+    localStorage.setItem('timer_sound_5m', String(id))
+  }
+
+  const handleSelect45mSound = (id: number) => {
+    setTimer45mSoundId(id)
+    localStorage.setItem('timer_sound_45m', String(id))
   }
 
   const handleAddDir = async () => {
@@ -154,35 +160,61 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
           <button onClick={() => onNavigate('trash')} className="mt-2 text-xs text-[#666] hover:text-[#f0f0f0] transition-colors">Корзина →</button>
         </section>
 
-        {/* Timer sound */}
+        {/* 5-minute sound */}
         <section>
-          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">Звук таймера</h2>
-          <p className="text-xs text-[#555] mb-3">Играет каждые 5 минут, пока таймер активен</p>
-          <div className="space-y-0.5 max-h-80 overflow-y-auto pr-1 rounded border border-[#252525]">
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">Звук каждые 5 минут</h2>
+          <p className="text-xs text-[#555] mb-3">Короткий сигнал, пока таймер активен</p>
+          <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1 rounded border border-[#252525]">
             {TIMER_SOUNDS.map(sound => (
               <div
                 key={sound.id}
-                onClick={() => handleSelectTimerSound(sound.id)}
+                onClick={() => handleSelect5mSound(sound.id)}
                 className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
-                  timerSoundId === sound.id
+                  timer5mSoundId === sound.id
                     ? 'bg-[#5060a0]/20 text-[#f0f0f0]'
                     : 'hover:bg-[#252525]/60 text-[#999]'
                 }`}
               >
-                <span className={`text-[10px] w-5 shrink-0 font-mono ${timerSoundId === sound.id ? 'text-[#5060a0]' : 'text-[#383838]'}`}>
+                <span className={`text-[10px] w-5 shrink-0 font-mono ${timer5mSoundId === sound.id ? 'text-[#5060a0]' : 'text-[#383838]'}`}>
                   {String(sound.id).padStart(2, '0')}
                 </span>
                 <span className="flex-1 text-sm">{sound.name}</span>
-                {timerSoundId === sound.id && (
-                  <span className="text-[#5060a0] text-[10px] shrink-0">✓</span>
-                )}
+                {timer5mSoundId === sound.id && <span className="text-[#5060a0] text-[10px] shrink-0">✓</span>}
                 <button
                   onClick={e => { e.stopPropagation(); previewTimerSound(sound.id) }}
                   className="text-[#383838] hover:text-[#8090c8] text-xs shrink-0 px-1 transition-colors"
                   title="Прослушать"
-                >
-                  ▶
-                </button>
+                >▶</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 45-minute sound */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">Звук каждые 45 минут</h2>
+          <p className="text-xs text-[#555] mb-3">Длинный сигнал ≥ 2.5с — напоминание о большом перерыве</p>
+          <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1 rounded border border-[#252525]">
+            {TIMER_SOUNDS.map(sound => (
+              <div
+                key={sound.id}
+                onClick={() => handleSelect45mSound(sound.id)}
+                className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                  timer45mSoundId === sound.id
+                    ? 'bg-[#5060a0]/20 text-[#f0f0f0]'
+                    : 'hover:bg-[#252525]/60 text-[#999]'
+                }`}
+              >
+                <span className={`text-[10px] w-5 shrink-0 font-mono ${timer45mSoundId === sound.id ? 'text-[#5060a0]' : 'text-[#383838]'}`}>
+                  {String(sound.id).padStart(2, '0')}
+                </span>
+                <span className="flex-1 text-sm">{sound.name}</span>
+                {timer45mSoundId === sound.id && <span className="text-[#5060a0] text-[10px] shrink-0">✓</span>}
+                <button
+                  onClick={e => { e.stopPropagation(); previewTimerSound(sound.id, true) }}
+                  className="text-[#383838] hover:text-[#8090c8] text-xs shrink-0 px-1 transition-colors"
+                  title="Прослушать (длинная версия)"
+                >▶</button>
               </div>
             ))}
           </div>

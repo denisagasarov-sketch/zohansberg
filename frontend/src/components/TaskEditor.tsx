@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Task, Direction } from '../types'
 import { api } from '../api'
 import { playSound } from '../sound'
-import { getQuadrant, computeUrgency, computeMatrixSlot } from '../utils/quadrant'
 
 interface Props {
   task: Task | null
@@ -11,6 +10,14 @@ interface Props {
   onSaved: () => void
   onDeleted: () => void
   onTakenNow: () => void
+}
+
+interface WorkSession {
+  id: number
+  started_at: string
+  ended_at: string | null
+  duration_actual: number | null
+  note: string | null
 }
 
 function Btn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -28,11 +35,21 @@ function Btn({ active, onClick, children }: { active: boolean; onClick: () => vo
   )
 }
 
+function formatDur(s: number | null): string {
+  if (!s) return '—'
+  const m = Math.floor(s / 60)
+  const h = Math.floor(m / 60)
+  if (h > 0) return `${h}ч ${m % 60}м`
+  return `${m}м`
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
 export default function TaskEditor({ task, directions, onClose, onSaved, onDeleted, onTakenNow }: Props) {
   const [title, setTitle] = useState(task?.title ?? '')
   const [directionId, setDirectionId] = useState<number | null>(task?.direction_id ?? null)
-  const [isImportant, setIsImportant] = useState(task?.is_important ?? 0)
-  const [isSomeday, setIsSomeday] = useState(task?.slot === 'someday')
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
@@ -41,21 +58,21 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [aiError, setAiError] = useState('')
+  const [tab, setTab] = useState<'notes' | 'log'>('notes')
+  const [sessions, setSessions] = useState<WorkSession[]>([])
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
-
-  const computedUrgency = computeUrgency(deadline)
+  const notesRef = useRef<HTMLTextAreaElement>(null)
 
   const isDirty = useCallback(() => {
     return (
       title !== (task?.title ?? '') ||
       directionId !== (task?.direction_id ?? null) ||
-      isImportant !== (task?.is_important ?? 0) ||
-      isSomeday !== (task?.slot === 'someday') ||
       deadline !== (task?.deadline?.slice(0, 10) ?? '') ||
       durationPlan !== (task?.duration_plan?.toString() ?? '') ||
       notes !== (task?.notes ?? '')
     )
-  }, [title, directionId, isImportant, isSomeday, deadline, durationPlan, notes, task])
+  }, [title, directionId, deadline, durationPlan, notes, task])
 
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 50)
@@ -75,18 +92,30 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     return () => window.removeEventListener('keydown', handler)
   }, [isDirty, onClose])
 
+  useEffect(() => {
+    if (tab === 'log' && task && !sessionsLoaded) {
+      api.getTaskSessions(task.id).then(s => {
+        setSessions(s)
+        setSessionsLoaded(true)
+      }).catch(() => setSessionsLoaded(true))
+    }
+  }, [tab, task, sessionsLoaded])
+
+  // Auto-grow notes textarea
+  useEffect(() => {
+    const el = notesRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(80, el.scrollHeight)}px`
+  }, [notes])
+
   const handleSave = async () => {
     if (!title.trim()) return
     setSaving(true)
     try {
-      const urgent = computeUrgency(deadline)
-      const slot = task?.slot === 'now' ? 'now' : (isSomeday ? 'someday' : computeMatrixSlot(isImportant, urgent))
       const data: Partial<Task> = {
         title: title.trim(),
         direction_id: directionId,
-        is_important: isImportant,
-        is_urgent: urgent,
-        slot,
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
@@ -162,8 +191,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     }
   }
 
-  const q = getQuadrant(isImportant, computedUrgency)
-
   return (
     <div className="fixed inset-0 z-40 flex justify-end" onClick={handleOverlayClick}>
       <div className="absolute inset-0 bg-black/40" />
@@ -197,7 +224,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             >
               {aiLoading ? '…' : '✨'}
             </button>
-            {/* AI suggestions */}
             {aiSuggestions.length > 0 && (
               <div className="mt-2 space-y-1">
                 {aiSuggestions.map((s, i) => (
@@ -227,40 +253,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               ))}
             </div>
           </div>
-
-          {/* Eisenhower — only Важно; Срочно is auto-computed */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-2">Приоритет</label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!isImportant} onChange={e => setIsImportant(e.target.checked ? 1 : 0)}
-                  className="accent-[#5060a0] w-4 h-4" />
-                <span className="text-sm text-[#f0f0f0]">Важно</span>
-              </label>
-              <span className="text-xs text-[#666]">
-                Срочно: <span className={computedUrgency ? 'text-[#b05050]' : 'text-[#505050]'}>
-                  {computedUrgency ? 'да (из дедлайна)' : 'нет'}
-                </span>
-              </span>
-            </div>
-            <span className="text-xs px-2 py-0.5 rounded" style={{ color: q.color, backgroundColor: q.border + '40' }}>{q.label}</span>
-          </div>
-
-          {/* Someday toggle (replaces slot selector) */}
-          {task?.slot !== 'now' && (
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer w-fit">
-                <input type="checkbox" checked={isSomeday} onChange={e => setIsSomeday(e.target.checked)}
-                  className="accent-[#5060a0] w-4 h-4" />
-                <span className="text-sm text-[#999]">Когда-нибудь</span>
-              </label>
-              {!isSomeday && (
-                <p className="text-[10px] text-[#505050] mt-1">
-                  Слот определяется автоматически из важности и дедлайна
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Deadline */}
           <div>
@@ -292,17 +284,57 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             />
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Заметки</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Детали, ссылки, мысли…"
-              rows={4}
-              className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838]"
-            />
-          </div>
+          {/* Tabs: Notes / Log */}
+          {task && (
+            <div className="flex gap-1 border-b border-[#252525] pb-0 mb-0 -mx-4 px-4">
+              <button
+                onClick={() => setTab('notes')}
+                className={`text-xs pb-2 border-b-2 transition-colors ${tab === 'notes' ? 'border-[#5060a0] text-[#f0f0f0]' : 'border-transparent text-[#666] hover:text-[#999]'}`}
+              >
+                Заметки
+              </button>
+              <button
+                onClick={() => setTab('log')}
+                className={`text-xs pb-2 border-b-2 transition-colors ml-3 ${tab === 'log' ? 'border-[#5060a0] text-[#f0f0f0]' : 'border-transparent text-[#666] hover:text-[#999]'}`}
+              >
+                Лог сессий
+              </button>
+            </div>
+          )}
+
+          {(!task || tab === 'notes') && (
+            <div>
+              {!task && <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Заметки</label>}
+              <textarea
+                ref={notesRef}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Детали, ссылки, мысли…"
+                style={{ minHeight: '80px', height: 'auto' }}
+                className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838] overflow-hidden"
+              />
+            </div>
+          )}
+
+          {task && tab === 'log' && (
+            <div className="space-y-2">
+              {!sessionsLoaded ? (
+                <p className="text-xs text-[#666]">Загружаю…</p>
+              ) : sessions.length === 0 ? (
+                <p className="text-xs text-[#383838]">Сессий пока нет</p>
+              ) : (
+                sessions.map(s => (
+                  <div key={s.id} className="bg-[#141414] border border-[#252525] rounded px-3 py-2">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-[#666]">{formatDate(s.started_at)}</span>
+                      <span className="text-[10px] text-[#5060a0]">{formatDur(s.duration_actual)}</span>
+                    </div>
+                    {s.note && <p className="text-xs text-[#999] mt-1">{s.note}</p>}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

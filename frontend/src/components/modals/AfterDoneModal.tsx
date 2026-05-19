@@ -1,13 +1,13 @@
 import type { Task } from '../../types'
 
 interface Props {
-  nextTasks: Task[]
+  queueTasks: Task[]
   onStartNext: (taskId: number) => void
   onChoose: () => void
   onLeaveEmpty: () => void
 }
 
-export default function AfterDoneModal({ nextTasks, onStartNext, onChoose, onLeaveEmpty }: Props) {
+export default function AfterDoneModal({ queueTasks, onStartNext, onChoose, onLeaveEmpty }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onLeaveEmpty} />
@@ -16,13 +16,13 @@ export default function AfterDoneModal({ nextTasks, onStartNext, onChoose, onLea
         <p className="text-[#666] text-sm mb-5">Что дальше?</p>
 
         <div className="flex flex-col gap-2">
-          {nextTasks.length > 0 && (
+          {queueTasks.length > 0 && (
             <button
-              onClick={() => onStartNext(nextTasks[0].id)}
+              onClick={() => onStartNext(queueTasks[0].id)}
               className="px-4 py-2.5 bg-[#5060a0] hover:bg-[#8090c8] rounded-lg text-sm text-white transition-colors text-left"
             >
-              <div className="text-xs text-[#8090c8]/70 mb-0.5">Начать первую из «Следом»</div>
-              <div className="font-medium truncate">{nextTasks[0].title}</div>
+              <div className="text-xs text-[#8090c8]/70 mb-0.5">Начать первую из очереди</div>
+              <div className="font-medium truncate">{queueTasks[0].title}</div>
             </button>
           )}
           <button

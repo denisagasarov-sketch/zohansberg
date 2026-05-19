@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
-import { getQuadrant } from '../utils/quadrant'
 import { getDirectionColor } from '../utils/directionColors'
 
 interface Props {
@@ -10,7 +9,7 @@ interface Props {
   onTaskClick: (task: Task) => void
   onReorder: (slot: string, orderedIds: number[]) => void
   onReorderInDirection: (directionId: number | null, orderedIds: number[]) => void
-  onMoveToLater: (taskId: number) => void
+  onMoveToQueue: (taskId: number) => void
   focusMode?: boolean
   nowTaskId?: number
 }
@@ -35,7 +34,6 @@ interface TaskRowProps {
 }
 
 function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggingId, focusMode, nowTaskId }: TaskRowProps) {
-  const q = getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0)
   const dimmed = focusMode && task.id !== nowTaskId
   return (
     <div
@@ -44,14 +42,13 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggi
       onDragOver={e => onDragOver(e, task.id)}
       onDrop={e => onDrop(e, task.id)}
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${draggingId === task.id ? 'opacity-40' : ''} ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
-      style={{ borderLeftColor: q.border }}
+      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
     >
       <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
       <span className="text-[#505050] text-[10px] font-mono w-3 shrink-0 select-none">{index}</span>
       <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
       {task.deadline && (
-        <span className="text-[10px] shrink-0" style={{ color: q.color }}>
+        <span className="text-[10px] text-[#666] shrink-0">
           {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
         </span>
       )}
@@ -59,19 +56,35 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggi
         <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
       )}
       {task.slot === 'now' && <span className="text-[10px] text-[#5060a0] shrink-0">▶</span>}
-      {task.slot === 'next' && <span className="text-[10px] text-[#666] shrink-0">→</span>}
     </div>
   )
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToLater, focusMode, nowTaskId }: Props) {
+function loadCollapsed(): Set<number | 'none'> {
+  try { return new Set(JSON.parse(localStorage.getItem('collapsed_dirs') ?? '[]')) }
+  catch { return new Set() }
+}
+
+function saveCollapsed(s: Set<number | 'none'>) {
+  localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
+}
+
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
-  const [somedayExpanded, setSomedayExpanded] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<number | 'none'>>(loadCollapsed)
 
-  const activeTasks = (tasks ?? []).filter(t =>
-    !t.done_at && !t.deleted_at && t.slot !== 'someday'
-  )
+  const toggleCollapse = useCallback((key: number | 'none') => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      saveCollapsed(next)
+      return next
+    })
+  }, [])
+
+  const activeTasks = (tasks ?? []).filter(t => !t.done_at && !t.deleted_at)
 
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
     draggingIdRef.current = taskId
@@ -110,15 +123,11 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
       return
     }
 
-    // Cross-slot drop (different directions or slots) → move to later
-    if (sourceTask.slot === 'now' || sourceTask.slot === 'next') {
-      onMoveToLater(sourceId)
+    // Cross-direction drop: move 'now' task to queue
+    if (sourceTask.slot === 'now') {
+      onMoveToQueue(sourceId)
     }
   }
-
-  const somedayTasks = (tasks ?? []).filter(t => t.slot === 'someday' && !t.done_at && !t.deleted_at)
-  const somedayVisible = somedayExpanded ? somedayTasks : somedayTasks.slice(0, 3)
-  const somedayRest = somedayTasks.length - somedayVisible.length
 
   const sortedDirs = [...(directions ?? [])].sort((a, b) => a.order_index - b.order_index)
 
@@ -130,21 +139,68 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
         {sortedDirs.map(dir => {
           const color = getDirectionColor(dir.id)
           const dirTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === dir.id))
+          const isCollapsed = collapsed.has(dir.id)
           return (
             <div key={dir.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
-              {/* Colored header */}
               <div
-                className="flex items-center justify-between px-3 py-2 border-b border-[#252525]"
+                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                 style={{ backgroundColor: color + '1a' }}
+                onClick={() => toggleCollapse(dir.id)}
               >
                 <span className="text-xs font-semibold" style={{ color }}>{dir.name}</span>
-                <span className="text-[10px]" style={{ color: color + '80' }}>{dirTasks.length}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px]" style={{ color: color + '80' }}>{dirTasks.length}</span>
+                  <span className="text-[10px]" style={{ color: color + '80' }}>{isCollapsed ? '▶' : '▼'}</span>
+                </div>
               </div>
-              {dirTasks.length === 0 ? (
-                <div className="px-3 py-2 text-[10px] text-[#383838]">Нет активных задач</div>
-              ) : (
+              {!isCollapsed && (
+                <>
+                  {dirTasks.length === 0 ? (
+                    <div className="px-3 py-2 text-[10px] text-[#383838]">Нет активных задач</div>
+                  ) : (
+                    <div className="divide-y divide-[#252525]/50">
+                      {dirTasks.map((task, idx) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          index={idx + 1}
+                          onClick={() => onTaskClick(task)}
+                          onDragStart={handleDragStart}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          draggingId={draggingId}
+                          focusMode={focusMode}
+                          nowTaskId={nowTaskId}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Tasks without direction */}
+        {(() => {
+          const noDirTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === null))
+          if (noDirTasks.length === 0) return null
+          const isCollapsed = collapsed.has('none')
+          return (
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
+              <div
+                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                onClick={() => toggleCollapse('none')}
+              >
+                <span className="text-xs font-medium text-[#666]">Без направления</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[#383838]">{noDirTasks.length}</span>
+                  <span className="text-[10px] text-[#383838]">{isCollapsed ? '▶' : '▼'}</span>
+                </div>
+              </div>
+              {!isCollapsed && (
                 <div className="divide-y divide-[#252525]/50">
-                  {dirTasks.map((task, idx) => (
+                  {noDirTasks.map((task, idx) => (
                     <TaskRow
                       key={task.id}
                       task={task}
@@ -162,78 +218,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
               )}
             </div>
           )
-        })}
-
-        {/* Tasks without direction */}
-        {(() => {
-          const noDirTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === null))
-          if (noDirTasks.length === 0) return null
-          return (
-            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-[#252525]">
-                <span className="text-xs font-medium text-[#666]">Без направления</span>
-                <span className="text-[10px] text-[#383838]">{noDirTasks.length}</span>
-              </div>
-              <div className="divide-y divide-[#252525]/50">
-                {noDirTasks.map((task, idx) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    index={idx + 1}
-                    onClick={() => onTaskClick(task)}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    draggingId={draggingId}
-                    focusMode={focusMode}
-                    nowTaskId={nowTaskId}
-                  />
-                ))}
-              </div>
-            </div>
-          )
         })()}
-
-        {/* Someday section */}
-        {somedayTasks.length > 0 && (
-          <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
-            <div className="px-3 py-2 border-b border-[#252525]">
-              <span className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase">Когда-нибудь</span>
-            </div>
-            <div className="divide-y divide-[#252525]/50">
-              {somedayVisible.map(task => {
-                const q = getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0)
-                const dimmed = focusMode && task.id !== nowTaskId
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => onTaskClick(task)}
-                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
-                    style={{ borderLeftColor: q.border }}
-                  >
-                    <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {somedayRest > 0 && (
-              <button
-                onClick={() => setSomedayExpanded(true)}
-                className="w-full px-3 py-1.5 text-left text-[10px] text-[#505050] hover:text-[#999] transition-colors"
-              >
-                ещё {somedayRest} ↓
-              </button>
-            )}
-            {somedayExpanded && somedayRest === 0 && (
-              <button
-                onClick={() => setSomedayExpanded(false)}
-                className="w-full px-3 py-1.5 text-left text-[10px] text-[#505050] hover:text-[#999] transition-colors"
-              >
-                свернуть ↑
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )
