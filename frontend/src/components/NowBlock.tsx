@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Task, Direction } from '../types'
 import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
+import { getQuadrant } from '../utils/quadrant'
 
 interface Props {
   task: Task | null
@@ -33,15 +34,9 @@ function formatTodayTime(s: number) {
   return `${m}м сегодня`
 }
 
-function priorityLabel(p: string) {
-  if (p === 'high') return { label: 'Высокий', cls: 'text-[#b07070] bg-[#6a3030]/30' }
-  if (p === 'medium') return { label: 'Средний', cls: 'text-[#a08850] bg-[#4a3a1e]/30' }
-  return { label: 'Низкий', cls: 'text-[#555] bg-[#222]/60' }
-}
-
 export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onDone, onTaskClick, onAddTask, onDropTask, onDragTask }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
-  const pri = task ? priorityLabel(task.priority) : null
+  const q = task ? getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0) : null
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -96,9 +91,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
               {direction && (
                 <span className="text-[#666]">{direction.name}</span>
               )}
-              {pri && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${pri.cls}`}>{pri.label}</span>
-              )}
+              {q && <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ color: q.color, backgroundColor: q.border + '30' }}>{q.label}</span>}
               {task.duration_plan && (
                 <span className="text-[#666]">{task.duration_plan}ч план</span>
               )}

@@ -68,6 +68,8 @@ function initSchema() {
       created_at   TEXT DEFAULT (datetime('now'))
     );
   `)
+  try { db.exec(`ALTER TABLE tasks ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
 }
 
 function cleanupTrash() {

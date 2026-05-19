@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Task, Direction } from '../types'
 import { api } from '../api'
 import { playSound } from '../sound'
+import { getQuadrant } from '../utils/quadrant'
 
 interface Props {
   task: Task | null
@@ -12,7 +13,6 @@ interface Props {
   onTakenNow: () => void
 }
 
-type Priority = 'high' | 'medium' | 'low'
 type Slot = 'next' | 'later' | 'someday'
 
 function Btn({ active, onClick, children, cls = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; cls?: string }) {
@@ -33,7 +33,8 @@ function Btn({ active, onClick, children, cls = '' }: { active: boolean; onClick
 export default function TaskEditor({ task, directions, onClose, onSaved, onDeleted, onTakenNow }: Props) {
   const [title, setTitle] = useState(task?.title ?? '')
   const [directionId, setDirectionId] = useState<number | null>(task?.direction_id ?? null)
-  const [priority, setPriority] = useState<Priority>(task?.priority ?? 'medium')
+  const [isImportant, setIsImportant] = useState(task?.is_important ?? 0)
+  const [isUrgent, setIsUrgent] = useState(task?.is_urgent ?? 0)
   const [slot, setSlot] = useState<Slot>((task?.slot === 'now' ? 'next' : task?.slot) as Slot ?? 'later')
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
@@ -46,13 +47,14 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     return (
       title !== (task?.title ?? '') ||
       directionId !== (task?.direction_id ?? null) ||
-      priority !== (task?.priority ?? 'medium') ||
+      isImportant !== (task?.is_important ?? 0) ||
+      isUrgent !== (task?.is_urgent ?? 0) ||
       slot !== ((task?.slot === 'now' ? 'next' : task?.slot) ?? 'later') ||
       deadline !== (task?.deadline?.slice(0, 10) ?? '') ||
       durationPlan !== (task?.duration_plan?.toString() ?? '') ||
       notes !== (task?.notes ?? '')
     )
-  }, [title, directionId, priority, slot, deadline, durationPlan, notes, task])
+  }, [title, directionId, isImportant, isUrgent, slot, deadline, durationPlan, notes, task])
 
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 50)
@@ -79,7 +81,8 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       const data: Partial<Task> = {
         title: title.trim(),
         direction_id: directionId,
-        priority,
+        is_important: isImportant,
+        is_urgent: isUrgent,
         slot: task?.slot === 'now' ? 'now' : slot,
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
@@ -166,14 +169,25 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             </div>
           </div>
 
-          {/* Priority */}
+          {/* Eisenhower Matrix */}
           <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Приоритет</label>
-            <div className="flex gap-1.5">
-              <Btn active={priority === 'high'} onClick={() => setPriority('high')} cls="text-[#b07070]">Высокий</Btn>
-              <Btn active={priority === 'medium'} onClick={() => setPriority('medium')} cls="text-[#a08850]">Средний</Btn>
-              <Btn active={priority === 'low'} onClick={() => setPriority('low')} cls="text-[#555]">Низкий</Btn>
+            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-2">Матрица Эйзенхауэра</label>
+            <div className="flex gap-3 mb-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!isImportant} onChange={e => setIsImportant(e.target.checked ? 1 : 0)}
+                  className="accent-[#5060a0] w-4 h-4" />
+                <span className="text-sm text-[#f0f0f0]">Важно</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!isUrgent} onChange={e => setIsUrgent(e.target.checked ? 1 : 0)}
+                  className="accent-[#5060a0] w-4 h-4" />
+                <span className="text-sm text-[#f0f0f0]">Срочно</span>
+              </label>
             </div>
+            {(() => {
+              const q = getQuadrant(isImportant, isUrgent)
+              return <span className="text-xs px-2 py-0.5 rounded" style={{ color: q.color, backgroundColor: q.border + '40' }}>{q.label}</span>
+            })()}
           </div>
 
           {/* Slot */}

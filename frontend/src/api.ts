@@ -106,4 +106,6 @@ export const api = {
     req<any>('GET', `/sessions/worklog?period=${period}`),
   getStatsDashboard: (period: string) =>
     req<any>('GET', `/stats/dashboard?period=${period}`),
+  getTodaySummary: () =>
+    req<any>('GET', '/today-summary'),
 }

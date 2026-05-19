@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { Task, Recommendation } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
+import { getQuadrant } from '../utils/quadrant'
 
 interface Props {
   tasks: Task[]
@@ -8,27 +9,12 @@ interface Props {
   recommendation: Recommendation | null
   onReorder: (slot: string, orderedIds: number[]) => void
   onDropFromOutside: (taskId: number) => void
+  focusMode?: boolean
+  nowTaskId?: number
 }
 
-function priorityBorder(p: string) {
-  if (p === 'high') return 'border-l-[#6a3030]'
-  if (p === 'medium') return 'border-l-[#4a3a1e]'
-  return 'border-l-[#252525]'
-}
-
-function priorityText(p: string) {
-  if (p === 'high') return 'text-[#b07070]'
-  if (p === 'medium') return 'text-[#a08850]'
-  return 'text-[#555]'
-}
-
-function priorityLabel(p: string) {
-  if (p === 'high') return 'Высокий'
-  if (p === 'medium') return 'Средний'
-  return 'Низкий'
-}
-
-export default function NextBlock({ tasks, onTaskClick, recommendation, onReorder, onDropFromOutside }: Props) {
+export default function NextBlock({ tasks, onTaskClick, recommendation, onReorder, onDropFromOutside, focusMode, nowTaskId }: Props) {
+  function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
   const nextTasks = (tasks ?? []).filter(t => t.slot === 'next' && !t.done_at && !t.deleted_at).slice(0, 5)
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
@@ -117,26 +103,30 @@ export default function NextBlock({ tasks, onTaskClick, recommendation, onReorde
           )
         ) : (
           <ul className="divide-y divide-[#252525]">
-            {nextTasks.map((task, idx) => (
-              <li
-                key={task.id}
-                draggable
-                onDragStart={e => handleDragStart(e, task.id)}
-                onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
-                onDrop={e => { e.stopPropagation(); handleDrop(e, task.id) }}
-                onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${priorityBorder(task.priority)} ${draggingId === task.id ? 'opacity-40' : ''}`}
-                onClick={() => onTaskClick(task)}
-              >
-                <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
-                <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
-                <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
-                <span className={`text-[10px] ${priorityText(task.priority)} shrink-0`}>{priorityLabel(task.priority)}</span>
-                {task.duration_plan && (
-                  <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
-                )}
-              </li>
-            ))}
+            {nextTasks.map((task, idx) => {
+              const q = getQuadrant(task.is_important ?? 0, task.is_urgent ?? 0)
+              return (
+                <li
+                  key={task.id}
+                  draggable
+                  onDragStart={e => handleDragStart(e, task.id)}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+                  onDrop={e => { e.stopPropagation(); handleDrop(e, task.id) }}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors border-l-[3px] ${draggingId === task.id ? 'opacity-40' : ''} ${focusDimmed(task) ? 'opacity-30 blur-[3px]' : ''}`}
+                  style={{ borderLeftColor: q.border }}
+                  onClick={() => onTaskClick(task)}
+                >
+                  <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
+                  <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
+                  <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+                  <span className="text-[10px] shrink-0" style={{ color: q.color }}>{q.short}</span>
+                  {task.duration_plan && (
+                    <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
