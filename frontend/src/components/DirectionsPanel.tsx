@@ -68,9 +68,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
 
-  // Only show now/next tasks in directions — later tasks are hidden here
   const activeTasks = (tasks ?? []).filter(t =>
-    !t.done_at && !t.deleted_at && (t.slot === 'now' || t.slot === 'next')
+    !t.done_at && !t.deleted_at && t.slot !== 'someday'
   )
 
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
