@@ -117,6 +117,54 @@ function initSchema() {
     db.pragma('foreign_keys = ON')
     console.log('[startup] Migrated slots to v2 (now/queue)')
   }
+
+  // Migrate priority: high/medium/low → I/II/III/none
+  const priorityMigrated = db.prepare(`SELECT value FROM settings WHERE key = 'priority_v2'`).get()
+  if (!priorityMigrated) {
+    db.pragma('foreign_keys = OFF')
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          title           TEXT NOT NULL,
+          direction_id    INTEGER REFERENCES directions(id),
+          priority        TEXT DEFAULT 'none',
+          slot            TEXT CHECK(slot IN ('now','queue')) DEFAULT 'queue',
+          slot_order      INTEGER DEFAULT 0,
+          direction_order INTEGER NOT NULL DEFAULT 0,
+          deadline        TEXT,
+          duration_plan   REAL,
+          duration_fact   REAL DEFAULT 0,
+          notes           TEXT,
+          in_queue        INTEGER NOT NULL DEFAULT 0,
+          someday         INTEGER NOT NULL DEFAULT 0,
+          created_at      TEXT DEFAULT (datetime('now')),
+          updated_at      TEXT DEFAULT (datetime('now')),
+          done_at         TEXT,
+          deleted_at      TEXT
+        )
+      `)
+      db.exec(`
+        INSERT INTO tasks_new
+          (id, title, direction_id, priority, slot, slot_order, direction_order,
+           deadline, duration_plan, duration_fact, notes, in_queue, someday,
+           created_at, updated_at, done_at, deleted_at)
+        SELECT
+          id, title, direction_id,
+          CASE priority WHEN 'high' THEN 'I' WHEN 'medium' THEN 'II' WHEN 'low' THEN 'III' ELSE 'none' END,
+          slot, slot_order, COALESCE(direction_order, 0),
+          deadline, duration_plan, duration_fact, notes,
+          COALESCE(in_queue, 0), COALESCE(someday, 0),
+          created_at, updated_at, done_at, deleted_at
+        FROM tasks
+      `)
+      db.exec(`DROP TABLE tasks`)
+      db.exec(`ALTER TABLE tasks_new RENAME TO tasks`)
+      db.exec(`INSERT INTO settings (key, value) VALUES ('priority_v2', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`)
+    })()
+    db.pragma('foreign_keys = ON')
+    console.log('[startup] Migrated priority to v2 (I/II/III/none)')
+  }
 }
 
 function cleanupTrash() {

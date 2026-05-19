@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
@@ -11,8 +11,55 @@ interface Props {
   onReorderInDirection: (directionId: number | null, orderedIds: number[]) => void
   onMoveToQueue: (taskId: number) => void
   onAddToQueue: (taskId: number) => void
+  onPriorityChange: (taskId: number, priority: string) => void
   focusMode?: boolean
   nowTaskId?: number
+}
+
+type CollapseKey = number | 'none' | 'someday'
+
+const PRIORITY_OPTIONS = [
+  { value: 'I',    label: 'Ⅰ', color: '#F97316' },
+  { value: 'II',   label: 'Ⅱ', color: '#94A3B8' },
+  { value: 'III',  label: 'Ⅲ', color: '#475569' },
+  { value: 'none', label: '–', color: '#555'     },
+] as const
+
+function priorityLabel(p: string) { return PRIORITY_OPTIONS.find(o => o.value === p)?.label ?? '–' }
+function priorityColor(p: string) { return PRIORITY_OPTIONS.find(o => o.value === p)?.color ?? '#555' }
+
+function PriorityPicker({ current, onChange, onClose }: {
+  current: string
+  onChange: (v: string) => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const el = document.getElementById('priority-picker')
+      if (el && !el.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      id="priority-picker"
+      className="absolute z-40 left-0 top-full mt-0.5 bg-[#1c1c1c] border border-[#383838] rounded shadow-xl py-0.5 min-w-[56px]"
+      onMouseDown={e => e.stopPropagation()}
+    >
+      {PRIORITY_OPTIONS.map(o => (
+        <button
+          key={o.value}
+          onClick={() => { onChange(o.value); onClose() }}
+          className={`flex items-center justify-center w-full px-3 py-1 text-xs hover:bg-[#252525] transition-colors ${current === o.value ? 'bg-[#252525]' : ''}`}
+          style={{ color: o.color }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function sortDirectionTasks(tasks: Task[]): Task[] {
@@ -30,13 +77,16 @@ interface TaskRowProps {
   onDragOver: (e: React.DragEvent, taskId: number) => void
   onDrop: (e: React.DragEvent, taskId: number) => void
   onAddToQueue: (taskId: number) => void
+  onPriorityChange: (taskId: number, priority: string) => void
   draggingId: number | null
   focusMode?: boolean
   nowTaskId?: number
 }
 
-function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, draggingId, focusMode, nowTaskId }: TaskRowProps) {
+function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onPriorityChange, draggingId, focusMode, nowTaskId }: TaskRowProps) {
   const dimmed = focusMode && task.id !== nowTaskId
+  const [showPicker, setShowPicker] = useState(false)
+
   return (
     <div
       draggable
@@ -48,6 +98,26 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
     >
       <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
       <span className="text-[#505050] text-[10px] font-mono w-3 shrink-0 select-none">{index}</span>
+
+      {/* Priority symbol */}
+      <div className="relative shrink-0">
+        <button
+          onClick={e => { e.stopPropagation(); setShowPicker(v => !v) }}
+          className="text-[11px] font-mono w-4 text-center leading-none transition-opacity hover:opacity-100"
+          style={{ color: priorityColor(task.priority) }}
+          title="Приоритет"
+        >
+          {priorityLabel(task.priority)}
+        </button>
+        {showPicker && (
+          <PriorityPicker
+            current={task.priority}
+            onChange={v => onPriorityChange(task.id, v)}
+            onClose={() => setShowPicker(false)}
+          />
+        )}
+      </div>
+
       <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
       {task.deadline && (
         <span className="text-[10px] text-[#666] shrink-0">
@@ -67,8 +137,6 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
   )
 }
 
-type CollapseKey = number | 'none' | 'someday'
-
 function loadCollapsed(): Set<CollapseKey> {
   try { return new Set(JSON.parse(localStorage.getItem('collapsed_dirs') ?? '[]')) }
   catch { return new Set() }
@@ -78,7 +146,7 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onPriorityChange, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
@@ -93,7 +161,6 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     })
   }, [])
 
-  // Only show tasks not in queue, not someday (and not done/deleted)
   const activeTasks = (tasks ?? []).filter(t => !t.in_queue && !t.someday && !t.done_at && !t.deleted_at)
   const somedayTasks = (tasks ?? []).filter(t => t.someday && !t.done_at && !t.deleted_at)
 
@@ -121,21 +188,17 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     const targetTask = tasks.find(t => t.id === targetId)
     if (!sourceTask || !targetTask) return
 
-    if (sourceTask.direction_id === targetTask.direction_id) {
-      const dirTasks = sortDirectionTasks(
-        activeTasks.filter(t => t.direction_id === sourceTask.direction_id)
-      )
-      const ids = dirTasks.map(t => t.id).filter(id => id !== sourceId)
-      const targetIdx = ids.indexOf(targetId)
-      if (targetIdx === -1) ids.push(sourceId)
-      else ids.splice(targetIdx, 0, sourceId)
-      onReorderInDirection(sourceTask.direction_id, ids)
-      return
-    }
+    // Only same-direction reordering; ignore queue tasks and cross-direction
+    if (sourceTask.in_queue || sourceTask.direction_id !== targetTask.direction_id) return
 
-    if (sourceTask.slot === 'now') {
-      onMoveToQueue(sourceId)
-    }
+    const dirTasks = sortDirectionTasks(
+      activeTasks.filter(t => t.direction_id === sourceTask.direction_id)
+    )
+    const ids = dirTasks.map(t => t.id).filter(id => id !== sourceId)
+    const targetIdx = ids.indexOf(targetId)
+    if (targetIdx === -1) ids.push(sourceId)
+    else ids.splice(targetIdx, 0, sourceId)
+    onReorderInDirection(sourceTask.direction_id, ids)
   }
 
   const sortedDirs = [...(directions ?? [])].sort((a, b) => a.order_index - b.order_index)
@@ -178,6 +241,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
                           onAddToQueue={onAddToQueue}
+                          onPriorityChange={onPriorityChange}
                           draggingId={draggingId}
                           focusMode={focusMode}
                           nowTaskId={nowTaskId}
@@ -220,6 +284,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       onAddToQueue={onAddToQueue}
+                      onPriorityChange={onPriorityChange}
                       draggingId={draggingId}
                       focusMode={focusMode}
                       nowTaskId={nowTaskId}
@@ -230,6 +295,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
             </div>
           )
         })()}
+
         {/* Someday section */}
         {(() => {
           if (somedayTasks.length === 0) return null

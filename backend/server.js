@@ -239,7 +239,7 @@ app.post('/api/tasks', (req, res) => {
     `).run(
       title.trim(),
       direction_id ?? null,
-      priority ?? 'medium',
+      priority ?? 'none',
       safeSlot,
       deadline ?? null,
       duration_plan ?? null,
