@@ -67,6 +67,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [addMinutes, setAddMinutes] = useState('')
   const [addNote, setAddNote] = useState('')
   const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState('')
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const notesRef = useRef<HTMLTextAreaElement>(null)
 
@@ -169,6 +170,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const handleAddSession = async () => {
     if (!task || !addMinutes || !addDate) return
     setAddSaving(true)
+    setAddError('')
     try {
       const duration_seconds = Math.round(parseFloat(addMinutes) * 60)
       const started_at = `${addDate}T00:00:00.000Z`
@@ -184,8 +186,8 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       setAddMinutes('')
       setAddNote('')
       setAddDate(new Date().toISOString().slice(0, 10))
-    } catch (e) {
-      console.error(e)
+    } catch (e: any) {
+      setAddError(e?.message ?? 'Ошибка')
     } finally {
       setAddSaving(false)
     }
@@ -413,9 +415,10 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                       className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-xs text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] placeholder-[#383838]"
                     />
                   </div>
+                  {addError && <p className="text-[10px] text-red-400">{addError}</p>}
                   <div className="flex gap-2 justify-end pt-1">
                     <button
-                      onClick={() => { setShowAddForm(false); setAddMinutes(''); setAddNote('') }}
+                      onClick={() => { setShowAddForm(false); setAddMinutes(''); setAddNote(''); setAddError('') }}
                       className="px-2.5 py-1 text-xs text-[#666] hover:text-[#f0f0f0] transition-colors"
                     >
                       Отмена
