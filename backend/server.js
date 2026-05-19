@@ -163,7 +163,7 @@ app.post('/api/tasks/take-now', (req, res) => {
     const task = db.prepare(`SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL`).get(Number(task_id))
     if (!task) return res.status(404).json({ error: 'Task not found' })
     evictNowTask(task_id)
-    db.prepare(`UPDATE tasks SET slot = 'now', slot_order = 0, updated_at = ? WHERE id = ?`)
+    db.prepare(`UPDATE tasks SET slot = 'now', slot_order = 0, in_queue = 0, updated_at = ? WHERE id = ?`)
       .run(nowIso(), Number(task_id))
     res.json(db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(Number(task_id)))
   } catch (err) {
@@ -260,7 +260,7 @@ app.patch('/api/tasks/:id', (req, res) => {
 
     const allowed = ['title', 'direction_id', 'priority', 'slot', 'slot_order',
                      'deadline', 'duration_plan', 'duration_fact', 'notes',
-                     'direction_order', 'done_at']
+                     'direction_order', 'done_at', 'in_queue']
     const fields = []
     const vals = []
 

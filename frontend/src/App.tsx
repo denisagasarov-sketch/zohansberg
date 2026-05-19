@@ -173,6 +173,14 @@ export default function App() {
     await updateTask(taskId, { slot: 'queue' })
   }, [updateTask])
 
+  const handleAddToQueue = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { in_queue: true } as any)
+  }, [updateTask])
+
+  const handleRemoveFromQueue = useCallback(async (taskId: number) => {
+    await updateTask(taskId, { in_queue: false } as any)
+  }, [updateTask])
+
   const handleFocusSwitchConfirm = useCallback(() => {
     setShowFocusSwitch(false)
     if (pendingFocusTask) setSelectedTask(pendingFocusTask)
@@ -227,7 +235,8 @@ export default function App() {
                 directions={directions}
                 onTaskClick={handleTaskClick}
                 onReorder={reorderTasks}
-                onDropFromOutside={handleDropToQueue}
+                onDropFromOutside={handleAddToQueue}
+                onRemoveFromQueue={handleRemoveFromQueue}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
@@ -243,6 +252,7 @@ export default function App() {
                 onReorder={reorderTasks}
                 onReorderInDirection={handleReorderInDirection}
                 onMoveToQueue={handleMoveToQueue}
+                onAddToQueue={handleAddToQueue}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
