@@ -92,6 +92,7 @@ SOURCE_FILES = {
     "link_destination":     BASE / "data" / ACCOUNT / "normalized" / "stage5a2f_link_destination.json",
     "stage5c1_reels":       BASE / "data" / ACCOUNT / "normalized" / "stage5c1_reels_index.json",
     "stage5c2_reels":       BASE / "data" / ACCOUNT / "normalized" / "stage5c2_reels_analysis.json",
+    "stage5e1_posts":       BASE / "data" / ACCOUNT / "normalized" / "stage5e1_posts_analysis.json",
 }
 
 _SECRET_PATTERNS = [
@@ -1384,6 +1385,14 @@ V2_REELS_HEADERS = [
     "Закреплён", "Дата", "Длительность", "Хэштеги", "День недели",
 ]
 
+POSTS_HEADERS = [
+    "Конкурент", "Ссылка на пост + заголовок", "Тема поста", "Механика подачи",
+    "Кратко о чем пост", "Хук / первый абзац", "Структура поста", "Продающая вставка",
+    "Какой CTA", "Куда ведет CTA", "Есть лид-магнит", "Какой лид-магнит", "Как получить?",
+    "Просмотры", "Лайки", "Комментарии", "Репосты", "ERR", "Средний ERR",
+    "ERR выше среднего?", "Что могло сработать", "Что можно протестировать у себя",
+]
+
 
 def _fmt_date(raw) -> str:
     """Parse ISO timestamp and return дд.мм.гггг, or '' on failure."""
@@ -1510,6 +1519,41 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
         rows.append(_make_row(V2_REELS_HEADERS, row))
 
     return V2_REELS_HEADERS, rows, warnings
+
+
+def build_posts_rows(sources: dict) -> tuple[list, list, list]:
+    """Build rows for 'Посты' sheet from stage5e1_posts_analysis.json.
+
+    Returns (headers, rows, warnings).
+    If file is missing or empty — returns (POSTS_HEADERS, [], [warning]).
+    Does NOT raise — caller wraps in try/except.
+    """
+    warnings = []
+
+    raw = sources.get("stage5e1_posts")
+    if not raw or not isinstance(raw, dict):
+        warnings.append(
+            "stage5e1_posts_analysis.json not found or empty; 'Посты' sheet skipped"
+        )
+        return POSTS_HEADERS, [], warnings
+
+    input_rows = raw.get("rows") or []
+    if not input_rows:
+        warnings.append("rows list empty in stage5e1_posts_analysis.json; 'Посты' sheet skipped")
+        return POSTS_HEADERS, [], warnings
+
+    # Prefer key order from first row (preserves _build_row order)
+    first = input_rows[0]
+    headers = list(first.keys()) if isinstance(first, dict) else POSTS_HEADERS
+
+    rows = []
+    for r in input_rows:
+        if not isinstance(r, dict):
+            warnings.append("Skipping non-dict row in stage5e1_posts_analysis.json")
+            continue
+        rows.append(_make_row(headers, r))
+
+    return headers, rows, warnings
 
 
 # ---------------------------------------------------------------------------
