@@ -707,10 +707,18 @@ app.post('/api/ai/analyze', async (req, res) => {
 })
 
 // POST /api/ai/suggest-title — 3 AI title suggestions via OpenAI
+const _fs = require('fs')
+const AI_LOG = require('path').join(__dirname, 'ai-suggest.log')
+function aiLog(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`
+  process.stderr.write(line)
+  _fs.appendFileSync(AI_LOG, line)
+}
+
 app.post('/api/ai/suggest-title', async (req, res) => {
   const key = getOpenAiKey()
   if (!key) {
-    console.error('[suggest-title] no OpenAI key configured')
+    aiLog('ERROR: no OpenAI key configured')
     return res.status(400).json({ error: 'OpenAI API key not configured' })
   }
 
@@ -753,8 +761,8 @@ app.post('/api/ai/suggest-title', async (req, res) => {
     messages: [{ role: 'user', content: prompt }],
   }
 
-  console.error(`[suggest-title] key prefix: ${key.slice(0, 10)}…`)
-  console.error(`[suggest-title] request body:`, JSON.stringify(requestBody, null, 2))
+  aiLog(`key prefix: ${key.slice(0, 10)}… | title: "${title.trim()}"`)
+  aiLog(`request body: ${JSON.stringify(requestBody)}`)
 
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -763,12 +771,12 @@ app.post('/api/ai/suggest-title', async (req, res) => {
       body: JSON.stringify(requestBody),
     })
     const rawText = await r.text()
-    console.error(`[suggest-title] OpenAI status: ${r.status}`)
-    console.error(`[suggest-title] OpenAI raw response: ${rawText}`)
+    aiLog(`OpenAI status: ${r.status}`)
+    aiLog(`OpenAI response: ${rawText}`)
 
     if (!r.ok) {
-      const errBody = JSON.parse(rawText).catch?.(() => ({})) ?? (() => { try { return JSON.parse(rawText) } catch { return {} } })()
-      const errMsg = errBody?.error?.message ?? rawText
+      let errMsg = rawText
+      try { errMsg = JSON.parse(rawText)?.error?.message ?? rawText } catch {}
       return res.status(r.status).json({ error: errMsg })
     }
     const data = JSON.parse(rawText)
