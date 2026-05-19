@@ -127,7 +127,14 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, isTime
       <div className="flex-1 text-center text-[#666] text-xs tabular-nums select-none">{datetime}</div>
 
       <nav className="flex items-center gap-1">
-        <button onClick={() => onNavigate('matrix')} title="Матрица" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">⊞</button>
+        <button onClick={() => onNavigate('matrix')} title="Матрица" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] transition-colors text-[#999] hover:text-[#f0f0f0]">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            <rect x="0" y="0" width="6" height="6" rx="1"/>
+            <rect x="8" y="0" width="6" height="6" rx="1"/>
+            <rect x="0" y="8" width="6" height="6" rx="1"/>
+            <rect x="8" y="8" width="6" height="6" rx="1"/>
+          </svg>
+        </button>
         <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📓</button>
         <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📊</button>
         <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📦</button>
