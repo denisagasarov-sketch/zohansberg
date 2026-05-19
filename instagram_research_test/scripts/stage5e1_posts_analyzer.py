@@ -549,7 +549,7 @@ def save_output(
         "rows": rows,
         "meta": {
             "account":       username,
-            "total":         successful + failed,
+            "total":         len(rows),
             "successful":    successful,
             "failed":        failed,
             "avg_err":       avg_err,
@@ -587,8 +587,26 @@ def main():
     if subprocess.run(["ffmpeg", "-version"], capture_output=True).returncode != 0:
         sys.exit("ffmpeg не найден. Установите: brew install ffmpeg")
 
+    # --- Load existing results for incremental analysis ---
+    existing_path = BASE / "data" / args.account / "normalized" / "stage5e1_posts_analysis.json"
+    existing_rows: list = []
+    analyzed_urls: set = set()
+    if existing_path.exists():
+        try:
+            existing = json.loads(existing_path.read_text(encoding="utf-8"))
+            existing_rows = existing.get("rows") or []
+            analyzed_urls = {
+                row["Ссылка на пост + заголовок"].split(" | ")[0]
+                for row in existing_rows
+                if "Ссылка на пост + заголовок" in row
+            }
+        except Exception as e:
+            print(f"[warn] Не удалось прочитать существующий вывод: {e}")
+
     # --- Load data ---
-    posts = load_posts(args.account, args.limit)
+    # Load all posts; --limit applies to NEW (unanalyzed) posts only
+    all_posts = load_posts(args.account, 0)
+    posts     = all_posts[:args.limit] if args.limit else all_posts  # for early-exit modes
 
     prof_path = BASE / "data" / args.account / "normalized" / "profile_summary.json"
     followers = 0
@@ -628,16 +646,43 @@ def main():
         sys.exit(0)
 
     # --- Full run or dry-run ---
-    is_dry     = args.dry_run
-    total      = len(posts)
+    is_dry = args.dry_run
+
+    print(f"=== Stage 5E-1: Posts Analyzer | @{args.account} | {'DRY-RUN' if is_dry else 'FULL RUN'} ===")
+    if existing_rows:
+        print(f"[resume] {len(existing_rows)} постов уже проанализировано\n")
+    else:
+        print()
+
+    # Filter new posts; show [skip] for already-analyzed; apply --limit to new only
+    posts_to_analyze: list = []
+    for p in all_posts:
+        url = p.get("url") or ""
+        if url in analyzed_urls:
+            print(f"  [skip] уже проанализирован: {url}")
+            continue
+        posts_to_analyze.append(p)
+        if args.limit and len(posts_to_analyze) >= args.limit:
+            break
+
+    # Recompute metrics and avg_err for new posts only
+    metrics  = compute_metrics(posts_to_analyze, followers)
+    avg_err  = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+
+    total      = len(posts_to_analyze)
     rows: list = []
     successful = 0
     failed     = 0
 
-    print(f"=== Stage 5E-1: Posts Analyzer | @{args.account} | {'DRY-RUN' if is_dry else 'FULL RUN'} ===\n")
+    if not posts_to_analyze:
+        print("\n[OK] Нет новых постов для анализа.")
+        out_path = save_output(existing_rows, args.account, avg_err, 0, 0)
+        print(f"[OK] Сохранено: {out_path.relative_to(BASE)}")
+        sys.exit(0)
 
+    print()
     used_tactics: list = []
-    for i, (post, m) in enumerate(zip(posts, metrics)):
+    for i, (post, m) in enumerate(zip(posts_to_analyze, metrics)):
         print(f"[{i+1}/{total}] {m['post_type']} | {m['url']}")
 
         # Download media
@@ -677,8 +722,9 @@ def main():
             if tmp_post.exists():
                 shutil.rmtree(tmp_post)
 
-    # Save output JSON
-    out_path = save_output(rows, args.account, avg_err, successful, failed)
+    # Save output JSON — merge existing rows with newly analyzed
+    all_rows = existing_rows + rows
+    out_path = save_output(all_rows, args.account, avg_err, successful, failed)
     print(f"\n[OK] Сохранено: {out_path.relative_to(BASE)}")
 
     # Summary
