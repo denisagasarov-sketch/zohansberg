@@ -112,6 +112,6 @@ export const api = {
   // AI
   recalculateUrgency: () =>
     req<any>('POST', '/tasks/recalculate-urgency'),
-  improveTitle: (data: { title: string; notes?: string; direction_name?: string }) =>
-    req<{ suggestions: string[] }>('POST', '/ai/improve-title', data),
+  suggestTitle: (data: { title: string; direction?: string; deadline?: string; notes?: string; recentTasks?: string[] }) =>
+    req<{ suggestions: string[] }>('POST', '/ai/suggest-title', data),
 }

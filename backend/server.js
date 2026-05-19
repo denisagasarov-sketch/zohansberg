@@ -706,25 +706,33 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 })
 
-// POST /api/ai/improve-title — generate 3 title suggestions via OpenAI
-app.post('/api/ai/improve-title', async (req, res) => {
+// POST /api/ai/suggest-title — 3 AI title suggestions via OpenAI
+app.post('/api/ai/suggest-title', async (req, res) => {
   const key = getOpenAiKey()
-  if (!key) return res.status(400).json({ error: 'OpenAI API key not configured' })
+  if (!key) {
+    console.log('[suggest-title] no OpenAI key configured')
+    return res.status(400).json({ error: 'OpenAI API key not configured' })
+  }
 
-  const { title, notes, direction_name } = req.body
+  const { title, direction, deadline, notes, recentTasks } = req.body
   if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
 
-  const doneTasks = db.prepare(`SELECT title FROM tasks WHERE done_at IS NOT NULL ORDER BY done_at DESC LIMIT 10`).all()
-  const doneContext = doneTasks.map(t => `- ${t.title}`).join('\n') || '(нет)'
+  // Use passed recentTasks if provided, otherwise fetch from DB
+  const recent = Array.isArray(recentTasks) && recentTasks.length > 0
+    ? recentTasks
+    : db.prepare(`SELECT title FROM tasks WHERE done_at IS NOT NULL ORDER BY done_at DESC LIMIT 10`).all().map(t => t.title)
+
+  const recentContext = recent.length ? recent.map(t => `- ${t}`).join('\n') : '(нет)'
 
   const prompt = `Ты помогаешь улучшить формулировку задачи для системы управления задачами.
 
 Текущая задача: "${title.trim()}"
+${direction ? `Направление: ${direction}` : ''}
+${deadline ? `Дедлайн: ${deadline}` : ''}
 ${notes ? `Заметки: ${notes}` : ''}
-${direction_name ? `Направление: ${direction_name}` : ''}
 
 Последние завершённые задачи пользователя:
-${doneContext}
+${recentContext}
 
 Предложи 3 улучшенных варианта названия задачи. Критерии:
 - Чёткий, конкретный результат (не процесс, а итог)
@@ -735,6 +743,7 @@ ${doneContext}
 Ответь строго в формате JSON-массива строк: ["вариант 1", "вариант 2", "вариант 3"]`
 
   try {
+    console.log(`[suggest-title] calling OpenAI for: "${title.trim()}"`)
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -746,14 +755,18 @@ ${doneContext}
     })
     if (!r.ok) {
       const errBody = await r.json().catch(() => ({}))
-      return res.status(r.status).json({ error: errBody?.error?.message ?? 'OpenAI request failed' })
+      const errMsg = errBody?.error?.message ?? 'OpenAI request failed'
+      console.error(`[suggest-title] OpenAI error ${r.status}:`, errMsg)
+      return res.status(r.status).json({ error: errMsg })
     }
     const data = await r.json()
     const text = data.choices?.[0]?.message?.content ?? ''
+    console.log('[suggest-title] raw response:', text)
     const match = text.match(/\[[\s\S]*?\]/)
     const suggestions = match ? JSON.parse(match[0]) : []
     res.json({ suggestions })
   } catch (err) {
+    console.error('[suggest-title] unexpected error:', err)
     res.status(500).json({ error: err.message })
   }
 })
