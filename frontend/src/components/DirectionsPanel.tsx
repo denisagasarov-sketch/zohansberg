@@ -67,6 +67,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggi
 export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToLater, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [somedayExpanded, setSomedayExpanded] = useState(false)
 
   const activeTasks = (tasks ?? []).filter(t =>
     !t.done_at && !t.deleted_at && t.slot !== 'someday'
@@ -116,7 +117,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
   }
 
   const somedayTasks = (tasks ?? []).filter(t => t.slot === 'someday' && !t.done_at && !t.deleted_at)
-  const somedayVisible = somedayTasks.slice(0, 3)
+  const somedayVisible = somedayExpanded ? somedayTasks : somedayTasks.slice(0, 3)
   const somedayRest = somedayTasks.length - somedayVisible.length
 
   const sortedDirs = [...(directions ?? [])].sort((a, b) => a.order_index - b.order_index)
@@ -216,7 +217,20 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
               })}
             </div>
             {somedayRest > 0 && (
-              <div className="px-3 py-1.5 text-[10px] text-[#383838]">ещё {somedayRest}</div>
+              <button
+                onClick={() => setSomedayExpanded(true)}
+                className="w-full px-3 py-1.5 text-left text-[10px] text-[#505050] hover:text-[#999] transition-colors"
+              >
+                ещё {somedayRest} ↓
+              </button>
+            )}
+            {somedayExpanded && somedayRest === 0 && (
+              <button
+                onClick={() => setSomedayExpanded(false)}
+                className="w-full px-3 py-1.5 text-left text-[10px] text-[#505050] hover:text-[#999] transition-colors"
+              >
+                свернуть ↑
+              </button>
             )}
           </div>
         )}
