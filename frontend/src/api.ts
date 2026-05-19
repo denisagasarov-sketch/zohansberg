@@ -68,10 +68,16 @@ export const api = {
     isTauri ? invoke<any>('start_session', { taskId: task_id, startedAt: started_at }) : req<any>('POST', '/sessions', { task_id, started_at }),
   endSession: (id: number, ended_at: string, duration_actual: number) =>
     isTauri ? invoke('end_session', { id, endedAt: ended_at, durationActual: duration_actual }) : req('PATCH', `/sessions/${id}`, { ended_at, duration_actual }),
+  heartbeatSession: (id: number, elapsed_seconds: number) =>
+    req<{ ok: boolean }>('PATCH', `/sessions/${id}/heartbeat`, { elapsed_seconds }),
+  getActiveSession: () =>
+    req<{ id: number; task_id: number; elapsed_seconds: number } | null>('GET', '/sessions/active'),
   updateSessionNote: (id: number, note: string) =>
     req('PATCH', `/sessions/${id}`, { note }),
   getTaskSessions: (task_id: number) =>
     req<any[]>('GET', `/sessions/task/${task_id}`),
+  createManualSession: (task_id: number, data: { started_at: string; ended_at: string; duration_seconds: number; note?: string }) =>
+    req<any>('POST', `/tasks/${task_id}/sessions`, data),
   getTodayTime: (task_id: number) =>
     isTauri
       ? invoke<number>('get_today_time', { taskId: task_id }).then(total => ({ total }))

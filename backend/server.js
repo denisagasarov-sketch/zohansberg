@@ -342,6 +342,32 @@ app.post('/api/sessions', (req, res) => {
   }
 })
 
+// GET /api/sessions/active — returns the most recent open session (no ended_at), or null
+app.get('/api/sessions/active', (_req, res) => {
+  try {
+    const session = db.prepare(`
+      SELECT * FROM work_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1
+    `).get()
+    res.json(session ?? null)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PATCH /api/sessions/:id/heartbeat — auto-save elapsed time while timer is running
+app.patch('/api/sessions/:id/heartbeat', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const session = db.prepare(`SELECT id FROM work_sessions WHERE id = ? AND ended_at IS NULL`).get(id)
+    if (!session) return res.status(404).json({ error: 'Active session not found' })
+    db.prepare(`UPDATE work_sessions SET elapsed_seconds = ? WHERE id = ?`)
+      .run(Number(req.body.elapsed_seconds) || 0, id)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // PATCH /api/sessions/:id — end session
 app.patch('/api/sessions/:id', (req, res) => {
   try {
@@ -382,6 +408,32 @@ app.get('/api/sessions/today/:task_id', (req, res) => {
       WHERE task_id = ? AND date(started_at) = date('now')
     `).get(task_id)
     res.json({ total: row.total })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/tasks/:id/sessions — manually add a session
+app.post('/api/tasks/:id/sessions', (req, res) => {
+  try {
+    const task_id = Number(req.params.id)
+    const task = db.prepare(`SELECT id FROM tasks WHERE id = ? AND deleted_at IS NULL`).get(task_id)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    const { started_at, ended_at, duration_seconds, note } = req.body
+    if (!started_at || !ended_at || !duration_seconds) {
+      return res.status(400).json({ error: 'started_at, ended_at, duration_seconds are required' })
+    }
+
+    const dur = Number(duration_seconds)
+    const result = db.prepare(
+      `INSERT INTO work_sessions (task_id, started_at, ended_at, duration_actual, note) VALUES (?, ?, ?, ?, ?)`
+    ).run(task_id, started_at, ended_at, dur, note ?? null)
+
+    db.prepare(`UPDATE tasks SET duration_fact = COALESCE(duration_fact, 0) + ?, updated_at = ? WHERE id = ?`)
+      .run(dur, nowIso(), task_id)
+
+    res.status(201).json(db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(result.lastInsertRowid))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

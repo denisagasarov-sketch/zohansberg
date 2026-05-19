@@ -62,6 +62,11 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [tab, setTab] = useState<'notes' | 'log'>('notes')
   const [sessions, setSessions] = useState<WorkSession[]>([])
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [addMinutes, setAddMinutes] = useState('')
+  const [addNote, setAddNote] = useState('')
+  const [addSaving, setAddSaving] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const notesRef = useRef<HTMLTextAreaElement>(null)
 
@@ -158,6 +163,31 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       onTakenNow()
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  const handleAddSession = async () => {
+    if (!task || !addMinutes || !addDate) return
+    setAddSaving(true)
+    try {
+      const duration_seconds = Math.round(parseFloat(addMinutes) * 60)
+      const started_at = `${addDate}T00:00:00.000Z`
+      const ended_at = new Date(new Date(started_at).getTime() + duration_seconds * 1000).toISOString()
+      const session = await api.createManualSession(task.id, {
+        started_at,
+        ended_at,
+        duration_seconds,
+        note: addNote || undefined,
+      })
+      setSessions(prev => [session, ...prev])
+      setShowAddForm(false)
+      setAddMinutes('')
+      setAddNote('')
+      setAddDate(new Date().toISOString().slice(0, 10))
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAddSaving(false)
     }
   }
 
@@ -347,6 +377,65 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                     {s.note && <p className="text-xs text-[#999] mt-1">{s.note}</p>}
                   </div>
                 ))
+              )}
+
+              {showAddForm ? (
+                <div className="bg-[#141414] border border-[#252525] rounded px-3 py-3 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-[#666] mb-1">Дата</label>
+                      <input
+                        type="date"
+                        value={addDate}
+                        onChange={e => setAddDate(e.target.value)}
+                        className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-xs text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] [color-scheme:dark]"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="block text-[10px] text-[#666] mb-1">Минуты</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={addMinutes}
+                        onChange={e => setAddMinutes(e.target.value)}
+                        placeholder="30"
+                        className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-xs text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-[#666] mb-1">Заметка</label>
+                    <input
+                      type="text"
+                      value={addNote}
+                      onChange={e => setAddNote(e.target.value)}
+                      placeholder="необязательно"
+                      className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-xs text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] placeholder-[#383838]"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button
+                      onClick={() => { setShowAddForm(false); setAddMinutes(''); setAddNote('') }}
+                      className="px-2.5 py-1 text-xs text-[#666] hover:text-[#f0f0f0] transition-colors"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleAddSession}
+                      disabled={addSaving || !addMinutes || !addDate}
+                      className="px-2.5 py-1 text-xs bg-[#5060a0] hover:bg-[#8090c8] disabled:opacity-50 rounded text-white transition-colors"
+                    >
+                      {addSaving ? 'Сохраняю…' : 'Сохранить'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full text-left text-xs text-[#383838] hover:text-[#666] transition-colors py-1"
+                >
+                  + Добавить вручную
+                </button>
               )}
             </div>
           )}
