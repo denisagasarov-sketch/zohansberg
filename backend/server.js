@@ -747,26 +747,32 @@ app.post('/api/ai/suggest-title', async (req, res) => {
 Верни JSON массив из 3 разных формулировок.
 Только массив, без объяснений.`
 
+  const requestBody = {
+    model: 'gpt-4o-mini',
+    max_tokens: 300,
+    messages: [{ role: 'user', content: prompt }],
+  }
+
+  console.log(`[suggest-title] key prefix: ${key.slice(0, 10)}…`)
+  console.log(`[suggest-title] request body:`, JSON.stringify(requestBody, null, 2))
+
   try {
-    console.log(`[suggest-title] calling OpenAI for: "${title.trim()}"`)
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      body: JSON.stringify(requestBody),
     })
+    const rawText = await r.text()
+    console.log(`[suggest-title] OpenAI status: ${r.status}`)
+    console.log(`[suggest-title] OpenAI raw response: ${rawText}`)
+
     if (!r.ok) {
-      const errBody = await r.json().catch(() => ({}))
-      const errMsg = errBody?.error?.message ?? 'OpenAI request failed'
-      console.error(`[suggest-title] OpenAI error ${r.status}:`, errMsg)
+      const errBody = JSON.parse(rawText).catch?.(() => ({})) ?? (() => { try { return JSON.parse(rawText) } catch { return {} } })()
+      const errMsg = errBody?.error?.message ?? rawText
       return res.status(r.status).json({ error: errMsg })
     }
-    const data = await r.json()
+    const data = JSON.parse(rawText)
     const text = data.choices?.[0]?.message?.content ?? ''
-    console.log('[suggest-title] raw response:', text)
     const match = text.match(/\[[\s\S]*?\]/)
     const suggestions = match ? JSON.parse(match[0]) : []
     res.json({ suggestions })
