@@ -1669,3 +1669,10 @@ def build_payload(sheet_data) -> dict:
         raise ValueError(f"Secrets detected in payload: {secrets}")
 
     return payload
+
+
+if __name__ == "__main__":
+    import subprocess as _subprocess
+    import sys as _sys
+    _runner = Path(__file__).parent / "stage5d1_run_local.py"
+    raise SystemExit(_subprocess.run([_sys.executable, str(_runner)] + _sys.argv[1:]).returncode)
