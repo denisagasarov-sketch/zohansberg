@@ -20,6 +20,7 @@ export interface Task {
   notes: string | null
   created_at: string
   updated_at: string
+  in_queue: boolean
   done_at: string | null
   deleted_at: string | null
   direction_name?: string

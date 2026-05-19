@@ -9,13 +9,14 @@ interface Props {
   onTaskClick: (task: Task) => void
   onReorder: (slot: string, orderedIds: number[]) => void
   onDropFromOutside: (taskId: number) => void
+  onRemoveFromQueue: (taskId: number) => void
   focusMode?: boolean
   nowTaskId?: number
 }
 
-export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, focusMode, nowTaskId }: Props) {
+export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
-  const queueTasks = (tasks ?? []).filter(t => t.slot === 'queue' && !t.done_at && !t.deleted_at)
+  const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.done_at && !t.deleted_at && t.slot !== 'now')
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -73,76 +74,70 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
   }
 
   return (
-    <div>
-      <div className="relative flex items-center mb-3">
-        <div className="flex-1 border-t border-[#252525] border-dashed" />
-        <span className="px-3 text-[10px] font-semibold tracking-widest text-[#383838] uppercase whitespace-nowrap">очередь</span>
-        <div className="flex-1 border-t border-[#252525] border-dashed" />
+    <div
+      className={`bg-[#1c1c1c] border rounded-lg overflow-hidden transition-colors ${isDragOver ? 'border-[#5060a0]' : 'border-[#252525]'}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={e => handleDrop(e)}
+    >
+      <div className="px-4 pt-3 pb-1">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Следом</div>
       </div>
 
-      <div
-        className={`bg-[#1c1c1c] border rounded-lg overflow-hidden transition-colors ${isDragOver ? 'border-[#5060a0]' : 'border-[#252525]'}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={e => handleDrop(e)}
-      >
-        <div className="px-4 pt-3 pb-1">
-          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Следом</div>
-        </div>
-
-        {queueTasks.length === 0 ? (
-          isDragOver ? (
-            <div className="px-4 pb-3 text-xs text-[#5060a0]">Отпустите, чтобы добавить в очередь</div>
-          ) : (
-            <div className="px-4 pb-3 text-xs text-[#666]">Очередь пуста</div>
-          )
+      {queueTasks.length === 0 ? (
+        isDragOver ? (
+          <div className="px-4 pb-3 text-xs text-[#5060a0]">Отпустите, чтобы добавить в очередь</div>
         ) : (
-          <ul className="divide-y divide-[#252525]">
-            {queueTasks.map((task, idx) => {
-              return (
-                <li
-                  key={task.id}
-                  draggable
-                  onDragStart={e => handleDragStart(e, task.id)}
-                  onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
-                  onDrop={e => { e.stopPropagation(); handleDrop(e, task.id) }}
-                  onDragEnd={handleDragEnd}
-                  className={`relative flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${focusDimmed(task) ? 'opacity-30 blur-[3px]' : ''}`}
-                  onClick={() => onTaskClick(task)}
-                >
-                  {task.duration_fact > 0 && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#5060a0]/60 rounded-r" />
-                  )}
-                  <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
-                  <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
-                  <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
-                  {task.direction_id != null && (() => {
-                    const dir = directions.find(d => d.id === task.direction_id)
-                    if (!dir) return null
-                    const c = getDirectionColor(dir.id)
-                    return (
-                      <span
-                        className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
-                        style={{ color: c, backgroundColor: c + '28' }}
-                      >
-                        {dir.name}
-                      </span>
-                    )
-                  })()}
-                  {task.deadline && (
-                    <span className="text-[10px] text-[#666] shrink-0">
-                      {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-                    </span>
-                  )}
-                  {task.duration_plan && (
-                    <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+          <div className="px-4 pb-3 text-xs text-[#666]">Очередь пуста — добавьте задачи из направлений</div>
+        )
+      ) : (
+        <ul className="divide-y divide-[#252525]">
+          {queueTasks.map((task, idx) => {
+            const dir = task.direction_id != null ? directions.find(d => d.id === task.direction_id) : null
+            const c = dir ? getDirectionColor(dir.id) : null
+            return (
+              <li
+                key={task.id}
+                draggable
+                onDragStart={e => handleDragStart(e, task.id)}
+                onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+                onDrop={e => { e.stopPropagation(); handleDrop(e, task.id) }}
+                onDragEnd={handleDragEnd}
+                className={`group relative flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${focusDimmed(task) ? 'opacity-30 blur-[3px]' : ''}`}
+                onClick={() => onTaskClick(task)}
+              >
+                {task.duration_fact > 0 && (
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#5060a0]/60 rounded-r" />
+                )}
+                <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
+                <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
+                <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+                {task.deadline && (
+                  <span className="text-[10px] text-[#666] shrink-0">
+                    {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+                {task.duration_plan != null && (
+                  <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
+                )}
+                {dir && c && (
+                  <span
+                    className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                    style={{ color: c, backgroundColor: c + '28' }}
+                  >
+                    {dir.name}
+                  </span>
+                )}
+                <button
+                  onClick={e => { e.stopPropagation(); onRemoveFromQueue(task.id) }}
+                  className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#f0f0f0] text-base leading-none shrink-0 transition-opacity px-0.5"
+                  title="Убрать из очереди"
+                >×</button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

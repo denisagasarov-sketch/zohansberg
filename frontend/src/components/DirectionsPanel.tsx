@@ -10,6 +10,7 @@ interface Props {
   onReorder: (slot: string, orderedIds: number[]) => void
   onReorderInDirection: (directionId: number | null, orderedIds: number[]) => void
   onMoveToQueue: (taskId: number) => void
+  onAddToQueue: (taskId: number) => void
   focusMode?: boolean
   nowTaskId?: number
 }
@@ -28,12 +29,13 @@ interface TaskRowProps {
   onDragStart: (e: React.DragEvent, taskId: number) => void
   onDragOver: (e: React.DragEvent, taskId: number) => void
   onDrop: (e: React.DragEvent, taskId: number) => void
+  onAddToQueue: (taskId: number) => void
   draggingId: number | null
   focusMode?: boolean
   nowTaskId?: number
 }
 
-function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggingId, focusMode, nowTaskId }: TaskRowProps) {
+function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, draggingId, focusMode, nowTaskId }: TaskRowProps) {
   const dimmed = focusMode && task.id !== nowTaskId
   return (
     <div
@@ -42,7 +44,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggi
       onDragOver={e => onDragOver(e, task.id)}
       onDrop={e => onDrop(e, task.id)}
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
+      className={`group flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${dimmed ? 'opacity-30 blur-[3px]' : ''}`}
     >
       <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
       <span className="text-[#505050] text-[10px] font-mono w-3 shrink-0 select-none">{index}</span>
@@ -52,10 +54,15 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, draggi
           {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
         </span>
       )}
-      {task.duration_plan && (
+      {task.duration_plan != null && (
         <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
       )}
       {task.slot === 'now' && <span className="text-[10px] text-[#5060a0] shrink-0">▶</span>}
+      <button
+        onClick={e => { e.stopPropagation(); onAddToQueue(task.id) }}
+        className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-xs shrink-0 transition-opacity px-0.5 font-bold"
+        title="Добавить в очередь"
+      >+</button>
     </div>
   )
 }
@@ -69,7 +76,7 @@ function saveCollapsed(s: Set<number | 'none'>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<number | 'none'>>(loadCollapsed)
@@ -84,7 +91,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     })
   }, [])
 
-  const activeTasks = (tasks ?? []).filter(t => !t.done_at && !t.deleted_at)
+  // Only show tasks not in queue (and not done/deleted)
+  const activeTasks = (tasks ?? []).filter(t => !t.in_queue && !t.done_at && !t.deleted_at)
 
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
     draggingIdRef.current = taskId
@@ -110,7 +118,6 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     const targetTask = tasks.find(t => t.id === targetId)
     if (!sourceTask || !targetTask) return
 
-    // Same direction → reorder within direction
     if (sourceTask.direction_id === targetTask.direction_id) {
       const dirTasks = sortDirectionTasks(
         activeTasks.filter(t => t.direction_id === sourceTask.direction_id)
@@ -123,7 +130,6 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
       return
     }
 
-    // Cross-direction drop: move 'now' task to queue
     if (sourceTask.slot === 'now') {
       onMoveToQueue(sourceId)
     }
@@ -156,7 +162,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
               {!isCollapsed && (
                 <>
                   {dirTasks.length === 0 ? (
-                    <div className="px-3 py-2 text-[10px] text-[#383838]">Нет активных задач</div>
+                    <div className="px-3 py-2 text-[10px] text-[#383838]">Нет задач вне очереди</div>
                   ) : (
                     <div className="divide-y divide-[#252525]/50">
                       {dirTasks.map((task, idx) => (
@@ -168,6 +174,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                           onDragStart={handleDragStart}
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
+                          onAddToQueue={onAddToQueue}
                           draggingId={draggingId}
                           focusMode={focusMode}
                           nowTaskId={nowTaskId}
@@ -209,6 +216,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       onDragStart={handleDragStart}
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
+                      onAddToQueue={onAddToQueue}
                       draggingId={draggingId}
                       focusMode={focusMode}
                       nowTaskId={nowTaskId}
