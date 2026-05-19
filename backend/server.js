@@ -269,6 +269,8 @@ app.patch('/api/tasks/:id', (req, res) => {
         // Normalize slot values
         if (key === 'slot') {
           vals.push(req.body[key] === 'now' ? 'now' : 'queue')
+        } else if (key === 'in_queue') {
+          vals.push(req.body[key] ? 1 : 0)
         } else {
           vals.push(req.body[key])
         }
