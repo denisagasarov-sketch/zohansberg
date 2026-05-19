@@ -148,7 +148,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     } catch (e: any) {
       const msg = e?.message ?? ''
       if (msg.includes('400') || msg.includes('not configured')) {
-        setAiError('Добавьте Anthropic API Key в настройках')
+        setAiError('Добавьте OpenAI API Key в настройках')
       } else {
         setAiError('Ошибка при обращении к AI')
       }
