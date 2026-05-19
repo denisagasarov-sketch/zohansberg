@@ -16,6 +16,7 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [volume, setVolume] = useState(0.5)
   const [apiKey, setApiKey] = useState('')
   const [apiStatus, setApiStatus] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle')
+  const [anthropicKey, setAnthropicKey] = useState('')
   const [dbPath, setDbPath] = useState('')
   const [newDirName, setNewDirName] = useState('')
   const [editingDir, setEditingDir] = useState<number | null>(null)
@@ -32,6 +33,7 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
       if (s.sounds_enabled) setSoundsEnabled(s.sounds_enabled !== 'false')
       if (s.sounds_volume) setVolume(parseFloat(s.sounds_volume))
       if (s.openai_api_key) setApiKey(s.openai_api_key)
+      if (s.anthropic_api_key) setAnthropicKey(s.anthropic_api_key)
       if (s.db_path) setDbPath(s.db_path)
     }).catch(() => {})
   }, [])
@@ -213,9 +215,24 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
           </div>
         </section>
 
-        {/* AI */}
+        {/* Anthropic API */}
         <section>
-          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">OpenAI API</h2>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">Anthropic API</h2>
+          <p className="text-xs text-[#555] mb-3">Используется для улучшения формулировок задач (кнопка ✨)</p>
+          <input
+            type="password"
+            value={anthropicKey}
+            onChange={e => setAnthropicKey(e.target.value)}
+            onBlur={() => saveSetting('anthropic_api_key', anthropicKey)}
+            placeholder="sk-ant-…"
+            className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-3 py-1.5 text-sm text-[#f0f0f0] placeholder-[#383838] focus:outline-none focus:border-[#5060a0]"
+          />
+        </section>
+
+        {/* OpenAI API */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">OpenAI API</h2>
+          <p className="text-xs text-[#555] mb-3">Используется для анализа дневника</p>
           <div className="flex gap-2 mb-2">
             <input
               type="password"
