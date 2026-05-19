@@ -356,13 +356,18 @@ def _build_visual_context(post_type: str, media_result: dict) -> str:
     return ""
 
 
-def _build_user_prompt(post_data: dict, visual_context: str, metrics: dict, avg_err: float) -> str:
+def _build_user_prompt(post_data: dict, visual_context: str, metrics: dict, avg_err: float, used_tactics: list) -> str:
     username      = post_data["username"]
     post_type     = post_data["post_type"]
     timestamp     = post_data["timestamp"]
     caption       = post_data["caption"]
     err           = metrics["err"]
     err_above_avg = metrics["err_above_avg"]
+
+    used_tactics_block = ""
+    if used_tactics:
+        used_tactics_str = "\n".join(f"- {t}" for t in used_tactics)
+        used_tactics_block = f"\nУже предложенные тактики для предыдущих постов этого конкурента — НЕ повторяй их:\n{used_tactics_str}\n"
 
     return f"""\
 Проанализируй пост конкурента.
@@ -393,7 +398,7 @@ Caption:
 "lead_magnet_name" — название; "" если нет
 "lead_magnet_how" — через коммент / в директ / по ссылке; "" если нет
 "what_worked" — для ВСЕХ постов: опиши какие приёмы, триггеры, формулировки, структура, конфликт, инсайт, подача или механики могли повлиять на реакцию аудитории. Если ERR выше среднего — объясни что сработало хорошо и почему. Если ERR ниже среднего — объясни что могло ограничить реакцию и что можно было усилить. Минимум 3-4 конкретных наблюдения.
-"what_to_test" — одна конкретная тактика для Кейт которую она ещё НЕ использует. Называй точный формат, механику или хук — например: «рубрика с еженедельным фактом», «хук с провокационным вопросом без ответа», «CTA через ключевое слово в комментарии». Не повторяй рекомендацию которую уже дал для другого поста этого же конкурента. Не предлагай «карусель с кейсами» и «личные истории» если они уже есть в последних 10 постах Кейт. Одно предложение, конкретно."""
+{used_tactics_block}"what_to_test" — одна конкретная тактика для Кейт которую она ещё НЕ использует. Называй точный формат, механику или хук — например: «рубрика с еженедельным фактом», «хук с провокационным вопросом без ответа», «CTA через ключевое слово в комментарии». Не повторяй рекомендацию которую уже дал для другого поста этого же конкурента. Не предлагай «карусель с кейсами» и «личные истории» если они уже есть в последних 10 постах Кейт. Одно предложение, конкретно."""
 
 
 def analyze_with_gpt(
@@ -402,6 +407,7 @@ def analyze_with_gpt(
     kate_context: dict,
     metrics: dict,
     avg_err: float,
+    used_tactics: list,
 ) -> Optional[dict]:
     import openai
 
@@ -411,7 +417,7 @@ def analyze_with_gpt(
     post_type   = post_data.get("post_type", "")
     visual_ctx  = _build_visual_context(post_type, {"images_b64": images_b64,
                                                      "fallback_thumbnail": metrics.get("fallback_thumbnail", False)})
-    user_prompt = _build_user_prompt(post_data, visual_ctx, metrics, avg_err)
+    user_prompt = _build_user_prompt(post_data, visual_ctx, metrics, avg_err, used_tactics)
 
     content: list[dict] = [{"type": "text", "text": user_prompt}]
     for img in images_b64:
@@ -630,6 +636,7 @@ def main():
 
     print(f"=== Stage 5E-1: Posts Analyzer | @{args.account} | {'DRY-RUN' if is_dry else 'FULL RUN'} ===\n")
 
+    used_tactics: list = []
     for i, (post, m) in enumerate(zip(posts, metrics)):
         print(f"[{i+1}/{total}] {m['post_type']} | {m['url']}")
 
@@ -649,12 +656,15 @@ def main():
         # Pass fallback_thumbnail flag through metrics dict for visual_context
         m_with_extra = {**m, "fallback_thumbnail": media["fallback_thumbnail"]}
 
-        result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, avg_err)
+        result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, avg_err, used_tactics)
         if result is None:
             print(f"  GPT: FAILED")
             failed += 1
         else:
             _postprocess_result(result, m["post_type"], media, m["err_above_avg"])
+            tactic = result.get("what_to_test", "")
+            if tactic:
+                used_tactics.append(tactic)
             row = _build_row(args.account, post, m, avg_err, result)
             rows.append(row)
             successful += 1
