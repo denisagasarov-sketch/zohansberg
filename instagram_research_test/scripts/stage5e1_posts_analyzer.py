@@ -87,7 +87,7 @@ def compute_metrics(posts: list, followers: int) -> list[dict]:
     results = []
     for post in posts:
         raw_type = post.get("type") or "Image"
-        likes    = int(post.get("likesCount")    or 0)
+        likes    = max(0, int(post.get("likesCount")    or 0))
         comments = int(post.get("commentsCount") or 0)
         reposts  = int(post.get("sharesCount")   or 0)
         views    = int(post.get("videoPlayCount") or post.get("videoViewCount") or 0)
