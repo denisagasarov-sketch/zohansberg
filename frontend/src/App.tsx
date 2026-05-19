@@ -184,6 +184,10 @@ export default function App() {
     await updateTask(taskId, { in_queue: false } as any)
   }, [updateTask])
 
+  const handlePriorityChange = useCallback(async (taskId: number, priority: string) => {
+    await updateTask(taskId, { priority } as any)
+  }, [updateTask])
+
   const handleFocusSwitchConfirm = useCallback(() => {
     setShowFocusSwitch(false)
     if (pendingFocusTask) setSelectedTask(pendingFocusTask)
@@ -256,6 +260,7 @@ export default function App() {
                 onReorderInDirection={handleReorderInDirection}
                 onMoveToQueue={handleMoveToQueue}
                 onAddToQueue={handleAddToQueue}
+                onPriorityChange={handlePriorityChange}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />

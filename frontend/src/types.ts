@@ -10,7 +10,7 @@ export interface Task {
   id: number
   title: string
   direction_id: number | null
-  priority: 'high' | 'medium' | 'low'
+  priority: 'I' | 'II' | 'III' | 'none'
   slot: 'now' | 'queue'
   slot_order: number
   direction_order: number
