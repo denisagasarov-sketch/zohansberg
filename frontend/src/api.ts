@@ -108,4 +108,10 @@ export const api = {
     req<any>('GET', `/stats/dashboard?period=${period}`),
   getTodaySummary: () =>
     req<any>('GET', '/today-summary'),
+
+  // AI
+  recalculateUrgency: () =>
+    req<any>('POST', '/tasks/recalculate-urgency'),
+  improveTitle: (data: { title: string; notes?: string; direction_name?: string }) =>
+    req<{ suggestions: string[] }>('POST', '/ai/improve-title', data),
 }

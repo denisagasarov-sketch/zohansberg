@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Task, Direction } from '../types'
 import { api } from '../api'
 import { playSound } from '../sound'
-import { getQuadrant } from '../utils/quadrant'
+import { getQuadrant, computeUrgency, computeMatrixSlot } from '../utils/quadrant'
 
 interface Props {
   task: Task | null
@@ -13,16 +13,14 @@ interface Props {
   onTakenNow: () => void
 }
 
-type Slot = 'next' | 'later' | 'someday'
-
-function Btn({ active, onClick, children, cls = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; cls?: string }) {
+function Btn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       className={`px-2.5 py-1 rounded text-xs transition-colors border ${
         active
           ? 'bg-[#5060a0] border-[#5060a0] text-white'
-          : `bg-transparent border-[#252525] text-[#666] hover:border-[#5060a0]/50 ${cls}`
+          : 'bg-transparent border-[#252525] text-[#666] hover:border-[#5060a0]/50'
       }`}
     >
       {children}
@@ -34,27 +32,30 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [title, setTitle] = useState(task?.title ?? '')
   const [directionId, setDirectionId] = useState<number | null>(task?.direction_id ?? null)
   const [isImportant, setIsImportant] = useState(task?.is_important ?? 0)
-  const [isUrgent, setIsUrgent] = useState(task?.is_urgent ?? 0)
-  const [slot, setSlot] = useState<Slot>((task?.slot === 'now' ? 'next' : task?.slot) as Slot ?? 'later')
+  const [isSomeday, setIsSomeday] = useState(task?.slot === 'someday')
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [aiError, setAiError] = useState('')
   const titleRef = useRef<HTMLTextAreaElement>(null)
+
+  const computedUrgency = computeUrgency(deadline)
 
   const isDirty = useCallback(() => {
     return (
       title !== (task?.title ?? '') ||
       directionId !== (task?.direction_id ?? null) ||
       isImportant !== (task?.is_important ?? 0) ||
-      isUrgent !== (task?.is_urgent ?? 0) ||
-      slot !== ((task?.slot === 'now' ? 'next' : task?.slot) ?? 'later') ||
+      isSomeday !== (task?.slot === 'someday') ||
       deadline !== (task?.deadline?.slice(0, 10) ?? '') ||
       durationPlan !== (task?.duration_plan?.toString() ?? '') ||
       notes !== (task?.notes ?? '')
     )
-  }, [title, directionId, isImportant, isUrgent, slot, deadline, durationPlan, notes, task])
+  }, [title, directionId, isImportant, isSomeday, deadline, durationPlan, notes, task])
 
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 50)
@@ -78,12 +79,14 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     if (!title.trim()) return
     setSaving(true)
     try {
+      const urgent = computeUrgency(deadline)
+      const slot = task?.slot === 'now' ? 'now' : (isSomeday ? 'someday' : computeMatrixSlot(isImportant, urgent))
       const data: Partial<Task> = {
         title: title.trim(),
         direction_id: directionId,
         is_important: isImportant,
-        is_urgent: isUrgent,
-        slot: task?.slot === 'now' ? 'now' : slot,
+        is_urgent: urgent,
+        slot,
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
@@ -133,6 +136,29 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     }
   }
 
+  const handleImproveTitle = async () => {
+    if (!title.trim()) return
+    setAiLoading(true)
+    setAiError('')
+    setAiSuggestions([])
+    try {
+      const dirName = directions.find(d => d.id === directionId)?.name
+      const result = await api.improveTitle({ title: title.trim(), notes: notes || undefined, direction_name: dirName })
+      setAiSuggestions(result.suggestions)
+    } catch (e: any) {
+      const msg = e?.message ?? ''
+      if (msg.includes('400') || msg.includes('not configured')) {
+        setAiError('Добавьте Anthropic API Key в настройках')
+      } else {
+        setAiError('Ошибка при обращении к AI')
+      }
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const q = getQuadrant(isImportant, computedUrgency)
+
   return (
     <div className="fixed inset-0 z-40 flex justify-end" onClick={handleOverlayClick}>
       <div className="absolute inset-0 bg-black/40" />
@@ -148,15 +174,43 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Title */}
-          <textarea
-            ref={titleRef}
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Название задачи"
-            rows={2}
-            className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838]"
-          />
+          {/* Title + AI */}
+          <div className="relative">
+            <textarea
+              ref={titleRef}
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Название задачи"
+              rows={2}
+              className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 pr-9 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838]"
+            />
+            <button
+              onClick={handleImproveTitle}
+              disabled={!title.trim() || aiLoading}
+              title="Улучшить формулировку (AI)"
+              className="absolute top-2 right-2 text-base text-[#383838] hover:text-[#8090c8] disabled:opacity-30 transition-colors"
+            >
+              {aiLoading ? '…' : '✨'}
+            </button>
+            {/* AI suggestions */}
+            {aiSuggestions.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {aiSuggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setTitle(s); setAiSuggestions([]) }}
+                    className="w-full text-left text-xs px-2.5 py-1.5 bg-[#141414] border border-[#252525] rounded hover:border-[#5060a0]/60 hover:text-[#f0f0f0] text-[#999] transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+                <button onClick={() => setAiSuggestions([])} className="text-[10px] text-[#383838] hover:text-[#666] transition-colors">скрыть</button>
+              </div>
+            )}
+            {aiError && (
+              <p className="text-[10px] text-[#a07030] mt-1">{aiError}</p>
+            )}
+          </div>
 
           {/* Direction */}
           <div>
@@ -169,36 +223,37 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             </div>
           </div>
 
-          {/* Eisenhower Matrix */}
+          {/* Eisenhower — only Важно; Срочно is auto-computed */}
           <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-2">Матрица Эйзенхауэра</label>
-            <div className="flex gap-3 mb-2">
+            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-2">Приоритет</label>
+            <div className="flex items-center gap-4 mb-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!isImportant} onChange={e => setIsImportant(e.target.checked ? 1 : 0)}
                   className="accent-[#5060a0] w-4 h-4" />
                 <span className="text-sm text-[#f0f0f0]">Важно</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!isUrgent} onChange={e => setIsUrgent(e.target.checked ? 1 : 0)}
-                  className="accent-[#5060a0] w-4 h-4" />
-                <span className="text-sm text-[#f0f0f0]">Срочно</span>
-              </label>
+              <span className="text-xs text-[#666]">
+                Срочно: <span className={computedUrgency ? 'text-[#b05050]' : 'text-[#505050]'}>
+                  {computedUrgency ? 'да (из дедлайна)' : 'нет'}
+                </span>
+              </span>
             </div>
-            {(() => {
-              const q = getQuadrant(isImportant, isUrgent)
-              return <span className="text-xs px-2 py-0.5 rounded" style={{ color: q.color, backgroundColor: q.border + '40' }}>{q.label}</span>
-            })()}
+            <span className="text-xs px-2 py-0.5 rounded" style={{ color: q.color, backgroundColor: q.border + '40' }}>{q.label}</span>
           </div>
 
-          {/* Slot */}
+          {/* Someday toggle (replaces slot selector) */}
           {task?.slot !== 'now' && (
             <div>
-              <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Слот</label>
-              <div className="flex gap-1.5">
-                <Btn active={slot === 'next'} onClick={() => setSlot('next')}>Следом</Btn>
-                <Btn active={slot === 'later'} onClick={() => setSlot('later')}>Позже</Btn>
-                <Btn active={slot === 'someday'} onClick={() => setSlot('someday')}>Когда-нибудь</Btn>
-              </div>
+              <label className="flex items-center gap-2 cursor-pointer w-fit">
+                <input type="checkbox" checked={isSomeday} onChange={e => setIsSomeday(e.target.checked)}
+                  className="accent-[#5060a0] w-4 h-4" />
+                <span className="text-sm text-[#999]">Когда-нибудь</span>
+              </label>
+              {!isSomeday && (
+                <p className="text-[10px] text-[#505050] mt-1">
+                  Слот определяется автоматически из важности и дедлайна
+                </p>
+              )}
             </div>
           )}
 

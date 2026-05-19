@@ -49,6 +49,11 @@ export default function App() {
     api.getTodayTime(nowTask.id).then(r => setTodayTime(r.total)).catch(() => setTodayTime(0))
   }, [nowTask?.id])
 
+  // Recalculate urgency from deadlines on mount, then refresh
+  useEffect(() => {
+    api.recalculateUrgency().then(() => refresh()).catch(() => {})
+  }, [])
+
   // Load recommendation on mount
   useEffect(() => {
     getNext()

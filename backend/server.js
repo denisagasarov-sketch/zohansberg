@@ -212,6 +212,28 @@ app.post('/api/tasks/cleanup-trash', (_req, res) => {
   }
 })
 
+// POST /api/tasks/recalculate-urgency — bulk-update is_urgent from deadline
+app.post('/api/tasks/recalculate-urgency', (_req, res) => {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    // Clear urgency for tasks without deadline
+    db.prepare(`UPDATE tasks SET is_urgent = 0 WHERE done_at IS NULL AND deleted_at IS NULL AND deadline IS NULL`).run()
+    // Update urgency for tasks with deadline
+    const tasks = db.prepare(`SELECT id, deadline FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND deadline IS NOT NULL`).all()
+    const update = db.prepare(`UPDATE tasks SET is_urgent = ? WHERE id = ?`)
+    for (const task of tasks) {
+      const d = new Date(task.deadline)
+      d.setHours(0, 0, 0, 0)
+      const diffDays = Math.floor((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      update.run(diffDays <= 2 ? 1 : 0, task.id)
+    }
+    res.json({ ok: true, updated: tasks.length })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /api/tasks — create task
 app.post('/api/tasks', (req, res) => {
   try {
@@ -679,6 +701,67 @@ app.post('/api/ai/analyze', async (req, res) => {
     }
     const data = await r.json()
     res.json({ result: data.choices?.[0]?.message?.content ?? '' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/ai/improve-title — generate 3 title suggestions via Anthropic
+function getAnthropicKey() {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = 'anthropic_api_key'`).get()
+  return row?.value ?? null
+}
+
+app.post('/api/ai/improve-title', async (req, res) => {
+  const key = getAnthropicKey()
+  if (!key) return res.status(400).json({ error: 'Anthropic API key not configured' })
+
+  const { title, notes, direction_name } = req.body
+  if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
+
+  const doneTasks = db.prepare(`SELECT title FROM tasks WHERE done_at IS NOT NULL ORDER BY done_at DESC LIMIT 10`).all()
+  const doneContext = doneTasks.map(t => `- ${t.title}`).join('\n') || '(нет)'
+
+  const prompt = `Ты помогаешь улучшить формулировку задачи для системы управления задачами.
+
+Текущая задача: "${title.trim()}"
+${notes ? `Заметки: ${notes}` : ''}
+${direction_name ? `Направление: ${direction_name}` : ''}
+
+Последние завершённые задачи пользователя:
+${doneContext}
+
+Предложи 3 улучшенных варианта названия задачи. Критерии:
+- Чёткий, конкретный результат (не процесс, а итог)
+- Начинается с глагола в инфинитиве
+- Не длиннее 60 символов
+- Сохраняет смысл оригинала
+
+Ответь строго в формате JSON-массива строк: ["вариант 1", "вариант 2", "вариант 3"]`
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+    if (!r.ok) {
+      const errBody = await r.json().catch(() => ({}))
+      return res.status(r.status).json({ error: errBody?.error?.message ?? 'Anthropic request failed' })
+    }
+    const data = await r.json()
+    const text = data.content?.[0]?.text ?? ''
+    const match = text.match(/\[[\s\S]*?\]/)
+    const suggestions = match ? JSON.parse(match[0]) : []
+    res.json({ suggestions })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
