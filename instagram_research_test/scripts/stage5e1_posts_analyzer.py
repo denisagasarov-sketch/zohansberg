@@ -392,7 +392,7 @@ Caption:
 "has_lead_magnet" — да / нет
 "lead_magnet_name" — название; "" если нет
 "lead_magnet_how" — через коммент / в директ / по ссылке; "" если нет
-"what_worked" — если ERR выше среднего: 2-3 приёма (хук/структура/визуал/триггер). Иначе ""
+"what_worked" — если err_above_avg=да: подробно опиши какие именно приёмы, триггеры, формулировки, структура, конфликт, инсайт, подача или механики могли дать сильную реакцию аудитории — минимум 3-4 конкретных наблюдения. Иначе верни пустую строку ""
 "what_to_test" — одна тактика для Кейт, не повторять её последние посты, одно предложение"""
 
 
@@ -465,7 +465,7 @@ def analyze_with_gpt(
 # Output builders
 # ---------------------------------------------------------------------------
 
-def _postprocess_result(result: dict, post_type: str, media_result: dict) -> None:
+def _postprocess_result(result: dict, post_type: str, media_result: dict, err_above_avg: str = "") -> None:
     """Apply defaults and mechanic notes in-place."""
     result.setdefault("title",            "")
     result.setdefault("topic",            "")
@@ -481,6 +481,10 @@ def _postprocess_result(result: dict, post_type: str, media_result: dict) -> Non
     result.setdefault("lead_magnet_how",  "")
     result.setdefault("what_worked",      "")
     result.setdefault("what_to_test",     "")
+
+    # Clear what_worked if post didn't outperform average
+    if err_above_avg != "да":
+        result["what_worked"] = ""
 
     # Ensure no-CTA fields not empty-string when "не найдено" expected
     for f in ("selling_insert", "cta", "cta_destination"):
@@ -520,8 +524,8 @@ def _build_row(
         "Лайки":                            m["likes"],
         "Комментарии":                      m["comments"],
         "Репосты":                          m["reposts"],
-        "ERR":                              m["err"],
-        "Средний ERR":                      avg_err,
+        "ERR":                              str(m["err"]).replace(".", ",") + "%",
+        "Средний ERR":                      str(avg_err).replace(".", ",") + "%",
         "ERR выше среднего?":               m["err_above_avg"],
         "Что могло сработать":              result.get("what_worked", ""),
         "Что можно протестировать у себя":  result.get("what_to_test", ""),
@@ -654,7 +658,7 @@ def main():
             print(f"  GPT: FAILED")
             failed += 1
         else:
-            _postprocess_result(result, m["post_type"], media)
+            _postprocess_result(result, m["post_type"], media, m["err_above_avg"])
             row = _build_row(args.account, post, m, avg_err, result)
             rows.append(row)
             successful += 1
