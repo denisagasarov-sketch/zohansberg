@@ -64,6 +64,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [addTime, setAddTime] = useState('00:00')
   const [addMinutes, setAddMinutes] = useState('')
   const [addNote, setAddNote] = useState('')
   const [addSaving, setAddSaving] = useState(false)
@@ -173,7 +174,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     setAddError('')
     try {
       const duration_seconds = Math.round(parseFloat(addMinutes) * 60)
-      const started_at = `${addDate}T00:00:00.000Z`
+      const started_at = new Date(`${addDate}T${addTime}:00`).toISOString()
       const ended_at = new Date(new Date(started_at).getTime() + duration_seconds * 1000).toISOString()
       const session = await api.createManualSession(task.id, {
         started_at,
@@ -186,6 +187,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
       setAddMinutes('')
       setAddNote('')
       setAddDate(new Date().toISOString().slice(0, 10))
+      setAddTime('00:00')
     } catch (e: any) {
       setAddError(e?.message ?? 'Ошибка')
     } finally {
@@ -394,6 +396,15 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                       />
                     </div>
                     <div className="w-20">
+                      <label className="block text-[10px] text-[#666] mb-1">Начало</label>
+                      <input
+                        type="time"
+                        value={addTime}
+                        onChange={e => setAddTime(e.target.value)}
+                        className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-xs text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] [color-scheme:dark]"
+                      />
+                    </div>
+                    <div className="w-16">
                       <label className="block text-[10px] text-[#666] mb-1">Минуты</label>
                       <input
                         type="number"
@@ -418,7 +429,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                   {addError && <p className="text-[10px] text-red-400">{addError}</p>}
                   <div className="flex gap-2 justify-end pt-1">
                     <button
-                      onClick={() => { setShowAddForm(false); setAddMinutes(''); setAddNote(''); setAddError('') }}
+                      onClick={() => { setShowAddForm(false); setAddMinutes(''); setAddNote(''); setAddTime('00:00'); setAddError('') }}
                       className="px-2.5 py-1 text-xs text-[#666] hover:text-[#f0f0f0] transition-colors"
                     >
                       Отмена
