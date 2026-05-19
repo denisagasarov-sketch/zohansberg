@@ -174,8 +174,11 @@ export default function App() {
   }, [updateTask])
 
   const handleAddToQueue = useCallback(async (taskId: number) => {
-    await updateTask(taskId, { in_queue: true } as any)
-  }, [updateTask])
+    const task = tasks.find(t => t.id === taskId)
+    const update: any = { in_queue: true }
+    if (task?.slot === 'now') update.slot = 'queue'
+    await updateTask(taskId, update)
+  }, [updateTask, tasks])
 
   const handleRemoveFromQueue = useCallback(async (taskId: number) => {
     await updateTask(taskId, { in_queue: false } as any)
