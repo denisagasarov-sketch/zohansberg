@@ -392,7 +392,7 @@ Caption:
 "has_lead_magnet" — да / нет
 "lead_magnet_name" — название; "" если нет
 "lead_magnet_how" — через коммент / в директ / по ссылке; "" если нет
-"what_worked" — если err_above_avg=да: подробно опиши какие именно приёмы, триггеры, формулировки, структура, конфликт, инсайт, подача или механики могли дать сильную реакцию аудитории — минимум 3-4 конкретных наблюдения. Иначе верни пустую строку ""
+"what_worked" — для ВСЕХ постов: опиши какие приёмы, триггеры, формулировки, структура, конфликт, инсайт, подача или механики могли повлиять на реакцию аудитории. Если ERR выше среднего — объясни что сработало хорошо и почему. Если ERR ниже среднего — объясни что могло ограничить реакцию и что можно было усилить. Минимум 3-4 конкретных наблюдения.
 "what_to_test" — одна тактика для Кейт, не повторять её последние посты, одно предложение"""
 
 
@@ -481,10 +481,6 @@ def _postprocess_result(result: dict, post_type: str, media_result: dict, err_ab
     result.setdefault("lead_magnet_how",  "")
     result.setdefault("what_worked",      "")
     result.setdefault("what_to_test",     "")
-
-    # Clear what_worked if post didn't outperform average
-    if err_above_avg != "да":
-        result["what_worked"] = ""
 
     # Ensure no-CTA fields not empty-string when "не найдено" expected
     for f in ("selling_insert", "cta", "cta_destination"):
