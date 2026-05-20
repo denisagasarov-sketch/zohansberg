@@ -9,6 +9,8 @@ Usage:
     python scripts/stage5e1_posts_analyzer.py --account vlada_kliuiko --limit 5 --download-only
     python scripts/stage5e1_posts_analyzer.py --account vlada_kliuiko --limit 5 --dry-run
     python scripts/stage5e1_posts_analyzer.py --account vlada_kliuiko --limit 5
+    python scripts/stage5e1_posts_analyzer.py --account vlada_kliuiko --limit 15 --post-types photo,carousel
+    python scripts/stage5e1_posts_analyzer.py --account vlada_kliuiko --limit 5 --refresh-days 0
 """
 
 import argparse
@@ -69,6 +71,20 @@ def _post_type(raw_type: str) -> str:
 
 def _post_type_ru(raw_type: str) -> str:
     return {"Sidecar": "карусель", "Video": "видео", "Image": "фото"}.get(raw_type, "фото")
+
+
+# ---------------------------------------------------------------------------
+# Accounts config
+# ---------------------------------------------------------------------------
+
+def _load_accounts_config() -> dict:
+    path = BASE / "data" / "accounts.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +525,8 @@ def _build_row(
     url   = m["url"]
     title = result.get("title") or ""
     return {
+        "Дата выгрузки":                    datetime.utcnow().strftime("%d.%m.%Y"),
+        "post_type":                         m["post_type"],  # техническое поле — не для Sheets
         "Конкурент":                        username,
         "Ссылка на пост + заголовок":       f"{url} | {title}",
         "Тема поста":                       result.get("topic", ""),
@@ -565,6 +583,10 @@ def save_output(
 # ---------------------------------------------------------------------------
 
 def main():
+    # Read accounts.json before argument parsing (needed for --refresh-days default)
+    accounts_config  = _load_accounts_config()
+    default_refresh  = accounts_config.get("posts_refresh_days")  # None if absent
+
     parser = argparse.ArgumentParser(
         description="Stage 5E-1: Posts Analyzer (download + GPT + сохранение)"
     )
@@ -573,9 +595,30 @@ def main():
     parser.add_argument("--dry-run",       action="store_true", help="Полный анализ без удаления tmp и без записи в Sheets")
     parser.add_argument("--metrics-only",  action="store_true", help="Только метрики без GPT")
     parser.add_argument("--download-only", action="store_true", help="Скачать медиа без GPT-анализа")
+    parser.add_argument(
+        "--post-types",
+        default=None,
+        help="Типы постов через запятую: photo,carousel,video. По умолчанию — все типы.",
+    )
+    parser.add_argument(
+        "--refresh-days",
+        type=lambda x: None if str(x).lower() == "none" else int(x),
+        default=default_refresh,
+        help=(
+            "Переанализировать если пост старше N дней. "
+            "0 = всегда, none = никогда (только новые). "
+            "По умолчанию читается из data/accounts.json → posts_refresh_days."
+        ),
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    refresh_days  = args.refresh_days   # int | None
+    allowed_types = (
+        {t.strip() for t in args.post_types.split(",")}
+        if args.post_types else None
+    )
 
     # --- Dependency checks ---
     from dotenv import load_dotenv
@@ -587,26 +630,23 @@ def main():
     if subprocess.run(["ffmpeg", "-version"], capture_output=True).returncode != 0:
         sys.exit("ffmpeg не найден. Установите: brew install ffmpeg")
 
-    # --- Load existing results for incremental analysis ---
+    # --- Load existing results ---
     existing_path = BASE / "data" / args.account / "normalized" / "stage5e1_posts_analysis.json"
     existing_rows: list = []
-    analyzed_urls: set = set()
+    url_to_rows: dict[str, list] = {}
     if existing_path.exists():
         try:
-            existing = json.loads(existing_path.read_text(encoding="utf-8"))
+            existing      = json.loads(existing_path.read_text(encoding="utf-8"))
             existing_rows = existing.get("rows") or []
-            analyzed_urls = {
-                row["Ссылка на пост + заголовок"].split(" | ")[0]
-                for row in existing_rows
-                if "Ссылка на пост + заголовок" in row
-            }
+            for row in existing_rows:
+                url = row.get("Ссылка на пост + заголовок", "").split(" | ")[0]
+                if url:
+                    url_to_rows.setdefault(url, []).append(row)
         except Exception as e:
             print(f"[warn] Не удалось прочитать существующий вывод: {e}")
 
     # --- Load data ---
-    # Load all posts; --limit applies to NEW (unanalyzed) posts only
     all_posts = load_posts(args.account, 0)
-    posts     = all_posts[:args.limit] if args.limit else all_posts  # for early-exit modes
 
     prof_path = BASE / "data" / args.account / "normalized" / "profile_summary.json"
     followers = 0
@@ -617,12 +657,12 @@ def main():
         except Exception:
             pass
 
-    metrics  = compute_metrics(posts, followers)
-    avg_err  = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
-    kate_ctx = load_kate_context()
-
     # --- --metrics-only ---
     if args.metrics_only:
+        posts    = all_posts[:args.limit] if args.limit else all_posts
+        metrics  = compute_metrics(posts, followers)
+        avg_err  = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+        kate_ctx = load_kate_context()
         print(f"=== Stage 5E-1: Posts Metrics | @{args.account} ===\n")
         for m in metrics:
             print(
@@ -637,6 +677,8 @@ def main():
 
     # --- --download-only ---
     if args.download_only:
+        posts   = all_posts[:args.limit] if args.limit else all_posts
+        metrics = compute_metrics(posts, followers)
         print(f"=== Stage 5E-1: Download Only | @{args.account} ===\n")
         for post, m in zip(posts, metrics):
             result = download_media(post, m["post_type"], args.account)
@@ -649,36 +691,82 @@ def main():
     is_dry = args.dry_run
 
     print(f"=== Stage 5E-1: Posts Analyzer | @{args.account} | {'DRY-RUN' if is_dry else 'FULL RUN'} ===")
+    types_label = ", ".join(sorted(allowed_types)) if allowed_types else "все"
+    print(f"  post-types: {types_label} | refresh-days: {refresh_days} | limit: {args.limit}")
     if existing_rows:
-        print(f"[resume] {len(existing_rows)} постов уже проанализировано\n")
+        print(f"  [resume] {len(existing_rows)} строк уже есть в базе\n")
     else:
         print()
 
-    # Filter new posts; show [skip] for already-analyzed; apply --limit to new only
+    # --- Filter: build posts_to_analyze ---
     posts_to_analyze: list = []
     for p in all_posts:
-        url = p.get("url") or ""
-        if url in analyzed_urls:
-            print(f"  [skip] уже проанализирован: {url}")
+        url       = p.get("url") or ""
+        raw_type  = p.get("type") or "Image"
+        post_type = _post_type(raw_type)
+
+        # a) Type filter
+        if allowed_types and post_type not in allowed_types:
+            print(f"  [skip-type] {post_type} | {url}")
             continue
+
+        # b) Existing rows for this URL
+        rows_for_url = url_to_rows.get(url, [])
+
+        # c) Refresh logic
+        if rows_for_url:
+            if refresh_days is None:
+                print(f"  [skip] уже есть | {url}")
+                continue
+            elif refresh_days == 0:
+                pass  # always re-analyze
+            else:
+                # Compute days since last analysis
+                dated = [
+                    r for r in rows_for_url
+                    if "Дата выгрузки" in r and r["Дата выгрузки"]
+                ]
+                if dated:
+                    try:
+                        last_date  = max(
+                            datetime.strptime(r["Дата выгрузки"], "%d.%m.%Y") for r in dated
+                        )
+                        days_since = (datetime.utcnow() - last_date).days
+                    except ValueError:
+                        days_since = 9999
+                else:
+                    days_since = 9999  # no date field → treat as very old
+
+                if days_since <= refresh_days:
+                    print(f"  [skip] свежий ({days_since}d) | {url}")
+                    continue
+                # else days_since > refresh_days → re-analyze
+
+        # d) New post or re-analysis → schedule
         posts_to_analyze.append(p)
         if args.limit and len(posts_to_analyze) >= args.limit:
             break
 
-    # Recompute metrics and avg_err for new posts only
-    metrics  = compute_metrics(posts_to_analyze, followers)
-    avg_err  = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+    # Warn if fewer than requested
+    if args.limit and len(posts_to_analyze) < args.limit:
+        n = len(posts_to_analyze)
+        print(f"\n  [warn] Найдено только {n} из {args.limit} запрошенных")
+
+    if not posts_to_analyze:
+        print("\n[OK] Нет постов для анализа.")
+        out_path = save_output(existing_rows, args.account, 0.0, 0, 0)
+        print(f"[OK] Сохранено: {out_path.relative_to(BASE)}")
+        sys.exit(0)
+
+    # Compute metrics and avg_err for posts being analyzed
+    metrics = compute_metrics(posts_to_analyze, followers)
+    avg_err = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+    kate_ctx = load_kate_context()
 
     total      = len(posts_to_analyze)
     rows: list = []
     successful = 0
     failed     = 0
-
-    if not posts_to_analyze:
-        print("\n[OK] Нет новых постов для анализа.")
-        out_path = save_output(existing_rows, args.account, avg_err, 0, 0)
-        print(f"[OK] Сохранено: {out_path.relative_to(BASE)}")
-        sys.exit(0)
 
     print()
     used_tactics: list = []
@@ -698,7 +786,6 @@ def main():
             "timestamp": post.get("timestamp") or "",
             "caption":   m["caption"],
         }
-        # Pass fallback_thumbnail flag through metrics dict for visual_context
         m_with_extra = {**m, "fallback_thumbnail": media["fallback_thumbnail"]}
 
         result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, avg_err, used_tactics)
@@ -717,19 +804,19 @@ def main():
 
         # Cleanup tmp (only in full run)
         if not is_dry:
-            post_id   = post.get("id") or post.get("shortCode") or "unknown"
-            tmp_post  = BASE / "data" / args.account / "tmp" / "posts" / str(post_id)
+            post_id  = post.get("id") or post.get("shortCode") or "unknown"
+            tmp_post = BASE / "data" / args.account / "tmp" / "posts" / str(post_id)
             if tmp_post.exists():
                 shutil.rmtree(tmp_post)
 
-    # Save output JSON — merge existing rows with newly analyzed
+    # Save output JSON — merge existing rows with newly analyzed (never delete existing)
     all_rows = existing_rows + rows
     out_path = save_output(all_rows, args.account, avg_err, successful, failed)
     print(f"\n[OK] Сохранено: {out_path.relative_to(BASE)}")
 
     # Summary
     if is_dry:
-        print("\n=== DRY-RUN Preview (первые 2 строки) ===")
+        print("\n=== DRY-RUN Preview (первые 2 новые строки) ===")
         for row in rows[:2]:
             preview = {k: str(v)[:80] for k, v in row.items()}
             print(json.dumps(preview, ensure_ascii=False, indent=2))
