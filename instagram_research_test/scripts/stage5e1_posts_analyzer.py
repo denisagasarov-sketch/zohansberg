@@ -99,6 +99,70 @@ def load_posts(username: str, limit: int) -> list:
     return data[:limit] if limit else data
 
 
+def load_posts_unified(username: str) -> tuple[list, str, dict]:
+    """Load posts, preferring stage5e0_posts_index.json, fallback to posts_test_raw.json.
+
+    Returns (posts, source_label, url_to_raw):
+        posts        — raw-Apify-compatible dicts for compute_metrics() / download_media()
+        source_label — human-readable source description for dry-run output
+        url_to_raw   — dict[url → full raw item]
+    """
+    index_path    = BASE / "data" / username / "normalized" / "stage5e0_posts_index.json"
+    raw_e0_path   = BASE / "data" / username / "raw"        / "stage5e0_posts_raw.json"
+    fallback_path = BASE / "data" / username / "raw"        / INPUT_FILENAME
+
+    if index_path.exists():
+        index       = json.loads(index_path.read_text(encoding="utf-8"))
+        posts_index = index.get("posts") or []
+
+        # Build url → full raw item for captions and media download
+        url_to_raw: dict[str, dict] = {}
+        if raw_e0_path.exists():
+            try:
+                raw_items = json.loads(raw_e0_path.read_text(encoding="utf-8"))
+                for item in raw_items:
+                    url = item.get("url") or ""
+                    if not url.startswith("http"):
+                        short = item.get("shortCode") or item.get("id") or ""
+                        url = f"https://www.instagram.com/p/{short}/" if short else ""
+                    if url:
+                        url_to_raw[url] = item
+            except Exception:
+                pass
+
+        by_type = index.get("by_type") or {}
+        total   = index.get("total", len(posts_index))
+        parts   = [f"{v} {k}" for k, v in by_type.items() if v]
+        source_label = f"stage5e0_posts_index.json ({total} постов: {', '.join(parts)})"
+
+        _reverse_type = {"carousel": "Sidecar", "video": "Video", "photo": "Image"}
+        posts_out = []
+        for p in posts_index:
+            url     = p.get("url") or ""
+            raw     = url_to_raw.get(url, {})
+            unified = dict(raw)  # start with full raw (displayUrl, childPosts, videoUrl, etc.)
+            if not unified.get("type"):
+                unified["type"] = _reverse_type.get(p.get("post_type", "photo"), "Image")
+            unified["likesCount"]     = p.get("likes", 0)
+            unified["commentsCount"]  = p.get("comments", 0)
+            unified["videoPlayCount"] = p.get("views", 0)
+            unified["url"]            = url
+            unified["shortCode"]      = p.get("short_code") or unified.get("shortCode") or ""
+            unified["caption"]        = raw.get("caption") or p.get("caption_preview") or ""
+            unified["timestamp"]      = p.get("timestamp") or unified.get("timestamp") or ""
+            posts_out.append(unified)
+
+        return posts_out, source_label, url_to_raw
+
+    # Fallback: old behavior
+    if not fallback_path.exists():
+        sys.exit(f"[ERROR] Файл не найден: {fallback_path.relative_to(BASE)}")
+    data         = json.loads(fallback_path.read_text(encoding="utf-8"))
+    source_label = f"{INPUT_FILENAME} (fallback)"
+    url_to_raw   = {(item.get("url") or ""): item for item in data if item.get("url")}
+    return data, source_label, url_to_raw
+
+
 def compute_metrics(posts: list, followers: int) -> list[dict]:
     results = []
     for post in posts:
@@ -646,7 +710,7 @@ def main():
             print(f"[warn] Не удалось прочитать существующий вывод: {e}")
 
     # --- Load data ---
-    all_posts = load_posts(args.account, 0)
+    all_posts, _source_label, _url_to_raw = load_posts_unified(args.account)
 
     prof_path = BASE / "data" / args.account / "normalized" / "profile_summary.json"
     followers = 0
@@ -693,6 +757,7 @@ def main():
     print(f"=== Stage 5E-1: Posts Analyzer | @{args.account} | {'DRY-RUN' if is_dry else 'FULL RUN'} ===")
     types_label = ", ".join(sorted(allowed_types)) if allowed_types else "все"
     print(f"  post-types: {types_label} | refresh-days: {refresh_days} | limit: {args.limit}")
+    print(f"  Источник: {_source_label}")
     if existing_rows:
         print(f"  [resume] {len(existing_rows)} строк уже есть в базе\n")
     else:
@@ -758,14 +823,13 @@ def main():
         print(f"[OK] Сохранено: {out_path.relative_to(BASE)}")
         sys.exit(0)
 
-    # Compute metrics and avg_err for posts being analyzed
-    metrics = compute_metrics(posts_to_analyze, followers)
-    avg_err = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
-    kate_ctx = load_kate_context()
+    # Per-post ERR; pre_avg_err used only as GPT prompt context
+    metrics     = compute_metrics(posts_to_analyze, followers)
+    pre_avg_err = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+    kate_ctx    = load_kate_context()
 
     total      = len(posts_to_analyze)
-    rows: list = []
-    successful = 0
+    successes: list = []  # (post, m, result, media)
     failed     = 0
 
     print()
@@ -788,7 +852,7 @@ def main():
         }
         m_with_extra = {**m, "fallback_thumbnail": media["fallback_thumbnail"]}
 
-        result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, avg_err, used_tactics)
+        result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, pre_avg_err, used_tactics)
         if result is None:
             print(f"  GPT: FAILED")
             failed += 1
@@ -797,9 +861,7 @@ def main():
             tactic = result.get("what_to_test", "")
             if tactic:
                 used_tactics.append(tactic)
-            row = _build_row(args.account, post, m, avg_err, result)
-            rows.append(row)
-            successful += 1
+            successes.append((post, m, result, media))
             print(f"  GPT: OK  mechanic={result.get('mechanic', '')[:50]}")
 
         # Cleanup tmp (only in full run)
@@ -809,8 +871,24 @@ def main():
             if tmp_post.exists():
                 shutil.rmtree(tmp_post)
 
-    # Save output JSON — merge existing rows with newly analyzed (never delete existing)
-    all_rows = existing_rows + rows
+    # avg_err and err_above_avg computed from successful posts only
+    successful = len(successes)
+    avg_err    = round(statistics.mean(m["err"] for _, m, _, _ in successes), 2) if successes else 0.0
+    rows: list = []
+    for post, m, result, _media in successes:
+        m["err_above_avg"] = "да" if m["err"] > avg_err else "нет"
+        rows.append(_build_row(args.account, post, m, avg_err, result))
+
+    # Merge: drop existing rows for re-analyzed URLs, then append new rows
+    reanalyzed_urls = {
+        row.get("Ссылка на пост + заголовок", "").split(" | ")[0]
+        for row in rows
+    }
+    filtered_existing = [
+        r for r in existing_rows
+        if r.get("Ссылка на пост + заголовок", "").split(" | ")[0] not in reanalyzed_urls
+    ]
+    all_rows = filtered_existing + rows
     out_path = save_output(all_rows, args.account, avg_err, successful, failed)
     print(f"\n[OK] Сохранено: {out_path.relative_to(BASE)}")
 
