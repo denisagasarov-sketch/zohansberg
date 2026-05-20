@@ -642,6 +642,31 @@ def save_output(
     return out_path
 
 
+def _recalc_run_avg_err(all_rows: list, run_date: str) -> float:
+    """Recompute avg_err for all rows dated run_date and update them in-place.
+
+    Returns the new avg_err (0.0 if no matching rows).
+    """
+    day_rows = [r for r in all_rows if r.get("Дата выгрузки") == run_date]
+    if not day_rows:
+        return 0.0
+
+    def _parse_err(r: dict) -> float:
+        try:
+            return float((r.get("ERR") or "0%").rstrip("%").replace(",", "."))
+        except ValueError:
+            return 0.0
+
+    avg     = round(statistics.mean(_parse_err(r) for r in day_rows), 2)
+    avg_str = str(avg).replace(".", ",") + "%"
+
+    for r in day_rows:
+        r["Средний ERR"]        = avg_str
+        r["ERR выше среднего?"] = "да" if _parse_err(r) > avg else "нет"
+
+    return avg
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -905,8 +930,15 @@ def main():
         if r.get("Ссылка на пост + заголовок", "").split(" | ")[0] not in reanalyzed_urls
     ]
     all_rows = filtered_existing + rows
-    out_path = save_output(all_rows, args.account, avg_err, successful, failed)
-    print(f"\n[OK] Сохранено: {out_path.relative_to(BASE)}")
+
+    # Recalculate avg_err for ALL rows from today's run date, update them in-place
+    run_date      = datetime.utcnow().strftime("%d.%m.%Y")
+    final_avg_err = _recalc_run_avg_err(all_rows, run_date)
+    n_day_rows    = sum(1 for r in all_rows if r.get("Дата выгрузки") == run_date)
+    print(f"\n  avg_err пересчитан по {n_day_rows} строкам от {run_date}: {final_avg_err}%")
+
+    out_path = save_output(all_rows, args.account, final_avg_err, successful, failed)
+    print(f"[OK] Сохранено: {out_path.relative_to(BASE)}")
 
     # Summary
     if is_dry:
@@ -915,9 +947,9 @@ def main():
             preview = {k: str(v)[:80] for k, v in row.items()}
             print(json.dumps(preview, ensure_ascii=False, indent=2))
         tmp_path = f"data/{args.account}/tmp/posts/"
-        print(f"\nУспешно: {successful}/{total} | avg_err: {avg_err}% | tmp: {tmp_path}")
+        print(f"\nУспешно: {successful}/{total} | avg_err: {final_avg_err}% | tmp: {tmp_path}")
     else:
-        print(f"Успешно: {successful}/{total} | avg_err: {avg_err}%")
+        print(f"Успешно: {successful}/{total} | avg_err: {final_avg_err}%")
 
 
 if __name__ == "__main__":
