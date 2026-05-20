@@ -1386,6 +1386,7 @@ V2_REELS_HEADERS = [
 ]
 
 POSTS_HEADERS = [
+    "Дата выгрузки",
     "Конкурент", "Ссылка на пост + заголовок", "Тема поста", "Механика подачи",
     "Кратко о чем пост", "Хук / первый абзац", "Структура поста", "Продающая вставка",
     "Какой CTA", "Куда ведет CTA", "Есть лид-магнит", "Какой лид-магнит", "Как получить?",
@@ -1524,11 +1525,26 @@ def build_reels_rows(sources: dict) -> tuple[list, list, list]:
 def build_posts_rows(sources: dict) -> tuple[list, list, list]:
     """Build rows for 'Посты' sheet from stage5e1_posts_analysis.json.
 
-    Returns (headers, rows, warnings).
+    Filters by posts_sheet_types from data/accounts.json (default: photo, carousel).
+    "post_type" is used for filtering only — not included in output headers.
+    "Дата выгрузки" is always the first column.
+    All rows passing the type filter are included (no URL deduplication).
+
+    Returns (POSTS_HEADERS, rows, warnings).
     If file is missing or empty — returns (POSTS_HEADERS, [], [warning]).
     Does NOT raise — caller wraps in try/except.
     """
     warnings = []
+
+    # Load type filter from accounts.json
+    _accounts_path = BASE / "data" / "accounts.json"
+    _accounts_cfg: dict = {}
+    if _accounts_path.exists():
+        try:
+            _accounts_cfg = json.loads(_accounts_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    sheet_types = set(_accounts_cfg.get("posts_sheet_types", ["photo", "carousel"]))
 
     raw = sources.get("stage5e1_posts")
     if not raw or not isinstance(raw, dict):
@@ -1542,18 +1558,25 @@ def build_posts_rows(sources: dict) -> tuple[list, list, list]:
         warnings.append("rows list empty in stage5e1_posts_analysis.json; 'Посты' sheet skipped")
         return POSTS_HEADERS, [], warnings
 
-    # Prefer key order from first row (preserves _build_row order)
-    first = input_rows[0]
-    headers = list(first.keys()) if isinstance(first, dict) else POSTS_HEADERS
-
     rows = []
+    skipped_type = 0
     for r in input_rows:
         if not isinstance(r, dict):
             warnings.append("Skipping non-dict row in stage5e1_posts_analysis.json")
             continue
-        rows.append(_make_row(headers, r))
+        post_type = r.get("post_type", "")
+        if post_type not in sheet_types:
+            skipped_type += 1
+            continue
+        rows.append(_make_row(POSTS_HEADERS, r))
 
-    return headers, rows, warnings
+    if skipped_type:
+        warnings.append(
+            f"{skipped_type} row(s) excluded by posts_sheet_types filter "
+            f"(allowed: {sorted(sheet_types)})"
+        )
+
+    return POSTS_HEADERS, rows, warnings
 
 
 # ---------------------------------------------------------------------------

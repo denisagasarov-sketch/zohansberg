@@ -4,5 +4,7 @@
   ],
   "posts_limit": 5,
   "highlights_limit": 1,
-  "mode": "actor_inspection"
+  "mode": "actor_inspection",
+  "posts_sheet_types": ["photo", "carousel"],
+  "posts_refresh_days": null
 }
