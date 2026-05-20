@@ -488,7 +488,7 @@ def analyze_with_gpt(
     metrics: dict,
     avg_err: float,
     used_tactics: list,
-) -> Optional[dict]:
+) -> dict:
     import openai
 
     client      = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -529,10 +529,10 @@ def analyze_with_gpt(
                 time.sleep(2 ** (attempt + 1))
             else:
                 logger.error("Failed after 3 attempts: %s", url)
-                return None
+                return {}
 
     if raw is None:
-        return None
+        return {}
 
     # Strip markdown fences if present
     stripped = raw.strip()
@@ -544,7 +544,7 @@ def analyze_with_gpt(
         return json.loads(stripped)
     except Exception:
         logger.error("JSON parse failed for %s: %s", url, stripped[:300])
-        return None
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -778,6 +778,17 @@ def main():
         # b) Existing rows for this URL
         rows_for_url = url_to_rows.get(url, [])
 
+        # b1) If the most recent existing row is a GPT failure → treat as unanalyzed
+        if rows_for_url:
+            dated    = [r for r in rows_for_url if r.get("Дата выгрузки")]
+            last_row = (
+                max(dated, key=lambda r: datetime.strptime(r["Дата выгрузки"], "%d.%m.%Y"))
+                if dated else rows_for_url[-1]
+            )
+            if "(GPT отказал)" in (last_row.get("Механика подачи") or ""):
+                rows_for_url = []
+                print(f"  [retry-gpt] {post_type} | {url}")
+
         # c) Refresh logic
         if rows_for_url:
             if refresh_days is None:
@@ -828,9 +839,10 @@ def main():
     pre_avg_err = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
     kate_ctx    = load_kate_context()
 
-    total      = len(posts_to_analyze)
+    total          = len(posts_to_analyze)
     successes: list = []  # (post, m, result, media)
-    failed     = 0
+    gpt_ok_count   = 0
+    gpt_fail_count = 0
 
     print()
     used_tactics: list = []
@@ -852,17 +864,20 @@ def main():
         }
         m_with_extra = {**m, "fallback_thumbnail": media["fallback_thumbnail"]}
 
-        result = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, pre_avg_err, used_tactics)
-        if result is None:
-            print(f"  GPT: FAILED")
-            failed += 1
+        result     = analyze_with_gpt(post_data, media["images_b64"], kate_ctx, m_with_extra, pre_avg_err, used_tactics)
+        gpt_failed = not result  # analyze_with_gpt returns {} on failure
+        _postprocess_result(result, m["post_type"], media, m["err_above_avg"])
+        if gpt_failed:
+            result["mechanic"] = "(GPT отказал)"
+            gpt_fail_count += 1
+            print(f"  GPT: FAILED (stub row)")
         else:
-            _postprocess_result(result, m["post_type"], media, m["err_above_avg"])
             tactic = result.get("what_to_test", "")
             if tactic:
                 used_tactics.append(tactic)
-            successes.append((post, m, result, media))
+            gpt_ok_count += 1
             print(f"  GPT: OK  mechanic={result.get('mechanic', '')[:50]}")
+        successes.append((post, m, result, media))
 
         # Cleanup tmp (only in full run)
         if not is_dry:
@@ -871,8 +886,9 @@ def main():
             if tmp_post.exists():
                 shutil.rmtree(tmp_post)
 
-    # avg_err and err_above_avg computed from successful posts only
-    successful = len(successes)
+    # avg_err and err_above_avg from all posts in this run (including stubs)
+    successful = gpt_ok_count
+    failed     = gpt_fail_count
     avg_err    = round(statistics.mean(m["err"] for _, m, _, _ in successes), 2) if successes else 0.0
     rows: list = []
     for post, m, result, _media in successes:
