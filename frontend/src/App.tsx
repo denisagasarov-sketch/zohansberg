@@ -184,6 +184,14 @@ export default function App() {
     await updateTask(taskId, { in_queue: false } as any)
   }, [updateTask])
 
+  const handleMarkDone = useCallback(async (taskId: number) => {
+    if (nowTask && taskId === nowTask.id) {
+      await handleDoneNow()
+      return
+    }
+    await updateTask(taskId, { done_at: new Date().toISOString() } as any)
+  }, [nowTask, handleDoneNow, updateTask])
+
   const handlePriorityChange = useCallback(async (taskId: number, priority: string) => {
     await updateTask(taskId, { priority } as any)
   }, [updateTask])
@@ -245,6 +253,7 @@ export default function App() {
                 onReorder={reorderTasks}
                 onDropFromOutside={handleAddToQueue}
                 onRemoveFromQueue={handleRemoveFromQueue}
+                onMarkDone={handleMarkDone}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
@@ -261,6 +270,7 @@ export default function App() {
                 onReorderInDirection={handleReorderInDirection}
                 onMoveToQueue={handleMoveToQueue}
                 onAddToQueue={handleAddToQueue}
+                onMarkDone={handleMarkDone}
                 onPriorityChange={handlePriorityChange}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
@@ -312,6 +322,10 @@ export default function App() {
           onTakenNow={() => {
             if (selectedTask) handleTakeNow(selectedTask.id)
           }}
+          onMarkDone={selectedTask && !selectedTask.done_at ? async () => {
+            await handleMarkDone(selectedTask.id)
+            setSelectedTask(undefined)
+          } : undefined}
         />
       )}
 

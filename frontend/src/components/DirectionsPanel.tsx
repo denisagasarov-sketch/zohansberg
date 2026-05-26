@@ -11,6 +11,7 @@ interface Props {
   onReorderInDirection: (directionId: number | null, orderedIds: number[]) => void
   onMoveToQueue: (taskId: number) => void
   onAddToQueue: (taskId: number) => void
+  onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
   focusMode?: boolean
   nowTaskId?: number
@@ -77,13 +78,14 @@ interface TaskRowProps {
   onDragOver: (e: React.DragEvent, taskId: number) => void
   onDrop: (e: React.DragEvent, taskId: number) => void
   onAddToQueue: (taskId: number) => void
+  onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
   draggingId: number | null
   focusMode?: boolean
   nowTaskId?: number
 }
 
-function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onPriorityChange, draggingId, focusMode, nowTaskId }: TaskRowProps) {
+function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onMarkDone, onPriorityChange, draggingId, focusMode, nowTaskId }: TaskRowProps) {
   const dimmed = focusMode && task.id !== nowTaskId
   const [showPicker, setShowPicker] = useState(false)
 
@@ -129,6 +131,11 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
       )}
       {task.slot === 'now' && <span className="text-[10px] text-[#5060a0] shrink-0">▶</span>}
       <button
+        onClick={e => { e.stopPropagation(); onMarkDone(task.id) }}
+        className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-xs shrink-0 transition-opacity px-0.5"
+        title="Отметить выполненной"
+      >✓</button>
+      <button
         onClick={e => { e.stopPropagation(); onAddToQueue(task.id) }}
         className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-xs shrink-0 transition-opacity px-0.5 font-bold"
         title="Добавить в очередь"
@@ -146,7 +153,7 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onPriorityChange, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
@@ -241,6 +248,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
                           onAddToQueue={onAddToQueue}
+                          onMarkDone={onMarkDone}
                           onPriorityChange={onPriorityChange}
                           draggingId={draggingId}
                           focusMode={focusMode}
@@ -284,6 +292,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       onAddToQueue={onAddToQueue}
+                      onMarkDone={onMarkDone}
                       onPriorityChange={onPriorityChange}
                       draggingId={draggingId}
                       focusMode={focusMode}

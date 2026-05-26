@@ -140,12 +140,20 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
           {/* Buttons — 3 states */}
           <div className="flex items-center gap-2">
             {!timer.isRunning && !timer.isPaused && (
-              <button
-                onClick={onStart}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white"
-              >
-                ▶ Старт
-              </button>
+              <>
+                <button
+                  onClick={onStart}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white"
+                >
+                  ▶ Старт
+                </button>
+                <button
+                  onClick={onDone}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] transition-colors rounded text-sm text-[#666]"
+                >
+                  ✓ Готово
+                </button>
+              </>
             )}
 
             {timer.isRunning && (

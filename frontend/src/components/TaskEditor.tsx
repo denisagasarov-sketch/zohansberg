@@ -10,6 +10,7 @@ interface Props {
   onSaved: () => void
   onDeleted: () => void
   onTakenNow: () => void
+  onMarkDone?: () => void
 }
 
 interface WorkSession {
@@ -47,7 +48,7 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function TaskEditor({ task, directions, onClose, onSaved, onDeleted, onTakenNow }: Props) {
+export default function TaskEditor({ task, directions, onClose, onSaved, onDeleted, onTakenNow, onMarkDone }: Props) {
   const [title, setTitle] = useState(task?.title ?? '')
   const [directionId, setDirectionId] = useState<number | null>(task?.direction_id ?? null)
   const [deadline, setDeadline] = useState(task?.deadline?.slice(0, 10) ?? '')
@@ -475,6 +476,14 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                 className="px-3 py-1.5 bg-[#252525] hover:bg-[#383838] rounded text-xs text-[#f0f0f0] transition-colors"
               >
                 Взять сейчас
+              </button>
+            )}
+            {onMarkDone && (
+              <button
+                onClick={onMarkDone}
+                className="px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] rounded text-xs text-[#666] transition-colors"
+              >
+                ✓ Готово
               </button>
             )}
             <button
