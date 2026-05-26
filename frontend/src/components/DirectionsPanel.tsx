@@ -54,11 +54,17 @@ function PriorityPicker({ current, onChange, onClose }: {
   )
 }
 
+const PRIORITY_RANK: Record<string, number> = { I: 1, II: 2, III: 3, none: 4 }
+
 function sortDirectionTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
     const diff = (a.direction_order ?? 0) - (b.direction_order ?? 0)
     return diff !== 0 ? diff : a.id - b.id
   })
+}
+
+function sortByPriority(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => (PRIORITY_RANK[a.priority] ?? 4) - (PRIORITY_RANK[b.priority] ?? 4))
 }
 
 interface TaskRowProps {
@@ -112,11 +118,14 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
       </div>
 
       <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
-      {task.deadline && (
-        <span className="text-[10px] text-[#666] shrink-0">
-          {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-        </span>
-      )}
+      {task.deadline && (() => {
+        const d = new Date(task.deadline)
+        const today = new Date(); today.setHours(0, 0, 0, 0)
+        const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+        return d < today
+          ? <span className="text-[10px] text-red-500 font-bold animate-blink shrink-0">! {dateStr}</span>
+          : <span className="text-[10px] text-[#b8900a] font-bold shrink-0">{dateStr}</span>
+      })()}
       {task.duration_plan != null && (
         <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
       )}
@@ -148,6 +157,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
+  const [prioritySorted, setPrioritySorted] = useState<Set<CollapseKey>>(new Set())
 
   const toggleCollapse = useCallback((key: CollapseKey) => {
     setCollapsed(prev => {
@@ -155,6 +165,15 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
       if (next.has(key)) next.delete(key)
       else next.add(key)
       saveCollapsed(next)
+      return next
+    })
+  }, [])
+
+  const togglePrioritySort = useCallback((key: CollapseKey) => {
+    setPrioritySorted(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }, [])
@@ -208,19 +227,29 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {sortedDirs.map(dir => {
           const color = getDirectionColor(dir.id)
-          const dirTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === dir.id))
+          const isByPriority = prioritySorted.has(dir.id)
+          const baseTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === dir.id))
+          const dirTasks = isByPriority ? sortByPriority(baseTasks) : baseTasks
           const isCollapsed = collapsed.has(dir.id)
           return (
             <div key={dir.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
               <div
-                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                className="flex items-center justify-between px-3 py-2 select-none"
                 style={{ backgroundColor: color + '1a' }}
-                onClick={() => toggleCollapse(dir.id)}
               >
-                <span className="text-xs font-semibold" style={{ color }}>{dir.name}</span>
+                <span
+                  className="text-xs font-semibold cursor-pointer"
+                  style={{ color }}
+                  onClick={() => togglePrioritySort(dir.id)}
+                  title="Клик — сортировка по приоритету"
+                >{dir.name}{isByPriority ? ' ↓' : ''}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px]" style={{ color: color + '80' }}>{dirTasks.length}</span>
-                  <span className="text-[10px]" style={{ color: color + '80' }}>{isCollapsed ? '▶' : '▼'}</span>
+                  <span
+                    className="text-[10px] cursor-pointer px-0.5"
+                    style={{ color: color + '80' }}
+                    onClick={() => toggleCollapse(dir.id)}
+                  >{isCollapsed ? '▶' : '▼'}</span>
                 </div>
               </div>
               {!isCollapsed && (
@@ -256,19 +285,27 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
 
         {/* Tasks without direction */}
         {(() => {
-          const noDirTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === null))
+          const isByPriorityNone = prioritySorted.has('none')
+          const baseNone = sortDirectionTasks(activeTasks.filter(t => t.direction_id === null))
+          const noDirTasks = isByPriorityNone ? sortByPriority(baseNone) : baseNone
           if (noDirTasks.length === 0) return null
           const isCollapsed = collapsed.has('none')
           return (
             <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
               <div
-                className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
-                onClick={() => toggleCollapse('none')}
+                className="flex items-center justify-between px-3 py-2 select-none"
               >
-                <span className="text-xs font-medium text-[#666]">Без направления</span>
+                <span
+                  className="text-xs font-medium text-[#666] cursor-pointer"
+                  onClick={() => togglePrioritySort('none')}
+                  title="Клик — сортировка по приоритету"
+                >Без направления{isByPriorityNone ? ' ↓' : ''}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-[#383838]">{noDirTasks.length}</span>
-                  <span className="text-[10px] text-[#383838]">{isCollapsed ? '▶' : '▼'}</span>
+                  <span
+                    className="text-[10px] text-[#383838] cursor-pointer px-0.5"
+                    onClick={() => toggleCollapse('none')}
+                  >{isCollapsed ? '▶' : '▼'}</span>
                 </div>
               </div>
               {!isCollapsed && (

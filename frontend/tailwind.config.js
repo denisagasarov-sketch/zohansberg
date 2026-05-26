@@ -3,6 +3,12 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      keyframes: {
+        blink: { '50%': { opacity: '0' } },
+      },
+      animation: {
+        blink: 'blink 1s step-start infinite',
+      },
       colors: {
         bg: '#181818',
         header: '#141414',
