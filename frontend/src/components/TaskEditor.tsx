@@ -40,12 +40,17 @@ function formatDur(s: number | null): string {
   if (!s) return '—'
   const m = Math.floor(s / 60)
   const h = Math.floor(m / 60)
-  if (h > 0) return `${h}ч ${m % 60}м`
-  return `${m}м`
+  if (h > 0) return `${h}ч ${m % 60}мин`
+  return `${m} мин`
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+function formatSessionLine(started_at: string, ended_at: string | null, duration_actual: number | null): string {
+  const d = new Date(started_at)
+  const date = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  const start = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const end = ended_at ? new Date(ended_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : null
+  const dur = formatDur(duration_actual)
+  return end ? `${date}, ${start} → ${end} · ${dur}` : `${date}, ${start} · ${dur}`
 }
 
 export default function TaskEditor({ task, directions, onClose, onSaved, onDeleted, onTakenNow, onMarkDone }: Props) {
@@ -351,10 +356,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               ) : (
                 sessions.map(s => (
                   <div key={s.id} className="bg-[#141414] border border-[#252525] rounded px-3 py-2">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-[#666]">{formatDate(s.started_at)}</span>
-                      <span className="text-[10px] text-[#5060a0]">{formatDur(s.duration_actual)}</span>
-                    </div>
+                    <span className="text-[10px] text-[#666]">{formatSessionLine(s.started_at, s.ended_at, s.duration_actual)}</span>
                     {s.note && <p className="text-xs text-[#999] mt-1">{s.note}</p>}
                   </div>
                 ))
