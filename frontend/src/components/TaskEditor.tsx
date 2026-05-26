@@ -60,7 +60,6 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [aiError, setAiError] = useState('')
-  const [tab, setTab] = useState<'notes' | 'log'>('notes')
   const [sessions, setSessions] = useState<WorkSession[]>([])
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -103,13 +102,13 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   }, [isDirty, onClose])
 
   useEffect(() => {
-    if (tab === 'log' && task && !sessionsLoaded) {
+    if (task && !sessionsLoaded) {
       api.getTaskSessions(task.id).then(s => {
         setSessions(s)
         setSessionsLoaded(true)
       }).catch(() => setSessionsLoaded(true))
     }
-  }, [tab, task, sessionsLoaded])
+  }, [task, sessionsLoaded])
 
   // Auto-grow notes textarea
   useEffect(() => {
@@ -334,42 +333,19 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             <span className="text-xs text-[#666]">Когда-нибудь</span>
           </label>
 
-          {/* Tabs: Notes / Log */}
+          {/* Sessions block — only for existing tasks */}
           {task && (
-            <div className="flex gap-1 border-b border-[#252525] pb-0 mb-0 -mx-4 px-4">
-              <button
-                onClick={() => setTab('notes')}
-                className={`text-xs pb-2 border-b-2 transition-colors ${tab === 'notes' ? 'border-[#5060a0] text-[#f0f0f0]' : 'border-transparent text-[#666] hover:text-[#999]'}`}
-              >
-                Заметки
-              </button>
-              <button
-                onClick={() => setTab('log')}
-                className={`text-xs pb-2 border-b-2 transition-colors ml-3 ${tab === 'log' ? 'border-[#5060a0] text-[#f0f0f0]' : 'border-transparent text-[#666] hover:text-[#999]'}`}
-              >
-                Лог сессий
-              </button>
-            </div>
-          )}
-
-          {(!task || tab === 'notes') && (
-            <div>
-              {!task && <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Заметки</label>}
-              <textarea
-                ref={notesRef}
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Детали, ссылки, мысли…"
-                style={{ minHeight: '80px', height: 'auto' }}
-                className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838] overflow-hidden"
-              />
-            </div>
-          )}
-
-          {task && tab === 'log' && (
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] text-[#666] uppercase tracking-wider">Лог сессий</label>
+                {sessionsLoaded && sessions.length > 0 && (
+                  <span className="text-[10px] text-[#5060a0]">
+                    {formatDur(sessions.reduce((s, r) => s + (r.duration_actual ?? 0), 0))} итого
+                  </span>
+                )}
+              </div>
               {!sessionsLoaded ? (
-                <p className="text-xs text-[#666]">Загружаю…</p>
+                <p className="text-xs text-[#555]">Загружаю…</p>
               ) : sessions.length === 0 ? (
                 <p className="text-xs text-[#383838]">Сессий пока нет</p>
               ) : (
@@ -454,6 +430,19 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               )}
             </div>
           )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Заметки</label>
+            <textarea
+              ref={notesRef}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Детали, ссылки, мысли…"
+              style={{ minHeight: '80px', height: 'auto' }}
+              className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-2 text-[#f0f0f0] text-sm focus:outline-none focus:border-[#5060a0] resize-none placeholder-[#383838] overflow-hidden"
+            />
+          </div>
         </div>
 
         {/* Footer */}
