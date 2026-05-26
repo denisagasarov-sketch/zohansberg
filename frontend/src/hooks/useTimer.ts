@@ -20,6 +20,7 @@ export function useTimer() {
   })
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
 
@@ -34,7 +35,34 @@ export function useTimer() {
     }
   }, [])
 
-  useEffect(() => () => clearTimer(), [clearTimer])
+  const clearHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current !== null) {
+      clearInterval(heartbeatIntervalRef.current)
+      heartbeatIntervalRef.current = null
+    }
+  }, [])
+
+  const startHeartbeat = useCallback(() => {
+    clearHeartbeat()
+    heartbeatIntervalRef.current = setInterval(() => {
+      const sid = sessionIdRef.current
+      if (sid === null) return
+      const elapsed = startedAtMsRef.current !== null
+        ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
+        : stateRef.current.elapsed
+      api.heartbeatSession(sid, elapsed).catch(() => {})
+    }, 30_000)
+  }, [clearHeartbeat])
+
+  useEffect(() => () => { clearTimer(); clearHeartbeat() }, [clearTimer, clearHeartbeat])
+
+  // Close any session left open from a previous page load — always start idle
+  useEffect(() => {
+    api.getActiveSession().then(session => {
+      if (!session) return
+      api.endSession(session.id, new Date().toISOString(), session.elapsed_seconds ?? 0).catch(() => {})
+    }).catch(() => {})
+  }, [])
 
   const startInterval = useCallback(() => {
     intervalRef.current = setInterval(() => {
@@ -68,6 +96,7 @@ export function useTimer() {
     setState({ isRunning: true, isPaused: false, elapsed: 0, sessionId: null, taskId })
     playSound('start')
     startInterval()
+    startHeartbeat()
 
     try {
       const session = await api.startSession(taskId, nowIso)
@@ -76,17 +105,18 @@ export function useTimer() {
     } catch (e) {
       console.error('Failed to start session', e)
     }
-  }, [clearTimer, startInterval])
+  }, [clearTimer, startInterval, startHeartbeat])
 
   const pause = useCallback(() => {
     clearTimer()
+    clearHeartbeat()
     const elapsed = startedAtMsRef.current !== null
       ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
       : stateRef.current.elapsed
     startedAtMsRef.current = null
     setState(prev => ({ ...prev, isRunning: false, isPaused: true, elapsed }))
     playSound('pause')
-  }, [clearTimer])
+  }, [clearTimer, clearHeartbeat])
 
   const resume = useCallback(() => {
     if (!stateRef.current.isPaused) return
@@ -95,10 +125,12 @@ export function useTimer() {
     setState(prev => ({ ...prev, isRunning: true, isPaused: false }))
     playSound('start')
     startInterval()
-  }, [startInterval])
+    startHeartbeat()
+  }, [startInterval, startHeartbeat])
 
   const stop = useCallback(async (): Promise<{ sessionId: number | null }> => {
     clearTimer()
+    clearHeartbeat()
     const elapsed = startedAtMsRef.current !== null
       ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
       : stateRef.current.elapsed
@@ -117,7 +149,7 @@ export function useTimer() {
     playSound('pause')
     setState({ isRunning: false, isPaused: false, elapsed: 0, sessionId: null, taskId: null })
     return { sessionId }
-  }, [clearTimer])
+  }, [clearTimer, clearHeartbeat])
 
   return { timerState: state, start, pause, resume, stop }
 }
