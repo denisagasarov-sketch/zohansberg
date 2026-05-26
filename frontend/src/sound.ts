@@ -4,62 +4,74 @@ function getCtx(): AudioContext {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
   }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {})
+  }
   return audioCtx
 }
 
+// Returns a safe scheduled time: adds 100ms buffer when context isn't running yet
+function st(ctx: AudioContext, t: number): number {
+  return ctx.state !== 'running' ? Math.max(t, ctx.currentTime + 0.1) : t
+}
+
 function beep(freq: number, duration: number, type: OscillatorType, vol: number, ctx: AudioContext, t: number) {
+  const s = st(ctx, t)
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.connect(gain); gain.connect(ctx.destination)
   osc.type = type
-  osc.frequency.setValueAtTime(Math.max(freq, 1), t)
-  gain.gain.setValueAtTime(Math.max(vol, 0.001), t)
-  gain.gain.exponentialRampToValueAtTime(0.001, t + duration)
-  osc.start(t); osc.stop(t + duration + 0.01)
+  osc.frequency.setValueAtTime(Math.max(freq, 1), s)
+  gain.gain.setValueAtTime(Math.max(vol, 0.001), s)
+  gain.gain.exponentialRampToValueAtTime(0.001, s + duration)
+  osc.start(s); osc.stop(s + duration + 0.01)
 }
 
 function sweep(f0: number, f1: number, dur: number, type: OscillatorType, vol: number, ctx: AudioContext, t: number) {
+  const s = st(ctx, t)
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.connect(gain); gain.connect(ctx.destination)
   osc.type = type
-  osc.frequency.setValueAtTime(Math.max(f0, 1), t)
-  osc.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur)
-  gain.gain.setValueAtTime(Math.max(vol, 0.001), t)
-  gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
-  osc.start(t); osc.stop(t + dur + 0.01)
+  osc.frequency.setValueAtTime(Math.max(f0, 1), s)
+  osc.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), s + dur)
+  gain.gain.setValueAtTime(Math.max(vol, 0.001), s)
+  gain.gain.exponentialRampToValueAtTime(0.001, s + dur)
+  osc.start(s); osc.stop(s + dur + 0.01)
 }
 
 // ── Long sound helpers (>= 2.5s) for 45-minute sounds ────────────────────
 
 function lngNote(f: number, type: OscillatorType, vol: number, ctx: AudioContext, t: number, dur = 2.5) {
+  const s = st(ctx, t)
   const osc = ctx.createOscillator(), g = ctx.createGain()
   osc.connect(g); g.connect(ctx.destination)
   osc.type = type
-  osc.frequency.setValueAtTime(Math.max(f, 1), t)
-  g.gain.setValueAtTime(0.001, t)
-  g.gain.linearRampToValueAtTime(vol, t + 0.05)
-  g.gain.setValueAtTime(vol * 0.85, t + dur - 0.3)
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-  osc.start(t); osc.stop(t + dur + 0.05)
+  osc.frequency.setValueAtTime(Math.max(f, 1), s)
+  g.gain.setValueAtTime(0.001, s)
+  g.gain.linearRampToValueAtTime(vol, s + 0.05)
+  g.gain.setValueAtTime(vol * 0.85, s + dur - 0.3)
+  g.gain.exponentialRampToValueAtTime(0.001, s + dur)
+  osc.start(s); osc.stop(s + dur + 0.05)
 }
 
 function lngSweep(f0: number, f1: number, type: OscillatorType, vol: number, ctx: AudioContext, t: number, dur = 2.5) {
+  const s = st(ctx, t)
   const osc = ctx.createOscillator(), g = ctx.createGain()
   osc.connect(g); g.connect(ctx.destination)
   osc.type = type
-  osc.frequency.setValueAtTime(Math.max(f0, 1), t)
-  osc.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur - 0.3)
-  g.gain.setValueAtTime(0.001, t)
-  g.gain.linearRampToValueAtTime(vol, t + 0.05)
-  g.gain.setValueAtTime(vol * 0.8, t + dur - 0.3)
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-  osc.start(t); osc.stop(t + dur + 0.05)
+  osc.frequency.setValueAtTime(Math.max(f0, 1), s)
+  osc.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), s + dur - 0.3)
+  g.gain.setValueAtTime(0.001, s)
+  g.gain.linearRampToValueAtTime(vol, s + 0.05)
+  g.gain.setValueAtTime(vol * 0.8, s + dur - 0.3)
+  g.gain.exponentialRampToValueAtTime(0.001, s + dur)
+  osc.start(s); osc.stop(s + dur + 0.05)
 }
 
 // Spreads notes across 2s, last note sustained to fill 2.5s total
 function lngMel(freqs: number[], type: OscillatorType, vol: number, ctx: AudioContext) {
-  const t = ctx.currentTime, n = freqs.length, step = 2.0 / n
+  const t = st(ctx, ctx.currentTime), n = freqs.length, step = 2.0 / n
   freqs.forEach((f, i) => {
     const nt = t + i * step, isLast = i === n - 1
     const dur = isLast ? Math.max(2.5 - i * step, 0.4) : step * 1.2
@@ -76,7 +88,7 @@ function lngMel(freqs: number[], type: OscillatorType, vol: number, ctx: AudioCo
 }
 
 function lngChord(freqs: number[], type: OscillatorType, vol: number, ctx: AudioContext) {
-  const t = ctx.currentTime, perVol = (vol / freqs.length) * 1.5
+  const t = st(ctx, ctx.currentTime), perVol = (vol / freqs.length) * 1.5
   freqs.forEach(f => lngNote(f, type, perVol, ctx, t))
 }
 
@@ -159,7 +171,7 @@ export const TIMER_SOUNDS: TimerSound[] = [
     playLong: (ctx, vol) => lngSweep(200, 1200, 'square', vol * 0.45, ctx, ctx.currentTime) },
   { id: 23, name: 'Нарастание',
     play: (ctx, vol) => {
-      const t = ctx.currentTime
+      const t = st(ctx, ctx.currentTime)
       const osc = ctx.createOscillator(); const gain = ctx.createGain()
       osc.connect(gain); gain.connect(ctx.destination)
       osc.type = 'sine'
@@ -235,7 +247,7 @@ export const TIMER_SOUNDS: TimerSound[] = [
     playLong: (ctx, vol) => lngMel([880, 722, 592, 485, 399], 'square', vol * 0.5, ctx) },
   { id: 44, name: 'Вибрато',
     play: (ctx, vol) => {
-      const t = ctx.currentTime
+      const t = st(ctx, ctx.currentTime)
       const osc = ctx.createOscillator(); const gain = ctx.createGain()
       const lfo = ctx.createOscillator(); const lfoGain = ctx.createGain()
       lfo.connect(lfoGain); lfoGain.connect(osc.frequency)
@@ -247,7 +259,7 @@ export const TIMER_SOUNDS: TimerSound[] = [
       lfo.start(t); osc.start(t); lfo.stop(t + 0.75); osc.stop(t + 0.75)
     },
     playLong: (ctx, vol) => {
-      const t = ctx.currentTime
+      const t = st(ctx, ctx.currentTime)
       const osc = ctx.createOscillator(), gain = ctx.createGain()
       const lfo = ctx.createOscillator(), lfoGain = ctx.createGain()
       lfo.connect(lfoGain); lfoGain.connect(osc.frequency)
