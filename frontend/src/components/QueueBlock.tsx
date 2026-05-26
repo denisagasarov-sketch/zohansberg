@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
+import { priorityLabel, priorityColor } from '../utils/priority'
 
 interface Props {
   tasks: Task[]
@@ -114,6 +115,9 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                 )}
                 <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                 <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
+                {task.priority && task.priority !== 'none' && (
+                  <span className="text-[11px] font-mono shrink-0" style={{ color: priorityColor(task.priority) }}>{priorityLabel(task.priority)}</span>
+                )}
                 <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
                 {task.deadline && (
                   <span className="text-[10px] text-[#666] shrink-0">
