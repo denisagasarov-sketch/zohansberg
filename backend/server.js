@@ -29,7 +29,11 @@ function evictNowTask(excludeId = null) {
   if (excludeId != null) q += ` AND id != ${Number(excludeId)}`
   const current = db.prepare(q).get()
   if (current) {
-    db.prepare(`UPDATE tasks SET slot = 'queue', updated_at = ? WHERE id = ?`)
+    // Shift existing queue tasks to make room at position 0
+    db.prepare(`UPDATE tasks SET slot_order = slot_order + 1, updated_at = ? WHERE in_queue = 1 AND deleted_at IS NULL`)
+      .run(nowIso())
+    // Place evicted task at the front of the queue
+    db.prepare(`UPDATE tasks SET slot = 'queue', in_queue = 1, slot_order = 0, updated_at = ? WHERE id = ?`)
       .run(nowIso(), current.id)
   }
 }
