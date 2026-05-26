@@ -265,6 +265,7 @@ export default function App() {
                 onDropFromOutside={handleAddToQueue}
                 onRemoveFromQueue={handleRemoveFromQueue}
                 onMarkDone={handleMarkDone}
+                onTakeNow={handleTakeNow}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />

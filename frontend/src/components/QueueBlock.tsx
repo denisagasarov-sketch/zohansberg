@@ -12,11 +12,12 @@ interface Props {
   onDropFromOutside: (taskId: number) => void
   onRemoveFromQueue: (taskId: number) => void
   onMarkDone: (taskId: number) => void
+  onTakeNow: (taskId: number) => void
   focusMode?: boolean
   nowTaskId?: number
 }
 
-export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, focusMode, nowTaskId }: Props) {
+export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, onTakeNow, focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
   const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.someday && !t.done_at && !t.deleted_at && t.slot !== 'now')
   const draggingIdRef = useRef<number | null>(null)
@@ -135,6 +136,11 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                     {dir.name}
                   </span>
                 )}
+                <button
+                  onClick={e => { e.stopPropagation(); onTakeNow(task.id) }}
+                  className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-[10px] leading-none shrink-0 transition-opacity px-0.5"
+                  title="Взять сейчас"
+                >▶</button>
                 <button
                   onClick={e => { e.stopPropagation(); onMarkDone(task.id) }}
                   className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-xs leading-none shrink-0 transition-opacity px-0.5"
