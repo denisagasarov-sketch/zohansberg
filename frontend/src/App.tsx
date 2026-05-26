@@ -125,6 +125,16 @@ export default function App() {
     setShowAfterDone(true)
   }, [nowTask, timerState.isRunning, timerState.isPaused, stop, updateTask])
 
+  const handleSendToQueue = useCallback(async () => {
+    if (!nowTask) return
+    if (timerState.isRunning || timerState.isPaused) {
+      const { sessionId } = await stop()
+      if (sessionId !== null) setPostStopSessionId(sessionId)
+    }
+    await api.evictNow()
+    await refresh()
+  }, [nowTask, timerState.isRunning, timerState.isPaused, stop, refresh])
+
   const handleTakeNow = useCallback(async (taskId: number) => {
     if (timerState.isRunning) {
       setPendingSwitchTaskId(taskId)
@@ -242,6 +252,7 @@ export default function App() {
                 onResume={handleResumeTimer}
                 onStop={handleStopTimer}
                 onDone={handleDoneNow}
+                onSendToQueue={handleSendToQueue}
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
                 onDropTask={handleDropToNow}

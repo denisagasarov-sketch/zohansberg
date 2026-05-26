@@ -175,6 +175,16 @@ app.post('/api/tasks/take-now', (req, res) => {
   }
 })
 
+// POST /api/tasks/evict-now — move current now-task to front of queue
+app.post('/api/tasks/evict-now', (_req, res) => {
+  try {
+    evictNowTask()
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /api/tasks/reorder — {slot, ordered_ids}
 app.post('/api/tasks/reorder', (req, res) => {
   try {

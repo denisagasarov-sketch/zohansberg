@@ -15,6 +15,7 @@ interface Props {
   onPause: () => void
   onResume: () => void
   onDone: () => void
+  onSendToQueue: () => void
   onTaskClick: (task: Task) => void
   onAddTask: () => void
   onDropTask: (taskId: number) => void
@@ -36,7 +37,7 @@ function formatTime(s: number): string {
   return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onTaskClick, onAddTask, onDropTask }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const dirColor = direction ? getDirectionColor(direction.id) : null
   const [isDragOver, setIsDragOver] = useState(false)
@@ -161,6 +162,12 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                 >
                   ✓ Готово
                 </button>
+                <button
+                  onClick={onSendToQueue}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#666] hover:text-[#f0f0f0] transition-colors rounded text-sm text-[#666]"
+                >
+                  ↓ В очередь
+                </button>
               </>
             )}
 
@@ -184,6 +191,12 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                 >
                   ✓ Готово
                 </button>
+                <button
+                  onClick={onSendToQueue}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#666] hover:text-[#f0f0f0] transition-colors rounded text-sm text-[#666]"
+                >
+                  ↓ В очередь
+                </button>
               </>
             )}
 
@@ -206,6 +219,12 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] transition-colors rounded text-sm text-[#666]"
                 >
                   ✓ Готово
+                </button>
+                <button
+                  onClick={onSendToQueue}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#666] hover:text-[#f0f0f0] transition-colors rounded text-sm text-[#666]"
+                >
+                  ↓ В очередь
                 </button>
               </>
             )}

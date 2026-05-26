@@ -49,6 +49,8 @@ export const api = {
     isTauri ? invoke('restore_task', { id }) : req('POST', `/tasks/${id}/restore`, {}),
   takeNow: (task_id: number) =>
     isTauri ? invoke('take_now', { taskId: task_id }) : req('POST', '/tasks/take-now', { task_id }),
+  evictNow: () =>
+    req('POST', '/tasks/evict-now', {}),
   reorderTasks: (slot: string, ordered_ids: number[]) =>
     isTauri ? invoke('reorder_tasks', { slot, orderedIds: ordered_ids }) : req('POST', '/tasks/reorder', { slot, ordered_ids }),
   resetOrder: (slot: string) =>
