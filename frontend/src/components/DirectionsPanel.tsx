@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
+import { PRIORITY_OPTIONS, priorityLabel, priorityColor } from '../utils/priority'
 
 interface Props {
   tasks: Task[]
@@ -18,16 +19,6 @@ interface Props {
 }
 
 type CollapseKey = number | 'none' | 'someday'
-
-const PRIORITY_OPTIONS = [
-  { value: 'I',    label: 'Ⅰ', color: '#F97316' },
-  { value: 'II',   label: 'Ⅱ', color: '#94A3B8' },
-  { value: 'III',  label: 'Ⅲ', color: '#475569' },
-  { value: 'none', label: '–', color: '#555'     },
-] as const
-
-function priorityLabel(p: string) { return PRIORITY_OPTIONS.find(o => o.value === p)?.label ?? '–' }
-function priorityColor(p: string) { return PRIORITY_OPTIONS.find(o => o.value === p)?.color ?? '#555' }
 
 function PriorityPicker({ current, onChange, onClose }: {
   current: string

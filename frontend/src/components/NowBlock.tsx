@@ -3,6 +3,7 @@ import type { Task, Direction } from '../types'
 import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
+import { priorityLabel, priorityColor } from '../utils/priority'
 
 interface Props {
   task: Task | null
@@ -89,7 +90,14 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             className="cursor-pointer hover:opacity-80 transition-opacity mb-4"
             onClick={() => onTaskClick(task)}
           >
-            <h2 className="text-xl font-bold text-[#f0f0f0] leading-tight mb-1.5">{task.title}</h2>
+            <div className="flex items-start gap-2 mb-1.5">
+              {task.priority && task.priority !== 'none' && (
+                <span className="text-[13px] font-mono leading-tight mt-[3px] shrink-0" style={{ color: priorityColor(task.priority) }}>
+                  {priorityLabel(task.priority)}
+                </span>
+              )}
+              <h2 className="text-xl font-bold text-[#f0f0f0] leading-tight">{task.title}</h2>
+            </div>
             <div className="flex items-center gap-2 flex-wrap text-xs">
               {direction && dirColor && (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ color: dirColor, backgroundColor: dirColor + '28' }}>{direction.name}</span>
