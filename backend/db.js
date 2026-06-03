@@ -75,6 +75,7 @@ function initSchema() {
       order_index INTEGER NOT NULL DEFAULT 0
     );
   `)
+  try { db.exec(`ALTER TABLE directions ADD COLUMN notes TEXT`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN direction_order INTEGER NOT NULL DEFAULT 0`) } catch {}

@@ -4,6 +4,7 @@ export interface Direction {
   order_index: number
   archived: number
   created_at: string
+  notes: string | null
 }
 
 export interface Task {

@@ -81,12 +81,13 @@ app.patch('/api/directions/:id', (req, res) => {
     const existing = db.prepare(`SELECT * FROM directions WHERE id = ?`).get(id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
-    const { name, order_index, archived } = req.body
+    const { name, order_index, archived, notes } = req.body
     const fields = []
     const vals = []
     if (name !== undefined) { fields.push('name = ?'); vals.push(name) }
     if (order_index !== undefined) { fields.push('order_index = ?'); vals.push(order_index) }
     if (archived !== undefined) { fields.push('archived = ?'); vals.push(archived ? 1 : 0) }
+    if (notes !== undefined) { fields.push('notes = ?'); vals.push(notes || null) }
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
 
     vals.push(id)

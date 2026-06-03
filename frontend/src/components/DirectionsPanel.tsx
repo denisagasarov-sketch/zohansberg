@@ -14,6 +14,7 @@ interface Props {
   onAddToQueue: (taskId: number) => void
   onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
+  onUpdateDirection: (id: number, data: Partial<Direction>) => void
   focusMode?: boolean
   nowTaskId?: number
 }
@@ -153,11 +154,15 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
   const [prioritySorted, setPrioritySorted] = useState<Set<CollapseKey>>(new Set())
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null)
+  const [noteValues, setNoteValues] = useState<Record<number, string>>(() =>
+    Object.fromEntries(directions.map(d => [d.id, d.notes ?? '']))
+  )
 
   const toggleCollapse = useCallback((key: CollapseKey) => {
     setCollapsed(prev => {
@@ -252,6 +257,35 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                   >{isCollapsed ? '▶' : '▼'}</span>
                 </div>
               </div>
+              {/* Notes row */}
+              {!isCollapsed && (
+                <div className="px-3 pb-1">
+                  {editingNoteId === dir.id ? (
+                    <textarea
+                      autoFocus
+                      value={noteValues[dir.id] ?? ''}
+                      onChange={e => setNoteValues(p => ({ ...p, [dir.id]: e.target.value }))}
+                      onBlur={() => {
+                        setEditingNoteId(null)
+                        onUpdateDirection(dir.id, { notes: noteValues[dir.id] || null } as any)
+                      }}
+                      rows={2}
+                      placeholder="Заметки к направлению…"
+                      className="w-full bg-transparent text-[11px] text-[#666] resize-none focus:outline-none focus:text-[#999] placeholder-[#383838] py-1"
+                    />
+                  ) : (noteValues[dir.id] || null) ? (
+                    <p
+                      className="text-[11px] text-[#555] cursor-pointer hover:text-[#777] py-1 leading-snug"
+                      onClick={() => setEditingNoteId(dir.id)}
+                    >{noteValues[dir.id]}</p>
+                  ) : (
+                    <button
+                      className="text-[10px] text-[#383838] hover:text-[#555] py-0.5"
+                      onClick={() => setEditingNoteId(dir.id)}
+                    >+ заметка</button>
+                  )}
+                </div>
+              )}
               {!isCollapsed && (
                 <>
                   {dirTasks.length === 0 ? (
