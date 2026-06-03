@@ -1049,6 +1049,38 @@ app.get('/api/today-summary', (_req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/weekly-summary — last 7 days stats for weekly review
+app.get('/api/weekly-summary', (_req, res) => {
+  try {
+    const done_count = db.prepare(
+      `SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) >= date('now','-6 days') AND deleted_at IS NULL`
+    ).get().n
+
+    const time_seconds = db.prepare(
+      `SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= date('now','-6 days')`
+    ).get().s
+
+    const by_direction = db.prepare(`
+      SELECT t.direction_id, COALESCE(d.name,'Без направления') AS direction_name,
+             SUM(ws.duration_actual) AS seconds
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE date(ws.started_at) >= date('now','-6 days') AND ws.duration_actual > 0
+      GROUP BY t.direction_id ORDER BY seconds DESC
+    `).all()
+
+    const done_tasks = db.prepare(`
+      SELECT t.title, COALESCE(d.name,'') AS direction
+      FROM tasks t LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE date(t.done_at) >= date('now','-6 days') AND t.deleted_at IS NULL
+      ORDER BY t.done_at ASC LIMIT 20
+    `).all()
+
+    res.json({ done_count, time_seconds, by_direction, done_tasks })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Day Plan ────────────────────────────────────────────────────────────────
 
 // GET /api/day-plan?date=YYYY-MM-DD

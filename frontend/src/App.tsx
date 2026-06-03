@@ -14,6 +14,7 @@ import TimerSwitchModal from './components/modals/TimerSwitchModal'
 import CheckinModal from './components/modals/CheckinModal'
 import FocusSwitchModal from './components/modals/FocusSwitchModal'
 import EveningSummaryModal from './components/modals/EveningSummaryModal'
+import WeeklyReviewModal from './components/modals/WeeklyReviewModal'
 import MorningPlanModal from './components/modals/MorningPlanModal'
 import DayPlanBlock from './components/DayPlanBlock'
 import SessionNoteModal from './components/modals/SessionNoteModal'
@@ -33,6 +34,7 @@ export default function App() {
   const [pendingFocusTask, setPendingFocusTask] = useState<Task | null>(null)
   const [showFocusSwitch, setShowFocusSwitch] = useState(false)
   const [showEveningSummary, setShowEveningSummary] = useState(false)
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   const [showMorningPlan, setShowMorningPlan] = useState(false)
   const [planTaskIds, setPlanTaskIds] = useState<number[]>([])
   const [planTasks, setPlanTasks] = useState<any[]>([])
@@ -62,6 +64,18 @@ export default function App() {
       rows.forEach(r => { if (r.direction_id != null) map[r.direction_id] = r.seconds })
       setWeeklyTime(map)
     }).catch(() => {})
+  }, [])
+
+  // Show weekly review on Fri/Sat/Sun after 17:00 (once per week)
+  useEffect(() => {
+    const now = new Date()
+    const day = now.getDay() // 0=Sun, 5=Fri, 6=Sat
+    if (![0, 5, 6].includes(day) || now.getHours() < 17) return
+    const weekKey = `weekly_review_${now.getFullYear()}_${Math.ceil(now.getDate() / 7)}_${now.getMonth()}`
+    if (!localStorage.getItem(weekKey)) {
+      setShowWeeklyReview(true)
+      localStorage.setItem(weekKey, '1')
+    }
   }, [])
 
   // Show checkin modal if no checkin recorded today
@@ -416,6 +430,15 @@ export default function App() {
           directions={directions}
           onClose={() => setShowEveningSummary(false)}
           onLater={() => setShowEveningSummary(false)}
+        />
+      )}
+
+      {showWeeklyReview && (
+        <WeeklyReviewModal
+          tasks={tasks}
+          directions={directions}
+          onClose={() => setShowWeeklyReview(false)}
+          onLater={() => setShowWeeklyReview(false)}
         />
       )}
 
