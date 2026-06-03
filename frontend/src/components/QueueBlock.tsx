@@ -120,6 +120,7 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                   <span className="text-[11px] font-mono shrink-0" style={{ color: priorityColor(task.priority) }}>{priorityLabel(task.priority)}</span>
                 )}
                 <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+                {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
                 {task.deadline && (
                   <span className="text-[10px] text-[#666] shrink-0">
                     {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}

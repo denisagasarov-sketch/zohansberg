@@ -77,6 +77,8 @@ function initSchema() {
   `)
   try { db.exec(`ALTER TABLE directions ADD COLUMN notes TEXT`) } catch {}
   try { db.exec(`ALTER TABLE directions ADD COLUMN weekly_goal_seconds INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE tasks ADD COLUMN recurrence TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_last_date TEXT`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN direction_order INTEGER NOT NULL DEFAULT 0`) } catch {}

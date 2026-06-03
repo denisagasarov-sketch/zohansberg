@@ -120,6 +120,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
       </div>
 
       <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+      {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
       {task.deadline && (() => {
         const d = new Date(task.deadline)
         const today = new Date(); today.setHours(0, 0, 0, 0)

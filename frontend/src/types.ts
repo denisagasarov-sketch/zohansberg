@@ -27,6 +27,8 @@ export interface Task {
   done_at: string | null
   deleted_at: string | null
   direction_name?: string
+  recurrence: 'daily' | 'weekdays' | 'weekly' | 'monthly' | null
+  recurrence_last_date: string | null
 }
 
 export interface WorkSession {

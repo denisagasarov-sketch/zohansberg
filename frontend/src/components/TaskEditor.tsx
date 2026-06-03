@@ -60,6 +60,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [durationPlan, setDurationPlan] = useState<string>(task?.duration_plan?.toString() ?? '')
   const [notes, setNotes] = useState(task?.notes ?? '')
   const [someday, setSomeday] = useState(!!task?.someday)
+  const [recurrence, setRecurrence] = useState<string>(task?.recurrence ?? '')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -133,6 +134,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
+        recurrence: recurrence || null,
         someday: someday as any,
         ...(someday ? { in_queue: false as any } : {}),
       }
@@ -325,6 +327,22 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               placeholder="0.5"
               className="w-28 bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
             />
+          </div>
+
+          {/* Recurrence */}
+          <div>
+            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Повтор</label>
+            <select
+              value={recurrence}
+              onChange={e => setRecurrence(e.target.value)}
+              className="bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
+            >
+              <option value="">Нет</option>
+              <option value="daily">Каждый день</option>
+              <option value="weekdays">Будни</option>
+              <option value="weekly">Каждую неделю</option>
+              <option value="monthly">Каждый месяц</option>
+            </select>
           </div>
 
           {/* Someday */}

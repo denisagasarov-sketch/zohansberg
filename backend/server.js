@@ -7,6 +7,33 @@ const { db, initSchema, cleanupTrash } = require('./db')
 initSchema()
 cleanupTrash()
 
+// ─── Recurring helpers ────────────────────────────────────────────────────────
+
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+
+function nextRecurrenceDate(recurrence, fromDate) {
+  const d = new Date(fromDate + 'T12:00:00')
+  if (recurrence === 'daily') { d.setDate(d.getDate() + 1) }
+  else if (recurrence === 'weekdays') {
+    do { d.setDate(d.getDate() + 1) } while ([0, 6].includes(d.getDay()))
+  } else if (recurrence === 'weekly') { d.setDate(d.getDate() + 7) }
+  else if (recurrence === 'monthly') { d.setMonth(d.getMonth() + 1) }
+  return d.toISOString().slice(0, 10)
+}
+
+function spawnRecurringNext(task) {
+  const nextDate = nextRecurrenceDate(task.recurrence, todayStr())
+  const existing = db.prepare(
+    `SELECT id FROM tasks WHERE recurrence_last_date = ? AND title = ? AND deleted_at IS NULL AND done_at IS NULL`
+  ).get(nextDate, task.title)
+  if (existing) return
+  db.prepare(`
+    INSERT INTO tasks (title, direction_id, priority, notes, recurrence, recurrence_last_date, deadline, duration_plan, in_queue, someday, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,0,0,datetime('now'),datetime('now'))
+  `).run(task.title, task.direction_id, task.priority, task.notes, task.recurrence, nextDate, nextDate, task.duration_plan)
+  db.prepare(`UPDATE tasks SET recurrence_last_date = ? WHERE id = ?`).run(nextDate, task.id)
+}
+
 const app = express()
 const PORT = process.env.PORT || 3001
 
@@ -311,7 +338,14 @@ app.patch('/api/tasks/:id', (req, res) => {
 
     vals.push(id)
     db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
-    res.json(db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(id))
+    const updated = db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(id)
+
+    // If marking done and task has recurrence — spawn next instance
+    if ('done_at' in req.body && req.body.done_at && existing.recurrence) {
+      spawnRecurringNext(existing)
+    }
+
+    res.json(updated)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
