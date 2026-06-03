@@ -18,6 +18,8 @@ interface DashboardData {
     duration_actual: number
     direction_id: number | null
     direction_name: string
+    task_title: string | null
+    note: string | null
   }>
   time_by_direction: Array<{
     direction_id: number | null
@@ -111,6 +113,12 @@ function getDayLabel(iso: string): string {
   return `${names[d.getDay()]} ${d.getDate()}`
 }
 
+type Session = DashboardData['sessions'][number]
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
 function TimelineBlock({
   sessions,
   colorMap,
@@ -118,6 +126,7 @@ function TimelineBlock({
   sessions: DashboardData['sessions']
   colorMap: Map<number | null, string>
 }) {
+  const [selected, setSelected] = useState<Session | null>(null)
   const weekDays = getWeekDays()
   const sessionsByDay = new Map<string, typeof sessions>()
   for (const s of sessions) {
@@ -125,12 +134,8 @@ function TimelineBlock({
     if (!sessionsByDay.has(day)) sessionsByDay.set(day, [])
     sessionsByDay.get(day)!.push(s)
   }
-
-  // Only render days that have at least one session
   const activeDays = weekDays.filter(day => sessionsByDay.has(day))
-
   if (activeDays.length === 0) return null
-
   const hourTicks = [6, 9, 12, 15, 18, 21, 24]
 
   return (
@@ -143,11 +148,7 @@ function TimelineBlock({
             const pct = ((h * 60 - TIMELINE_START) / TIMELINE_SPAN) * 100
             if (pct < 0 || pct > 100) return null
             return (
-              <span
-                key={h}
-                className="absolute text-[9px] text-[#383838] -translate-x-1/2"
-                style={{ left: `${pct}%` }}
-              >
+              <span key={h} className="absolute text-[9px] text-[#383838] -translate-x-1/2" style={{ left: `${pct}%` }}>
                 {h === 24 ? '00' : `${h}`}
               </span>
             )
@@ -165,29 +166,28 @@ function TimelineBlock({
                 {getDayLabel(day)}
               </span>
               <div className="flex-1 relative h-5 bg-[#141414] rounded overflow-hidden">
-                {hourTicks.slice(1, -1).map(h => {
-                  const pct = ((h * 60 - TIMELINE_START) / TIMELINE_SPAN) * 100
-                  return (
-                    <div
-                      key={h}
-                      className="absolute top-0 bottom-0 w-px bg-[#252525]"
-                      style={{ left: `${pct}%` }}
-                    />
-                  )
-                })}
+                {hourTicks.slice(1, -1).map(h => (
+                  <div key={h} className="absolute top-0 bottom-0 w-px bg-[#252525]"
+                    style={{ left: `${((h * 60 - TIMELINE_START) / TIMELINE_SPAN) * 100}%` }} />
+                ))}
                 {daySessions.map(s => {
-                  const startMin = minutesFromMidnight(s.started_at)
-                  const endMin = minutesFromMidnight(s.ended_at)
-                  const left = Math.max(0, ((startMin - TIMELINE_START) / TIMELINE_SPAN) * 100)
-                  const right = Math.min(100, ((endMin - TIMELINE_START) / TIMELINE_SPAN) * 100)
+                  const left = Math.max(0, ((minutesFromMidnight(s.started_at) - TIMELINE_START) / TIMELINE_SPAN) * 100)
+                  const right = Math.min(100, ((minutesFromMidnight(s.ended_at) - TIMELINE_START) / TIMELINE_SPAN) * 100)
                   const width = Math.max(0.5, right - left)
                   const color = colorMap.get(s.direction_id) ?? '#5060a0'
+                  const isSelected = selected?.id === s.id
                   return (
                     <div
                       key={s.id}
-                      title={`${s.direction_name}: ${fmtDuration(s.duration_actual)}`}
-                      className="absolute top-0.5 bottom-0.5 rounded-sm opacity-90"
-                      style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
+                      onClick={e => { e.stopPropagation(); setSelected(isSelected ? null : s) }}
+                      className="absolute top-0.5 bottom-0.5 rounded-sm cursor-pointer transition-all duration-150"
+                      style={{
+                        left: `${left}%`, width: `${width}%`,
+                        backgroundColor: color,
+                        opacity: selected && !isSelected ? 0.35 : 0.9,
+                        outline: isSelected ? `2px solid ${color}` : 'none',
+                        outlineOffset: '1px',
+                      }}
                     />
                   )
                 })}
@@ -196,6 +196,29 @@ function TimelineBlock({
           )
         })}
       </div>
+
+      {/* Session detail card */}
+      {selected && (
+        <div
+          className="mt-3 bg-[#141414] border border-[#5060a0]/40 rounded-xl px-4 py-3 animate-fade-in"
+          style={{ animation: 'fadeSlideIn 0.18s ease-out' }}
+        >
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <span className="text-sm text-[#e0e0e0] font-medium leading-snug flex-1">
+              {selected.task_title ?? '—'}
+            </span>
+            <button onClick={() => setSelected(null)} className="text-[#555] hover:text-[#999] text-xs shrink-0">✕</button>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-[#555]">
+            <span style={{ color: colorMap.get(selected.direction_id) ?? '#5060a0' }}>{selected.direction_name}</span>
+            <span>{fmtTime(selected.started_at)} → {fmtTime(selected.ended_at)}</span>
+            <span className="font-mono">{fmtDuration(selected.duration_actual)}</span>
+          </div>
+          {selected.note && (
+            <p className="mt-1.5 text-xs text-[#888] italic leading-snug">{selected.note}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -205,69 +228,136 @@ function TimelineBlock({
 function DonutChart({
   data,
   colorMap,
+  sessions,
 }: {
   data: DashboardData['time_by_direction']
   colorMap: Map<number | null, string>
+  sessions: DashboardData['sessions']
 }) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+
   const total = data.reduce((s, d) => s + d.total_seconds, 0)
   if (total === 0) {
     return <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных</div>
   }
 
-  const R = 62
-  const cx = 80
-  const cy = 80
-  const strokeW = 22
+  const R = 62, cx = 80, cy = 80, strokeW = 24, POP = 10
 
   let cumAngle = -Math.PI / 2
-  const arcs = data.map(d => {
+  const arcs = data.map((d, i) => {
     const frac = d.total_seconds / total
     const angle = frac * 2 * Math.PI
-    const x1 = cx + R * Math.cos(cumAngle)
-    const y1 = cy + R * Math.sin(cumAngle)
+    const startA = cumAngle
+    const x1 = cx + R * Math.cos(startA)
+    const y1 = cy + R * Math.sin(startA)
     cumAngle += angle
+    const midA = startA + angle / 2
     const x2 = cx + R * Math.cos(cumAngle)
     const y2 = cy + R * Math.sin(cumAngle)
     const large = angle > Math.PI ? 1 : 0
     const color = colorMap.get(d.direction_id) ?? '#5060a0'
-    return { x1, y1, x2, y2, large, color, angle }
+    const dx = POP * Math.cos(midA)
+    const dy = POP * Math.sin(midA)
+    return { x1, y1, x2, y2, large, color, angle, midA, dx, dy, idx: i }
   })
+
+  // Tasks for selected direction
+  const selData = selectedIdx !== null ? data[selectedIdx] : null
+  const selColor = selData ? (colorMap.get(selData.direction_id) ?? '#5060a0') : null
+  const dirTasks = selData
+    ? (() => {
+        const map = new Map<string, number>()
+        sessions
+          .filter(s => s.direction_id === selData.direction_id)
+          .forEach(s => {
+            const k = s.task_title ?? '—'
+            map.set(k, (map.get(k) ?? 0) + s.duration_actual)
+          })
+        return [...map.entries()].sort((a, b) => b[1] - a[1])
+      })()
+    : null
 
   return (
     <div className="flex gap-4 items-start">
-      <svg width={160} height={160} className="shrink-0">
+      <svg
+        width={160} height={160}
+        className="shrink-0 cursor-pointer"
+        onClick={() => setSelectedIdx(null)}
+      >
         {arcs.map((arc, i) => {
           if (arc.angle < 0.02) return null
+          const isSelected = selectedIdx === i
+          const isDimmed = selectedIdx !== null && !isSelected
           const path = `M ${arc.x1} ${arc.y1} A ${R} ${R} 0 ${arc.large} 1 ${arc.x2} ${arc.y2}`
           return (
-            <path
+            <g
               key={i}
-              d={path}
-              fill="none"
-              stroke={arc.color}
-              strokeWidth={strokeW}
-              strokeLinecap="butt"
-            />
+              style={{
+                transform: isSelected ? `translate(${arc.dx}px, ${arc.dy}px)` : 'translate(0,0)',
+                transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+                opacity: isDimmed ? 0.25 : 1,
+              }}
+              onClick={e => { e.stopPropagation(); setSelectedIdx(isSelected ? null : i) }}
+            >
+              <path
+                d={path}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={isSelected ? strokeW + 4 : strokeW}
+                strokeLinecap="butt"
+                style={{ transition: 'stroke-width 0.25s ease, opacity 0.25s ease' }}
+              />
+            </g>
           )
         })}
-        <circle cx={cx} cy={cy} r={R - strokeW / 2 - 1} fill="#1c1c1c" />
-        <text x={cx} y={cy - 5} textAnchor="middle" fill="#f0f0f0" fontSize={12} fontWeight="bold">
-          {fmtDuration(total)}
-        </text>
-        <text x={cx} y={cy + 11} textAnchor="middle" fill="#555" fontSize={9}>всего</text>
+        <circle cx={cx} cy={cy} r={R - strokeW / 2 - 2} fill="#1c1c1c" style={{ pointerEvents: 'none' }} />
+        {selData ? (
+          <>
+            <text x={cx} y={cy - 8} textAnchor="middle" fill={selColor!} fontSize={9} fontWeight="600">
+              {selData.direction_name.length > 12 ? selData.direction_name.slice(0, 11) + '…' : selData.direction_name}
+            </text>
+            <text x={cx} y={cy + 7} textAnchor="middle" fill="#f0f0f0" fontSize={13} fontWeight="bold">
+              {fmtDuration(selData.total_seconds)}
+            </text>
+            <text x={cx} y={cy + 19} textAnchor="middle" fill="#555" fontSize={9}>
+              {Math.round((selData.total_seconds / total) * 100)}%
+            </text>
+          </>
+        ) : (
+          <>
+            <text x={cx} y={cy - 5} textAnchor="middle" fill="#f0f0f0" fontSize={12} fontWeight="bold">{fmtDuration(total)}</text>
+            <text x={cx} y={cy + 11} textAnchor="middle" fill="#555" fontSize={9}>всего</text>
+          </>
+        )}
       </svg>
 
-      <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-        {data.slice(0, 6).map((d, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div
-              className="w-2.5 h-2.5 rounded-sm shrink-0"
-              style={{ backgroundColor: colorMap.get(d.direction_id) ?? '#5060a0' }}
-            />
-            <span className="text-xs text-[#666] flex-1 truncate">{d.direction_name}</span>
-            <span className="text-xs font-mono text-[#f0f0f0] shrink-0">{fmtDuration(d.total_seconds)}</span>
-          </div>
-        ))}
+      <div className="flex flex-col gap-1.5 min-w-0 flex-1 overflow-hidden">
+        {dirTasks ? (
+          <>
+            <div className="text-[9px] font-semibold tracking-widest uppercase mb-0.5" style={{ color: selColor! }}>
+              {selData!.direction_name}
+            </div>
+            {dirTasks.slice(0, 7).map(([title, secs], i) => (
+              <div key={i} className="flex items-start gap-1.5 animate-fade-in" style={{ animation: `fadeSlideIn 0.15s ease-out ${i * 0.04}s both` }}>
+                <span className="text-[#383838] text-[10px] shrink-0 mt-0.5">·</span>
+                <span className="text-xs text-[#c0c0c0] flex-1 leading-snug">{title}</span>
+                <span className="text-[11px] font-mono text-[#555] shrink-0">{fmtDuration(secs)}</span>
+              </div>
+            ))}
+          </>
+        ) : (
+          data.slice(0, 6).map((d, i) => (
+            <button
+              key={i}
+              onClick={() => setSelectedIdx(i)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity text-left w-full"
+            >
+              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorMap.get(d.direction_id) ?? '#5060a0' }} />
+              <span className="text-xs text-[#666] flex-1 truncate">{d.direction_name}</span>
+              <span className="text-xs font-mono text-[#f0f0f0] shrink-0">{fmtDuration(d.total_seconds)}</span>
+            </button>
+          ))
+        )}
       </div>
     </div>
   )
@@ -470,7 +560,7 @@ export default function StatsScreen({ onClose }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
                 <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По направлениям</div>
-                <DonutChart data={data.time_by_direction} colorMap={colorMap} />
+                <DonutChart data={data.time_by_direction} colorMap={colorMap} sessions={data.sessions} />
               </div>
 
               <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">

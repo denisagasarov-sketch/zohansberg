@@ -5,9 +5,14 @@ export default {
     extend: {
       keyframes: {
         blink: { '50%': { opacity: '0' } },
+        fadeSlideIn: {
+          '0%': { opacity: '0', transform: 'translateY(-6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         blink: 'blink 1s step-start infinite',
+        'fade-in': 'fadeSlideIn 0.18s ease-out',
       },
       colors: {
         bg: '#181818',

@@ -930,8 +930,8 @@ app.get('/api/stats/dashboard', (req, res) => {
 
     // Raw sessions for timeline (only completed sessions with end time)
     const sessions = db.prepare(`
-      SELECT ws.id, ws.started_at, ws.ended_at, ws.duration_actual,
-             t.direction_id,
+      SELECT ws.id, ws.started_at, ws.ended_at, ws.duration_actual, ws.note,
+             t.direction_id, t.title AS task_title,
              COALESCE(d.name, 'Без направления') AS direction_name
       FROM work_sessions ws
       LEFT JOIN tasks t ON t.id = ws.task_id
