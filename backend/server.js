@@ -1002,7 +1002,30 @@ app.get('/api/today-summary', (_req, res) => {
     const today = todayStr()
     const done_count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(today).n
     const time_row = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`).get(today)
-    res.json({ done_count, time_seconds: time_row.s })
+
+    // Tasks completed today with time spent on them today
+    const done_tasks = db.prepare(`
+      SELECT t.id, t.title, t.done_at,
+             COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
+      FROM tasks t
+      LEFT JOIN work_sessions ws ON ws.task_id = t.id AND date(ws.started_at) = ?
+      WHERE date(t.done_at) = ? AND t.deleted_at IS NULL
+      GROUP BY t.id
+      ORDER BY t.done_at ASC
+    `).all(today, today)
+
+    // Tasks not completed but worked on today
+    const worked_tasks = db.prepare(`
+      SELECT t.id, t.title, COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
+      FROM work_sessions ws
+      JOIN tasks t ON t.id = ws.task_id
+      WHERE date(ws.started_at) = ? AND t.done_at IS NULL AND t.deleted_at IS NULL
+      GROUP BY t.id
+      HAVING time_seconds > 0
+      ORDER BY time_seconds DESC
+    `).all(today)
+
+    res.json({ done_count, time_seconds: time_row.s, done_tasks, worked_tasks })
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 

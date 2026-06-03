@@ -217,13 +217,6 @@ export default function App() {
     await refresh()
   }, [refresh])
 
-  const handleMoveToTomorrow = useCallback(async (taskId: number) => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-    await updateTask(taskId, { deadline: tomorrowStr })
-  }, [updateTask])
-
   return (
     <div className="h-screen flex flex-col bg-[#181818] text-[#f0f0f0] overflow-hidden">
       <Header
@@ -375,10 +368,8 @@ export default function App() {
 
       {showEveningSummary && (
         <EveningSummaryModal
-          incompleteTasks={tasks.filter(t => !t.done_at && !t.deleted_at)}
           onClose={() => setShowEveningSummary(false)}
           onLater={() => setShowEveningSummary(false)}
-          onMoveToTomorrow={handleMoveToTomorrow}
         />
       )}
 
