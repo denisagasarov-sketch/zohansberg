@@ -3,6 +3,7 @@ import type { Task, Screen } from './types'
 import { api } from './api'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
+import { usePomodoro } from './hooks/usePomodoro'
 import Header from './components/Header'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
@@ -46,6 +47,7 @@ export default function App() {
   const queueTasks = tasks.filter(t => t.slot === 'queue' && !t.done_at && !t.deleted_at)
 
   const { timerState, start, pause, resume, stop } = useTimer()
+  const { pomodoroState, pomodoroEnabled, skipPomodoro } = usePomodoro(timerState.isRunning, pause)
 
   // Load today time for now task
   useEffect(() => {
@@ -279,6 +281,9 @@ export default function App() {
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
                 onDropTask={handleDropToNow}
+                pomodoroPhase={pomodoroEnabled ? pomodoroState.phase : 'idle'}
+                pomodoroRemaining={pomodoroState.remaining}
+                onSkipPomodoro={skipPomodoro}
               />
               <DayPlanBlock
                 planTaskIds={planTaskIds}

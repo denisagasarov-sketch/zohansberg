@@ -19,6 +19,9 @@ interface Props {
   onTaskClick: (task: Task) => void
   onAddTask: () => void
   onDropTask: (taskId: number) => void
+  pomodoroPhase?: 'work' | 'break' | 'idle'
+  pomodoroRemaining?: number
+  onSkipPomodoro?: () => void
 }
 
 function padZ(n: number) { return String(n).padStart(2, '0') }
@@ -37,7 +40,7 @@ function formatTime(s: number): string {
   return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro }: Props) {
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const dirColor = direction ? getDirectionColor(direction.id) : null
   const [isDragOver, setIsDragOver] = useState(false)
@@ -134,6 +137,19 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                   className="h-full bg-[#5060a0] transition-all duration-500"
                   style={{ width: `${Math.min(100, (timer.elapsed / (task.duration_plan * 3600)) * 100)}%` }}
                 />
+              </div>
+            )}
+
+            {/* Pomodoro indicator */}
+            {pomodoroPhase !== 'idle' && (
+              <div className={`flex items-center gap-2 mt-2 px-2 py-1 rounded-lg text-xs ${pomodoroPhase === 'break' ? 'bg-[#1a3a1a]' : 'bg-[#1a1a3a]'}`}>
+                <span className={pomodoroPhase === 'break' ? 'text-[#4a9a4a]' : 'text-[#8090c8]'}>
+                  {pomodoroPhase === 'break' ? '☕ Перерыв' : '🍅 Помодоро'}
+                </span>
+                <span className="font-mono text-[#f0f0f0]">
+                  {padZ(Math.floor(pomodoroRemaining / 60))}:{padZ(pomodoroRemaining % 60)}
+                </span>
+                <button onClick={onSkipPomodoro} className="ml-auto text-[#555] hover:text-[#999] text-[10px]">пропустить</button>
               </div>
             )}
 

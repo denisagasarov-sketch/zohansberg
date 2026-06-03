@@ -318,7 +318,54 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
             </button>
           </div>
         </section>
+
+        {/* Pomodoro */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Помодоро</h2>
+          <PomodoroSettings />
+        </section>
       </div>
+    </div>
+  )
+}
+
+function PomodoroSettings() {
+  const [enabled, setEnabled] = useState(() => !!parseInt(localStorage.getItem('pomo_enabled') ?? '0', 10))
+  const [workMin, setWorkMin] = useState(() => parseInt(localStorage.getItem('pomo_work_min') ?? '25', 10))
+  const [breakMin, setBreakMin] = useState(() => parseInt(localStorage.getItem('pomo_break_min') ?? '5', 10))
+
+  const toggle = () => {
+    const next = !enabled
+    setEnabled(next)
+    localStorage.setItem('pomo_enabled', next ? '1' : '0')
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-[#999]">Включить помодоро</span>
+        <button onClick={toggle} className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${enabled ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}>
+          <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+      {enabled && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-[#555] mb-1">Работа (мин)</label>
+            <input type="number" min="1" max="120" value={workMin}
+              onChange={e => { const v = parseInt(e.target.value) || 25; setWorkMin(v); localStorage.setItem('pomo_work_min', String(v)) }}
+              className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[#555] mb-1">Перерыв (мин)</label>
+            <input type="number" min="1" max="60" value={breakMin}
+              onChange={e => { const v = parseInt(e.target.value) || 5; setBreakMin(v); localStorage.setItem('pomo_break_min', String(v)) }}
+              className="w-full bg-[#1c1c1c] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
