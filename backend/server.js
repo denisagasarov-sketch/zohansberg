@@ -81,13 +81,14 @@ app.patch('/api/directions/:id', (req, res) => {
     const existing = db.prepare(`SELECT * FROM directions WHERE id = ?`).get(id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
-    const { name, order_index, archived, notes } = req.body
+    const { name, order_index, archived, notes, weekly_goal_seconds } = req.body
     const fields = []
     const vals = []
     if (name !== undefined) { fields.push('name = ?'); vals.push(name) }
     if (order_index !== undefined) { fields.push('order_index = ?'); vals.push(order_index) }
     if (archived !== undefined) { fields.push('archived = ?'); vals.push(archived ? 1 : 0) }
     if (notes !== undefined) { fields.push('notes = ?'); vals.push(notes || null) }
+    if (weekly_goal_seconds !== undefined) { fields.push('weekly_goal_seconds = ?'); vals.push(Number(weekly_goal_seconds) || 0) }
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
 
     vals.push(id)
@@ -1075,6 +1076,20 @@ app.post('/api/day-plan', (req, res) => {
     const insert = db.prepare(`INSERT INTO day_plan (date, task_id, order_index) VALUES (?, ?, ?)`)
     task_ids.forEach((id, i) => insert.run(date, Number(id), i))
     res.json({ ok: true })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/stats/weekly-time — current week's time per direction
+app.get('/api/stats/weekly-time', (_req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT t.direction_id, COALESCE(SUM(ws.duration_actual), 0) AS seconds
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      WHERE date(ws.started_at) >= date('now', '-6 days') AND ws.duration_actual > 0
+      GROUP BY t.direction_id
+    `).all()
+    res.json(rows)
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 

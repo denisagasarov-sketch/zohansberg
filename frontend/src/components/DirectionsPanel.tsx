@@ -15,6 +15,7 @@ interface Props {
   onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
   onUpdateDirection: (id: number, data: Partial<Direction>) => void
+  weeklyTime?: Record<number, number>
   focusMode?: boolean
   nowTaskId?: number
 }
@@ -154,7 +155,7 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, weeklyTime = {}, focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
@@ -249,6 +250,25 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                   title="Клик — сортировка по приоритету"
                 >{dir.name}{isByPriority ? ' ↓' : ''}</span>
                 <div className="flex items-center gap-2">
+                  {/* Weekly goal progress */}
+                  {dir.weekly_goal_seconds > 0 && (() => {
+                    const done = weeklyTime[dir.id] ?? 0
+                    const pct = Math.min(100, Math.round((done / dir.weekly_goal_seconds) * 100))
+                    const goalH = Math.round(dir.weekly_goal_seconds / 3600)
+                    const doneH = Math.floor(done / 3600)
+                    const doneM = Math.floor((done % 3600) / 60)
+                    return (
+                      <div className="flex items-center gap-1" title={`${doneH}ч ${doneM}м из ${goalH}ч цели`}>
+                        <div className="w-12 h-1 bg-[#252525] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#4a7a4a' : color }}
+                          />
+                        </div>
+                        <span className="text-[9px]" style={{ color: color + '80' }}>{pct}%</span>
+                      </div>
+                    )
+                  })()}
                   <span className="text-[10px]" style={{ color: color + '80' }}>{dirTasks.length}</span>
                   <span
                     className="text-[10px] cursor-pointer px-0.5"

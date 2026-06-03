@@ -5,6 +5,7 @@ export interface Direction {
   archived: number
   created_at: string
   notes: string | null
+  weekly_goal_seconds: number
 }
 
 export interface Task {

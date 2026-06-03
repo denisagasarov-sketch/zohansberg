@@ -37,6 +37,7 @@ export default function App() {
   const [planTasks, setPlanTasks] = useState<any[]>([])
   const [postStopSessionId, setPostStopSessionId] = useState<number | null>(null)
   const [todayTime, setTodayTime] = useState(0)
+  const [weeklyTime, setWeeklyTime] = useState<Record<number, number>>({})
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
   const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks, undo } = useTasks()
@@ -51,6 +52,15 @@ export default function App() {
     if (!nowTask) { setTodayTime(0); return }
     api.getTodayTime(nowTask.id).then(r => setTodayTime(r.total)).catch(() => setTodayTime(0))
   }, [nowTask?.id])
+
+  // Load weekly time for direction progress bars
+  useEffect(() => {
+    api.getWeeklyTime().then(rows => {
+      const map: Record<number, number> = {}
+      rows.forEach(r => { if (r.direction_id != null) map[r.direction_id] = r.seconds })
+      setWeeklyTime(map)
+    }).catch(() => {})
+  }, [])
 
   // Show checkin modal if no checkin recorded today
   useEffect(() => {
@@ -305,6 +315,7 @@ export default function App() {
                 onMarkDone={handleMarkDone}
                 onPriorityChange={handlePriorityChange}
                 onUpdateDirection={(id, data) => api.updateDirection(id, data).then(refresh).catch(() => {})}
+                weeklyTime={weeklyTime}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />

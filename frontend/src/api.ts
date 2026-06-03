@@ -115,6 +115,8 @@ export const api = {
   getTodaySummary: () =>
     req<any>('GET', '/today-summary'),
 
+  getWeeklyTime: () => req<{ direction_id: number | null; seconds: number }[]>('GET', '/stats/weekly-time'),
+
   // Day plan
   getDayPlan: (date: string) =>
     req<any[]>('GET', `/day-plan?date=${date}`),

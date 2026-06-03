@@ -139,11 +139,26 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
                     onClick={() => { setEditingDir(dir.id); setEditingName(dir.name) }}
                   >{dir.name}</span>
                 )}
-                <button
-                  onClick={() => handleArchiveDir(dir.id)}
-                  className="opacity-0 group-hover:opacity-100 text-[#666] hover:text-[#f0f0f0] text-xs transition-all"
-                  title="Архивировать"
-                >→</button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={dir.weekly_goal_seconds ? Math.round(dir.weekly_goal_seconds / 3600) : ''}
+                    placeholder="ч/нед"
+                    title="Цель в часах в неделю"
+                    onBlur={e => {
+                      const h = parseFloat(e.target.value) || 0
+                      api.updateDirection(dir.id, { weekly_goal_seconds: Math.round(h * 3600) } as any).catch(() => {})
+                    }}
+                    className="w-14 bg-[#141414] border border-[#252525] rounded px-1.5 py-0.5 text-xs text-[#999] focus:outline-none text-center"
+                  />
+                  <button
+                    onClick={() => handleArchiveDir(dir.id)}
+                    className="text-[#666] hover:text-[#f0f0f0] text-xs"
+                    title="Архивировать"
+                  >→</button>
+                </div>
               </div>
             ))}
           </div>
