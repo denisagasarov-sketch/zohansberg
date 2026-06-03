@@ -1003,8 +1003,22 @@ app.get('/api/today-summary', (_req, res) => {
     const done_count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(today).n
     const time_row = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`).get(today)
 
+    // All sessions today
+    const sessions_today = db.prepare(`
+      SELECT id, task_id, started_at, ended_at, duration_actual, note
+      FROM work_sessions
+      WHERE date(started_at) = ? AND ended_at IS NOT NULL
+      ORDER BY started_at ASC
+    `).all(today)
+
+    const sessionsByTask = {}
+    for (const s of sessions_today) {
+      if (!sessionsByTask[s.task_id]) sessionsByTask[s.task_id] = []
+      sessionsByTask[s.task_id].push(s)
+    }
+
     // Tasks completed today with time spent on them today
-    const done_tasks = db.prepare(`
+    const done_tasks_raw = db.prepare(`
       SELECT t.id, t.title, t.done_at,
              COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
       FROM tasks t
@@ -1014,8 +1028,10 @@ app.get('/api/today-summary', (_req, res) => {
       ORDER BY t.done_at ASC
     `).all(today, today)
 
+    const done_tasks = done_tasks_raw.map(t => ({ ...t, sessions: sessionsByTask[t.id] || [] }))
+
     // Tasks not completed but worked on today
-    const worked_tasks = db.prepare(`
+    const worked_tasks_raw = db.prepare(`
       SELECT t.id, t.title, COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
       FROM work_sessions ws
       JOIN tasks t ON t.id = ws.task_id
@@ -1024,6 +1040,8 @@ app.get('/api/today-summary', (_req, res) => {
       HAVING time_seconds > 0
       ORDER BY time_seconds DESC
     `).all(today)
+
+    const worked_tasks = worked_tasks_raw.map(t => ({ ...t, sessions: sessionsByTask[t.id] || [] }))
 
     res.json({ done_count, time_seconds: time_row.s, done_tasks, worked_tasks })
   } catch(e) { res.status(500).json({ error: e.message }) }
