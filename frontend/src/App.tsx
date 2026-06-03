@@ -13,6 +13,8 @@ import TimerSwitchModal from './components/modals/TimerSwitchModal'
 import CheckinModal from './components/modals/CheckinModal'
 import FocusSwitchModal from './components/modals/FocusSwitchModal'
 import EveningSummaryModal from './components/modals/EveningSummaryModal'
+import MorningPlanModal from './components/modals/MorningPlanModal'
+import DayPlanBlock from './components/DayPlanBlock'
 import SessionNoteModal from './components/modals/SessionNoteModal'
 import SettingsScreen from './components/SettingsScreen'
 import ArchiveScreen from './components/ArchiveScreen'
@@ -30,6 +32,9 @@ export default function App() {
   const [pendingFocusTask, setPendingFocusTask] = useState<Task | null>(null)
   const [showFocusSwitch, setShowFocusSwitch] = useState(false)
   const [showEveningSummary, setShowEveningSummary] = useState(false)
+  const [showMorningPlan, setShowMorningPlan] = useState(false)
+  const [planTaskIds, setPlanTaskIds] = useState<number[]>([])
+  const [planTasks, setPlanTasks] = useState<any[]>([])
   const [postStopSessionId, setPostStopSessionId] = useState<number | null>(null)
   const [todayTime, setTodayTime] = useState(0)
   const quickInputRef = useRef<HTMLInputElement | null>(null)
@@ -51,6 +56,21 @@ export default function App() {
   useEffect(() => {
     api.getTodayCheckin().then(r => {
       if (!r.exists) setShowCheckin(true)
+    }).catch(() => {})
+  }, [])
+
+  // Load today's plan + show morning modal if plan exists and not yet seen today
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    api.getDayPlan(today).then(rows => {
+      if (rows.length === 0) return
+      setPlanTaskIds(rows.map((r: any) => r.task_id))
+      setPlanTasks(rows)
+      const key = `morning_plan_shown_${today}`
+      if (!localStorage.getItem(key)) {
+        setShowMorningPlan(true)
+        localStorage.setItem(key, '1')
+      }
     }).catch(() => {})
   }, [])
 
@@ -250,6 +270,13 @@ export default function App() {
                 onAddTask={handleOpenNewTask}
                 onDropTask={handleDropToNow}
               />
+              <DayPlanBlock
+                planTaskIds={planTaskIds}
+                tasks={tasks}
+                directions={directions}
+                onTakeNow={handleTakeNow}
+                onMarkDone={handleMarkDone}
+              />
               <QueueBlock
                 tasks={tasks}
                 directions={directions}
@@ -368,8 +395,19 @@ export default function App() {
 
       {showEveningSummary && (
         <EveningSummaryModal
+          tasks={tasks}
+          directions={directions}
           onClose={() => setShowEveningSummary(false)}
           onLater={() => setShowEveningSummary(false)}
+        />
+      )}
+
+      {showMorningPlan && (
+        <MorningPlanModal
+          planTasks={planTasks}
+          directions={directions}
+          onTakeNow={handleTakeNow}
+          onClose={() => setShowMorningPlan(false)}
         />
       )}
 

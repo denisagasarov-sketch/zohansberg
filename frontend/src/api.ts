@@ -115,6 +115,12 @@ export const api = {
   getTodaySummary: () =>
     req<any>('GET', '/today-summary'),
 
+  // Day plan
+  getDayPlan: (date: string) =>
+    req<any[]>('GET', `/day-plan?date=${date}`),
+  setDayPlan: (date: string, task_ids: number[]) =>
+    req('POST', '/day-plan', { date, task_ids }),
+
   // AI
   reorderInDirection: (direction_id: number | null, ordered_ids: number[]) =>
     req('POST', '/tasks/reorder-direction', { direction_id, ordered_ids }),

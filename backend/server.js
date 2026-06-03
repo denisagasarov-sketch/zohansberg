@@ -1047,6 +1047,36 @@ app.get('/api/today-summary', (_req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Day Plan ────────────────────────────────────────────────────────────────
+
+// GET /api/day-plan?date=YYYY-MM-DD
+app.get('/api/day-plan', (req, res) => {
+  try {
+    const date = req.query.date || todayStr()
+    const rows = db.prepare(`
+      SELECT dp.id, dp.task_id, dp.order_index,
+             t.title, t.priority, t.direction_id, t.done_at, t.deleted_at
+      FROM day_plan dp
+      JOIN tasks t ON t.id = dp.task_id
+      WHERE dp.date = ? AND t.deleted_at IS NULL
+      ORDER BY dp.order_index ASC
+    `).all(date)
+    res.json(rows)
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/day-plan — replace plan for a date
+app.post('/api/day-plan', (req, res) => {
+  try {
+    const { date, task_ids } = req.body
+    if (!date || !Array.isArray(task_ids)) return res.status(400).json({ error: 'date and task_ids required' })
+    db.prepare(`DELETE FROM day_plan WHERE date = ?`).run(date)
+    const insert = db.prepare(`INSERT INTO day_plan (date, task_id, order_index) VALUES (?, ?, ?)`)
+    task_ids.forEach((id, i) => insert.run(date, Number(id), i))
+    res.json({ ok: true })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Frontend static (SPA) ───────────────────────────────────────────────────
 
 const _path = require('path')

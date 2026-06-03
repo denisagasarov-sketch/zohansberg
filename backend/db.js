@@ -67,6 +67,13 @@ function initSchema() {
       content      TEXT,
       created_at   TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS day_plan (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      date        TEXT NOT NULL,
+      task_id     INTEGER REFERENCES tasks(id),
+      order_index INTEGER NOT NULL DEFAULT 0
+    );
   `)
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
