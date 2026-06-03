@@ -10,6 +10,34 @@ export interface TimerState {
   taskId: number | null
 }
 
+// ── sessionStorage persistence (survives Vite HMR full-reload) ────────────────
+
+const TIMER_KEY = 'focusboard_timer'
+
+interface StoredTimer {
+  startedAtMs: number
+  taskId: number
+  sessionId: number | null
+}
+
+function saveTimer(data: StoredTimer | null) {
+  try {
+    if (data) sessionStorage.setItem(TIMER_KEY, JSON.stringify(data))
+    else sessionStorage.removeItem(TIMER_KEY)
+  } catch {}
+}
+
+function loadTimer(): StoredTimer | null {
+  try {
+    const raw = sessionStorage.getItem(TIMER_KEY)
+    return raw ? (JSON.parse(raw) as StoredTimer) : null
+  } catch {
+    return null
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function useTimer() {
   const [state, setState] = useState<TimerState>({
     isRunning: false,
@@ -56,14 +84,6 @@ export function useTimer() {
 
   useEffect(() => () => { clearTimer(); clearHeartbeat() }, [clearTimer, clearHeartbeat])
 
-  // Close any session left open from a previous page load — always start idle
-  useEffect(() => {
-    api.getActiveSession().then(session => {
-      if (!session) return
-      api.endSession(session.id, new Date().toISOString(), session.elapsed_seconds ?? 0).catch(() => {})
-    }).catch(() => {})
-  }, [])
-
   const startInterval = useCallback(() => {
     intervalRef.current = setInterval(() => {
       const elapsed = startedAtMsRef.current !== null
@@ -84,6 +104,29 @@ export function useTimer() {
     }, 500)
   }, [])
 
+  // On mount: restore running timer after page reload, or close any orphaned session
+  useEffect(() => {
+    const saved = loadTimer()
+    if (saved) {
+      const elapsed = Math.floor((Date.now() - saved.startedAtMs) / 1000)
+      startedAtMsRef.current = saved.startedAtMs
+      sessionIdRef.current = saved.sessionId
+      lastTickMarkRef.current = Math.floor(elapsed / 300)
+      setState({
+        isRunning: true, isPaused: false, elapsed,
+        sessionId: saved.sessionId, taskId: saved.taskId,
+      })
+      startInterval()
+      startHeartbeat()
+    } else {
+      // No active timer — close any DB session left open from a previous unexpected close
+      api.getActiveSession().then(session => {
+        if (!session) return
+        api.endSession(session.id, new Date().toISOString(), session.elapsed_seconds ?? 0).catch(() => {})
+      }).catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const start = useCallback(async (taskId: number) => {
     clearTimer()
     const nowMs = Date.now()
@@ -93,6 +136,7 @@ export function useTimer() {
     sessionIdRef.current = null
     lastTickMarkRef.current = 0
 
+    saveTimer({ startedAtMs: nowMs, taskId, sessionId: null })
     setState({ isRunning: true, isPaused: false, elapsed: 0, sessionId: null, taskId })
     playSound('start')
     startInterval()
@@ -102,6 +146,7 @@ export function useTimer() {
       const session = await api.startSession(taskId, nowIso)
       sessionIdRef.current = session.id
       setState(prev => ({ ...prev, sessionId: session.id }))
+      saveTimer({ startedAtMs: nowMs, taskId, sessionId: session.id })
     } catch (e) {
       console.error('Failed to start session', e)
     }
@@ -114,6 +159,7 @@ export function useTimer() {
       ? Math.floor((Date.now() - startedAtMsRef.current) / 1000)
       : stateRef.current.elapsed
     startedAtMsRef.current = null
+    saveTimer(null)
     setState(prev => ({ ...prev, isRunning: false, isPaused: true, elapsed }))
     playSound('pause')
   }, [clearTimer, clearHeartbeat])
@@ -121,7 +167,10 @@ export function useTimer() {
   const resume = useCallback(() => {
     if (!stateRef.current.isPaused) return
     const currentElapsed = stateRef.current.elapsed
-    startedAtMsRef.current = Date.now() - currentElapsed * 1000
+    const nowMs = Date.now() - currentElapsed * 1000
+    startedAtMsRef.current = nowMs
+    const taskId = stateRef.current.taskId!
+    saveTimer({ startedAtMs: nowMs, taskId, sessionId: sessionIdRef.current })
     setState(prev => ({ ...prev, isRunning: true, isPaused: false }))
     playSound('start')
     startInterval()
@@ -138,6 +187,7 @@ export function useTimer() {
     sessionIdRef.current = null
     startedAtMsRef.current = null
     lastTickMarkRef.current = 0
+    saveTimer(null)
 
     if (sessionId !== null) {
       try {

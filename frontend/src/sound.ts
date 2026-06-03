@@ -10,6 +10,16 @@ function getCtx(): AudioContext {
   return audioCtx
 }
 
+// Re-resume AudioContext when tab becomes visible after being hidden
+// (Chrome suspends AudioContext automatically for background tabs)
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && audioCtx?.state === 'suspended') {
+      audioCtx.resume().catch(() => {})
+    }
+  })
+}
+
 // Returns a safe scheduled time: adds 100ms buffer when context isn't running yet
 function st(ctx: AudioContext, t: number): number {
   return ctx.state !== 'running' ? Math.max(t, ctx.currentTime + 0.1) : t
