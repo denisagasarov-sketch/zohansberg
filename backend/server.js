@@ -973,7 +973,7 @@ app.get('/api/stats/dashboard', (req, res) => {
     // Tasks done count
     const tasksDoneCount = db.prepare(`
       SELECT COUNT(*) AS c FROM tasks
-      WHERE status = 'done' AND deleted_at IS NULL ${taskDateFilter}
+      WHERE done_at IS NOT NULL AND deleted_at IS NULL ${taskDateFilter}
     `).get().c
 
     // Top direction
