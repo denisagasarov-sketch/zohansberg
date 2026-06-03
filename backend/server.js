@@ -1078,6 +1078,75 @@ app.post('/api/day-plan', (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Export ──────────────────────────────────────────────────────────────────
+
+// GET /api/export/sessions.csv?period=week|month|all
+app.get('/api/export/sessions.csv', (req, res) => {
+  try {
+    const { period } = req.query
+    let dateFilter = ''
+    if (period === 'week') dateFilter = `AND date(ws.started_at) >= date('now', '-7 days')`
+    else if (period === 'month') dateFilter = `AND date(ws.started_at) >= date('now', '-30 days')`
+
+    const rows = db.prepare(`
+      SELECT
+        date(ws.started_at) AS date,
+        time(ws.started_at) AS time_start,
+        time(ws.ended_at)   AS time_end,
+        ws.duration_actual  AS duration_seconds,
+        t.title             AS task,
+        COALESCE(d.name, '') AS direction,
+        COALESCE(ws.note, '') AS note
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE ws.ended_at IS NOT NULL AND ws.duration_actual > 0 ${dateFilter}
+      ORDER BY ws.started_at ASC
+    `).all()
+
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const header = ['Дата', 'Начало', 'Конец', 'Секунд', 'Задача', 'Направление', 'Комментарий']
+    const lines = [
+      header.map(escape).join(','),
+      ...rows.map(r => [r.date, r.time_start, r.time_end, r.duration_seconds, r.task, r.direction, r.note].map(escape).join(','))
+    ]
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="focusboard-sessions.csv"`)
+    res.send('﻿' + lines.join('\r\n'))
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/export/tasks.csv
+app.get('/api/export/tasks.csv', (_req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        t.title,
+        COALESCE(d.name, '') AS direction,
+        t.priority,
+        t.deadline,
+        date(t.done_at) AS done_date,
+        COALESCE(t.notes, '') AS notes
+      FROM tasks t
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE t.deleted_at IS NULL
+      ORDER BY t.done_at DESC NULLS LAST, t.id DESC
+    `).all()
+
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const header = ['Задача', 'Направление', 'Приоритет', 'Дедлайн', 'Выполнена', 'Заметки']
+    const lines = [
+      header.map(escape).join(','),
+      ...rows.map(r => [r.title, r.direction, r.priority ?? '', r.deadline ?? '', r.done_date ?? '', r.notes].map(escape).join(','))
+    ]
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="focusboard-tasks.csv"`)
+    res.send('﻿' + lines.join('\r\n'))
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Frontend static (SPA) ───────────────────────────────────────────────────
 
 const _path = require('path')

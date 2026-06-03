@@ -582,6 +582,27 @@ export default function StatsScreen({ onClose }: Props) {
                 )}
               </div>
             </div>
+
+            {/* Export */}
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-3">Экспорт</div>
+              <div className="flex gap-2">
+                <a
+                  href={`/api/export/sessions.csv?period=${period}`}
+                  download
+                  className="flex-1 text-center py-2 bg-[#252525] hover:bg-[#383838] rounded-lg text-xs text-[#999] transition-colors"
+                >
+                  ↓ Сессии (.csv)
+                </a>
+                <a
+                  href="/api/export/tasks.csv"
+                  download
+                  className="flex-1 text-center py-2 bg-[#252525] hover:bg-[#383838] rounded-lg text-xs text-[#999] transition-colors"
+                >
+                  ↓ Задачи (.csv)
+                </a>
+              </div>
+            </div>
           </>
         )}
       </div>
