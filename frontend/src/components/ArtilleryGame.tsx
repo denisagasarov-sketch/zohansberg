@@ -210,15 +210,30 @@ export default function ArtilleryGame() {
     for (let x = 0; x < W; x++) c.lineTo(x, t[x])
     c.lineTo(W, H); c.closePath(); c.fill()
 
-    // yellow aiming trajectory (player turn) with wind
+    // Worms-style bazooka crosshair: a sight on the arc around the gun
     if (st.shooter === 'you' && !st.shell && !st.over) {
-      const v = (st.power || 1) * 0.2 * WEAPONS[st.weapon].vmul, a = (st.angle * Math.PI) / 180
-      let x = st.px + 16, y = st.py - 12, vx = Math.cos(a) * v, vy = -Math.sin(a) * v
-      c.fillStyle = '#ffd24c'
-      for (let i = 0; i < 150; i++) {
-        vx += st.wind / 16; x += vx; y += vy; vy += GRAV
-        if (i % 5 === 0) { c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill() }
-        if (x < 0 || x > W || y > t[Math.max(0, Math.min(W - 1, Math.round(x)))]) break
+      const a = (st.angle * Math.PI) / 180
+      const ox = st.px, oy = st.py - 8
+      const R = 46
+      const cx2 = ox + Math.cos(a) * R, cy2 = oy - Math.sin(a) * R
+      // short barrel guide line
+      c.strokeStyle = '#ffd24c66'; c.lineWidth = 1
+      c.beginPath(); c.moveTo(ox + Math.cos(a) * 14, oy - Math.sin(a) * 14); c.lineTo(cx2, cy2); c.stroke()
+      // crosshair: circle + ticks
+      c.strokeStyle = '#ffd24c'; c.lineWidth = 1.5
+      c.beginPath(); c.arc(cx2, cy2, 6, 0, Math.PI * 2); c.stroke()
+      c.beginPath()
+      c.moveTo(cx2 - 10, cy2); c.lineTo(cx2 - 3, cy2); c.moveTo(cx2 + 3, cy2); c.lineTo(cx2 + 10, cy2)
+      c.moveTo(cx2, cy2 - 10); c.lineTo(cx2, cy2 - 3); c.moveTo(cx2, cy2 + 3); c.lineTo(cx2, cy2 + 10)
+      c.stroke()
+      c.fillStyle = '#ffd24c'; c.beginPath(); c.arc(cx2, cy2, 1.4, 0, Math.PI * 2); c.fill()
+      // Worms-style charging power bar above the gun
+      if (st.charging) {
+        const bw = 40, bx = ox - bw / 2, by = oy - 30, p = st.power / 100
+        c.fillStyle = '#000'; c.fillRect(bx - 1, by - 1, bw + 2, 6)
+        const grad = c.createLinearGradient(bx, 0, bx + bw, 0)
+        grad.addColorStop(0, '#5cc8ff'); grad.addColorStop(0.5, '#ffd24c'); grad.addColorStop(1, '#ff5c5c')
+        c.fillStyle = grad; c.fillRect(bx, by, bw * p, 4)
       }
     }
 
