@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import type { Direction } from '../types'
 import { api } from '../api'
 import { TIMER_SOUNDS, getTimer5mSoundId, getTimer45mSoundId, previewTimerSound } from '../sound'
+import ArtilleryGame from './ArtilleryGame'
+import ErrorBoundary from './ErrorBoundary'
 
 interface Props {
   directions: Direction[]
@@ -24,6 +26,20 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [editingName, setEditingName] = useState('')
   const dragDirRef = useRef<number | null>(null)
   const [localDirs, setLocalDirs] = useState<Direction[]>([])
+  // hidden easter egg: tap the «Настройки» title 7 times to unlock the worms game
+  const [titleTaps, setTitleTaps] = useState(0)
+  const [showGame, setShowGame] = useState(false)
+  const tapResetRef = useRef<number | null>(null)
+
+  const handleTitleTap = () => {
+    if (tapResetRef.current) window.clearTimeout(tapResetRef.current)
+    setTitleTaps(prev => {
+      const n = prev + 1
+      if (n >= 7) { setShowGame(true); return 0 }
+      tapResetRef.current = window.setTimeout(() => setTitleTaps(0), 1200)
+      return n
+    })
+  }
 
   useEffect(() => {
     setLocalDirs([...directions].sort((a, b) => a.order_index - b.order_index))
@@ -106,7 +122,9 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
     <div className="h-full flex flex-col bg-[#181818] text-[#f0f0f0]">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-[#252525]">
         <button onClick={onClose} className="text-[#666] hover:text-[#f0f0f0] text-sm transition-colors">← Назад</button>
-        <h1 className="text-base font-semibold">Настройки</h1>
+        <h1 className="text-base font-semibold cursor-default select-none" onClick={handleTitleTap}>
+          Настройки{titleTaps >= 3 && titleTaps < 7 && <span className="text-[#2c2c2c] text-xs ml-1">{'🐛'.repeat(titleTaps - 2)}</span>}
+        </h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8 max-w-2xl mx-auto w-full">
@@ -345,6 +363,18 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
           </div>
         </section>
       </div>
+
+      {showGame && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-6" onClick={() => setShowGame(false)}>
+          <div className="bg-[#181818] border border-[#252525] rounded-lg p-4 w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-[#f0f0f0]">🐛 Черви</h2>
+              <button onClick={() => setShowGame(false)} className="text-[#666] hover:text-[#f0f0f0] text-sm transition-colors">✕ Закрыть</button>
+            </div>
+            <ErrorBoundary><ArtilleryGame /></ErrorBoundary>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

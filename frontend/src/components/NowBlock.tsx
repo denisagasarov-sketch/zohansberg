@@ -5,8 +5,6 @@ import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
 import { PriorityPicker } from './PriorityPicker'
-import ArtilleryGame from './ArtilleryGame'
-import ErrorBoundary from './ErrorBoundary'
 
 interface Props {
   task: Task | null
@@ -78,7 +76,10 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] mb-3 uppercase">Сейчас</div>
 
       {!task ? (
-        <ErrorBoundary><ArtilleryGame /></ErrorBoundary>
+        <div className="py-10 text-center">
+          <div className="text-[#383838] text-sm">Нет активной задачи</div>
+          <div className="text-[#2c2c2c] text-xs mt-1.5">Перетащите сюда задачу или возьмите из «Следом»</div>
+        </div>
       ) : (
         <>
           {/* Task title row */}
