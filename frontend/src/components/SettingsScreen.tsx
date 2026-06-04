@@ -324,6 +324,15 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
           <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Помодоро</h2>
           <PomodoroSettings />
         </section>
+
+        {/* Focus settings */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Фокус</h2>
+          <div className="space-y-3">
+            <ToggleSetting storageKey="intent_enabled" defaultOn label="Намерение перед сессией" desc="Спрашивать «что сделаешь?» перед запуском таймера" />
+            <ToggleSetting storageKey="break_screen_enabled" defaultOn label="Экран перерыва" desc="Показывать экран с подсказками когда таймер на паузе" />
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -366,6 +375,30 @@ function PomodoroSettings() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ToggleSetting({ storageKey, defaultOn, label, desc }: { storageKey: string; defaultOn: boolean; label: string; desc: string }) {
+  const init = () => {
+    const v = localStorage.getItem(storageKey)
+    if (v === null) return defaultOn
+    return v !== 'false'
+  }
+  const [on, setOn] = useState(init)
+  const toggle = () => {
+    const next = !on; setOn(next)
+    localStorage.setItem(storageKey, next ? 'true' : 'false')
+  }
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <p className="text-sm text-[#999]">{label}</p>
+        <p className="text-[11px] text-[#555] mt-0.5">{desc}</p>
+      </div>
+      <button onClick={toggle} className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${on ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}>
+        <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </button>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
 import { usePomodoro } from './hooks/usePomodoro'
 import Header from './components/Header'
+import BreakScreen from './components/BreakScreen'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
 import DirectionsPanel from './components/DirectionsPanel'
@@ -474,6 +475,14 @@ export default function App() {
           directions={directions}
           onTakeNow={handleTakeNow}
           onClose={() => setShowMorningPlan(false)}
+        />
+      )}
+
+      {/* Break screen — shown when timer is paused and break screen is enabled */}
+      {timerState.isPaused && localStorage.getItem('break_screen_enabled') !== 'false' && (
+        <BreakScreen
+          elapsed={timerState.elapsed}
+          onResume={handleResumeTimer}
         />
       )}
 
