@@ -13,13 +13,15 @@ interface Props {
   onRemoveFromQueue: (taskId: number) => void
   onMarkDone: (taskId: number) => void
   onTakeNow: (taskId: number) => void
+  planTaskIds?: number[]
   focusMode?: boolean
   nowTaskId?: number
 }
 
-export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, onTakeNow, focusMode, nowTaskId }: Props) {
+export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, onTakeNow, planTaskIds = [], focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
-  const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.someday && !t.done_at && !t.deleted_at && t.slot !== 'now')
+  // Exclude tasks that are in today's plan — they show in «На сегодня» instead
+  const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.someday && !t.done_at && !t.deleted_at && t.slot !== 'now' && !planTaskIds.includes(t.id))
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)

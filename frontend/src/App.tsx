@@ -370,6 +370,7 @@ export default function App() {
                 onRemoveFromQueue={handleRemoveFromQueue}
                 onMarkDone={handleMarkDone}
                 onTakeNow={handleTakeNow}
+                planTaskIds={planTaskIds}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
