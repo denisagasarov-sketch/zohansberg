@@ -169,6 +169,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
   const [prioritySorted, setPrioritySorted] = useState<Set<CollapseKey>>(new Set())
+  const [showNoPrio, setShowNoPrio] = useState<Set<number>>(new Set())
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null)
   const [noteValues, setNoteValues] = useState<Record<number, string>>(() =>
     Object.fromEntries(directions.map(d => [d.id, d.notes ?? '']))
@@ -180,6 +181,15 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
       if (next.has(key)) next.delete(key)
       else next.add(key)
       saveCollapsed(next)
+      return next
+    })
+  }, [])
+
+  const toggleNoPrio = useCallback((dirId: number) => {
+    setShowNoPrio(prev => {
+      const next = new Set(prev)
+      if (next.has(dirId)) next.delete(dirId)
+      else next.add(dirId)
       return next
     })
   }, [])
@@ -245,7 +255,11 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
           const color = getDirectionColor(dir.id)
           const isByPriority = prioritySorted.has(dir.id)
           const baseTasks = sortDirectionTasks(activeTasks.filter(t => t.direction_id === dir.id))
-          const dirTasks = isByPriority ? sortByPriority(baseTasks) : baseTasks
+          const allDirTasks = isByPriority ? sortByPriority(baseTasks) : baseTasks
+          // Split: prioritized tasks stay visible; unprioritized are tucked into a quiet collapsible section
+          const dirTasks = allDirTasks.filter(t => t.priority && t.priority !== 'none')
+          const noPrioTasks = allDirTasks.filter(t => !t.priority || t.priority === 'none')
+          const noPrioOpen = showNoPrio.has(dir.id)
           const isCollapsed = collapsed.has(dir.id)
           return (
             <div key={dir.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
@@ -279,7 +293,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       </div>
                     )
                   })()}
-                  <span className="text-[10px]" style={{ color: color + '80' }}>{dirTasks.length}</span>
+                  <span className="text-[10px]" style={{ color: color + '80' }}>{allDirTasks.length}</span>
                   <span
                     className="text-[10px] cursor-pointer px-0.5"
                     style={{ color: color + '80' }}
@@ -318,7 +332,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
               )}
               {!isCollapsed && (
                 <>
-                  {dirTasks.length === 0 ? (
+                  {dirTasks.length === 0 && noPrioTasks.length === 0 ? (
                     <div className="px-3 py-2 text-[10px] text-[#383838]">Нет задач вне очереди</div>
                   ) : (
                     <div className="divide-y divide-[#252525]/50">
@@ -342,6 +356,41 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       ))}
                     </div>
                   )}
+
+                  {/* Quiet section: tasks without priority, collapsed by default */}
+                  {noPrioTasks.length > 0 && (
+                    <div className="border-t border-[#252525]/50">
+                      <button
+                        onClick={() => toggleNoPrio(dir.id)}
+                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-[#454545] hover:text-[#666] transition-colors"
+                      >
+                        <span>{noPrioOpen ? '▾' : '▸'}</span>
+                        <span>без приоритета · {noPrioTasks.length}</span>
+                      </button>
+                      {noPrioOpen && (
+                        <div className="divide-y divide-[#252525]/40 opacity-60">
+                          {noPrioTasks.map((task, idx) => (
+                            <TaskRow
+                              key={task.id}
+                              task={task}
+                              index={idx + 1}
+                              onClick={() => onTaskClick(task)}
+                              onDragStart={handleDragStart}
+                              onDragOver={handleDragOver}
+                              onDrop={handleDrop}
+                              onAddToQueue={onAddToQueue}
+                              onMarkDone={onMarkDone}
+                              onPriorityChange={onPriorityChange}
+                              draggingId={draggingId}
+                              inPlan={planTaskIds.includes(task.id)}
+                              focusMode={focusMode}
+                              nowTaskId={nowTaskId}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -352,8 +401,11 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
         {(() => {
           const isByPriorityNone = prioritySorted.has('none')
           const baseNone = sortDirectionTasks(activeTasks.filter(t => t.direction_id === null))
-          const noDirTasks = isByPriorityNone ? sortByPriority(baseNone) : baseNone
-          if (noDirTasks.length === 0) return null
+          const allNoDirTasks = isByPriorityNone ? sortByPriority(baseNone) : baseNone
+          if (allNoDirTasks.length === 0) return null
+          const noDirTasks = allNoDirTasks.filter(t => t.priority && t.priority !== 'none')
+          const noDirNoPrio = allNoDirTasks.filter(t => !t.priority || t.priority === 'none')
+          const noDirNoPrioOpen = showNoPrio.has(-1)
           const isCollapsed = collapsed.has('none')
           return (
             <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
@@ -366,7 +418,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                   title="Клик — сортировка по приоритету"
                 >Без направления{isByPriorityNone ? ' ↓' : ''}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[#383838]">{noDirTasks.length}</span>
+                  <span className="text-[10px] text-[#383838]">{allNoDirTasks.length}</span>
                   <span
                     className="text-[10px] text-[#383838] cursor-pointer px-0.5"
                     onClick={() => toggleCollapse('none')}
@@ -374,26 +426,63 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                 </div>
               </div>
               {!isCollapsed && (
-                <div className="divide-y divide-[#252525]/50">
-                  {noDirTasks.map((task, idx) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      index={idx + 1}
-                      onClick={() => onTaskClick(task)}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onAddToQueue={onAddToQueue}
-                      onMarkDone={onMarkDone}
-                      onPriorityChange={onPriorityChange}
-                      draggingId={draggingId}
-                      inPlan={planTaskIds.includes(task.id)}
-                      focusMode={focusMode}
-                      nowTaskId={nowTaskId}
-                    />
-                  ))}
-                </div>
+                <>
+                  {noDirTasks.length > 0 && (
+                    <div className="divide-y divide-[#252525]/50">
+                      {noDirTasks.map((task, idx) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          index={idx + 1}
+                          onClick={() => onTaskClick(task)}
+                          onDragStart={handleDragStart}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          onAddToQueue={onAddToQueue}
+                          onMarkDone={onMarkDone}
+                          onPriorityChange={onPriorityChange}
+                          draggingId={draggingId}
+                          inPlan={planTaskIds.includes(task.id)}
+                          focusMode={focusMode}
+                          nowTaskId={nowTaskId}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {noDirNoPrio.length > 0 && (
+                    <div className="border-t border-[#252525]/50">
+                      <button
+                        onClick={() => toggleNoPrio(-1)}
+                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-[#454545] hover:text-[#666] transition-colors"
+                      >
+                        <span>{noDirNoPrioOpen ? '▾' : '▸'}</span>
+                        <span>без приоритета · {noDirNoPrio.length}</span>
+                      </button>
+                      {noDirNoPrioOpen && (
+                        <div className="divide-y divide-[#252525]/40 opacity-60">
+                          {noDirNoPrio.map((task, idx) => (
+                            <TaskRow
+                              key={task.id}
+                              task={task}
+                              index={idx + 1}
+                              onClick={() => onTaskClick(task)}
+                              onDragStart={handleDragStart}
+                              onDragOver={handleDragOver}
+                              onDrop={handleDrop}
+                              onAddToQueue={onAddToQueue}
+                              onMarkDone={onMarkDone}
+                              onPriorityChange={onPriorityChange}
+                              draggingId={draggingId}
+                              inPlan={planTaskIds.includes(task.id)}
+                              focusMode={focusMode}
+                              nowTaskId={nowTaskId}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )
