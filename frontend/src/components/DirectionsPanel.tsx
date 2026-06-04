@@ -82,11 +82,12 @@ interface TaskRowProps {
   onPriorityChange: (taskId: number, priority: string) => void
   draggingId: number | null
   inPlan?: boolean
+  muted?: boolean
   focusMode?: boolean
   nowTaskId?: number
 }
 
-function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onMarkDone, onPriorityChange, draggingId, inPlan, focusMode, nowTaskId }: TaskRowProps) {
+function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onMarkDone, onPriorityChange, draggingId, inPlan, muted, focusMode, nowTaskId }: TaskRowProps) {
   const dimmed = focusMode && task.id !== nowTaskId
   const [showPicker, setShowPicker] = useState(false)
 
@@ -121,7 +122,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
         )}
       </div>
 
-      <span className={`flex-1 text-sm truncate ${task.in_queue || inPlan ? 'text-[#b8b8b8]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
+      <span className={`flex-1 text-sm truncate ${muted ? 'text-[#707070]' : task.in_queue || inPlan ? 'text-[#b8b8b8]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
       {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
       {/* Plan badge takes priority over queue badge */}
       {inPlan
@@ -368,7 +369,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                         <span>без приоритета · {noPrioTasks.length}</span>
                       </button>
                       {noPrioOpen && (
-                        <div className="divide-y divide-[#252525]/40 opacity-60">
+                        <div className="divide-y divide-[#252525]/40">
                           {noPrioTasks.map((task, idx) => (
                             <TaskRow
                               key={task.id}
@@ -383,6 +384,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                               onPriorityChange={onPriorityChange}
                               draggingId={draggingId}
                               inPlan={planTaskIds.includes(task.id)}
+                              muted
                               focusMode={focusMode}
                               nowTaskId={nowTaskId}
                             />
@@ -459,7 +461,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                         <span>без приоритета · {noDirNoPrio.length}</span>
                       </button>
                       {noDirNoPrioOpen && (
-                        <div className="divide-y divide-[#252525]/40 opacity-60">
+                        <div className="divide-y divide-[#252525]/40">
                           {noDirNoPrio.map((task, idx) => (
                             <TaskRow
                               key={task.id}
@@ -474,6 +476,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                               onPriorityChange={onPriorityChange}
                               draggingId={draggingId}
                               inPlan={planTaskIds.includes(task.id)}
+                              muted
                               focusMode={focusMode}
                               nowTaskId={nowTaskId}
                             />
