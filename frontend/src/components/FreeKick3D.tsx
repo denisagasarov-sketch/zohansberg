@@ -82,6 +82,7 @@ export default function FreeKick3D() {
   const [phase, setPhase] = useState<Phase>('aim')
   const [msg, setMsg] = useState('')
   const [stats, setStats] = useState<Stats>(loadStats)
+  const [failed, setFailed] = useState<string | null>(null)
 
   const st = useRef({
     phase: 'aim' as Phase,
@@ -100,9 +101,11 @@ export default function FreeKick3D() {
   const bump = (k: keyof Stats) => setStats(p => { const n = { ...p, [k]: p[k] + 1 }; saveStats(n); return n })
 
   useEffect(() => {
+    let renderer: THREE.WebGLRenderer
+    try {
     const canvas = canvasRef.current!
     const W = Math.max(360, Math.floor(wrapRef.current?.clientWidth ?? 600))
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
     renderer.setSize(W, VIEW_H, false)
     renderer.shadowMap.enabled = true
@@ -174,7 +177,11 @@ export default function FreeKick3D() {
     st.current.three = { scene, cam, renderer, ballMesh, aimMarker, trajLine }
 
     let raf = 0, last = performance.now()
-    const loop = (now: number) => { const dt = Math.min(0.04, (now - last) / 1000); last = now; update(dt); renderer.render(scene, cam); raf = requestAnimationFrame(loop) }
+    const loop = (now: number) => {
+      const dt = Math.min(0.04, (now - last) / 1000); last = now
+      try { update(dt); renderer.render(scene, cam) } catch (err) { console.error('[FreeKick3D loop]', err) }
+      raf = requestAnimationFrame(loop)
+    }
     raf = requestAnimationFrame(loop)
 
     const onResize = () => {
@@ -185,6 +192,10 @@ export default function FreeKick3D() {
     sndWhistle()
 
     return () => { cancelAnimationFrame(raf); ro.disconnect(); renderer.dispose() }
+    } catch (err: any) {
+      console.error('[FreeKick3D init]', err)
+      setFailed(err?.message || 'WebGL недоступен')
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -327,6 +338,13 @@ export default function FreeKick3D() {
   }, [])
 
   const acc = stats.shots ? Math.round((stats.goals / stats.shots) * 100) : 0
+
+  if (failed) return (
+    <div className="w-full text-center text-[12px] text-[#777] py-10">
+      3D-режим недоступен в этом окружении
+      <div className="text-[9px] text-[#444] mt-1">{failed}</div>
+    </div>
+  )
 
   return (
     <div ref={wrapRef} className="w-full" onClick={e => e.stopPropagation()}>

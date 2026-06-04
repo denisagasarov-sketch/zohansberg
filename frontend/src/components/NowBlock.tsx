@@ -6,6 +6,7 @@ import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
 import { PriorityPicker } from './PriorityPicker'
 import GameArcade from './GameArcade'
+import ErrorBoundary from './ErrorBoundary'
 
 interface Props {
   task: Task | null
@@ -77,7 +78,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] mb-3 uppercase">Сейчас</div>
 
       {!task ? (
-        <GameArcade />
+        <ErrorBoundary><GameArcade /></ErrorBoundary>
       ) : (
         <>
           {/* Task title row */}
