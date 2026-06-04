@@ -46,12 +46,33 @@ function emptyGrid(): boolean[][] {
   return NOTES.map(() => Array(STEPS).fill(false))
 }
 
+interface SavedPattern {
+  id: number
+  name: string
+  bpm: number
+  grid: boolean[][]
+}
+
+const STORE_KEY = 'piano_patterns'
+
+function loadPatterns(): SavedPattern[] {
+  try {
+    const raw = localStorage.getItem(STORE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function savePatterns(list: SavedPattern[]) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list)) } catch {}
+}
+
 export default function PianoSequencer() {
   const [grid, setGrid] = useState<boolean[][]>(emptyGrid)
   const [playing, setPlaying] = useState(false)
   const [bpm, setBpm] = useState(120)
   const [step, setStep] = useState(0)
   const [recording, setRecording] = useState(false)
+  const [saved, setSaved] = useState<SavedPattern[]>(loadPatterns)
 
   const stepRef = useRef(0)
   const gridRef = useRef(grid)
@@ -117,6 +138,34 @@ export default function PianoSequencer() {
     setPlaying(p => !p)
   }
 
+  const hasNotes = grid.some(r => r.some(Boolean))
+
+  const handleSave = () => {
+    if (!hasNotes) return
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    const entry: SavedPattern = {
+      id: Date.now(),
+      name: `Запись ${saved.length + 1} · ${time}`,
+      bpm,
+      grid: grid.map(r => [...r]),
+    }
+    const next = [entry, ...saved]
+    setSaved(next)
+    savePatterns(next)
+  }
+
+  const handleLoad = (p: SavedPattern) => {
+    setPlaying(false)
+    setGrid(p.grid.map(r => [...r]))
+    setBpm(p.bpm)
+  }
+
+  const handleDelete = (id: number) => {
+    const next = saved.filter(p => p.id !== id)
+    setSaved(next)
+    savePatterns(next)
+  }
+
   return (
     <div className="w-full max-w-[420px] bg-[#141414] border border-[#252525] rounded-xl p-3" onClick={e => e.stopPropagation()}>
       <div className="flex items-center gap-2 mb-2">
@@ -130,6 +179,12 @@ export default function PianoSequencer() {
           className={`px-2 py-0.5 rounded text-[11px] transition-colors ${recording ? 'bg-[#a04050] text-white' : 'bg-[#252525] text-[#999] hover:bg-[#383838]'}`}
           title="Запись игры в луп"
         >● rec</button>
+        <button
+          onClick={handleSave}
+          disabled={!hasNotes}
+          className="px-2 py-0.5 rounded text-[11px] bg-[#252525] text-[#999] hover:bg-[#383838] disabled:opacity-40 transition-colors"
+          title="Сохранить луп"
+        >💾</button>
         <button
           onClick={() => setGrid(emptyGrid())}
           className="px-2 py-0.5 rounded text-[11px] bg-[#252525] text-[#666] hover:bg-[#383838] transition-colors"
@@ -181,6 +236,27 @@ export default function PianoSequencer() {
       </div>
 
       <p className="text-[9px] text-[#383838] mt-2">Клик по сетке — нота. Клавиши z x c v b n m , — играть. ● rec пишет игру в луп.</p>
+
+      {/* Saved recordings */}
+      {saved.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[#252525] space-y-1">
+          <div className="text-[9px] font-semibold tracking-widest text-[#383838] uppercase">Записи</div>
+          {saved.map(p => (
+            <div key={p.id} className="flex items-center gap-2 group">
+              <button
+                onClick={() => handleLoad(p)}
+                className="flex-1 text-left text-[11px] text-[#999] hover:text-[#8090c8] transition-colors truncate"
+                title="Загрузить в секвенсор"
+              >▶ {p.name} · {p.bpm} BPM</button>
+              <button
+                onClick={() => handleDelete(p.id)}
+                className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#a04050] text-xs transition-all shrink-0"
+                title="Удалить"
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
