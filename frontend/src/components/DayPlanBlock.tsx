@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
-import { priorityLabel, priorityColor } from '../utils/priority'
+import { PriorityBadge } from './PriorityPicker'
 
 interface Props {
   planTaskIds: number[]
@@ -13,12 +13,13 @@ interface Props {
   onTaskClick: (task: Task) => void
   onReorder: (newIds: number[]) => void
   onAddToPlan: (taskId: number) => void
+  onPriorityChange: (taskId: number, priority: string) => void
 }
 
 // Internal reorder uses its own key; tasks dragged in from DirectionsPanel use DRAG_TASK_KEY
 const DRAG_KEY = 'dayplan-task-id'
 
-export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow, onMarkDone, onTaskClick, onReorder, onAddToPlan }: Props) {
+export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow, onMarkDone, onTaskClick, onReorder, onAddToPlan, onPriorityChange }: Props) {
   const planTasks = planTaskIds
     .map(id => tasks.find(t => t.id === id))
     .filter((t): t is Task => !!t && !t.done_at && !t.deleted_at && t.slot !== 'now')
@@ -107,11 +108,7 @@ export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow
                 >
                   {c && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ backgroundColor: c }} />}
                   <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
-                  {task.priority && task.priority !== 'none' && (
-                    <span className="text-[11px] font-mono shrink-0" style={{ color: priorityColor(task.priority) }}>
-                      {priorityLabel(task.priority)}
-                    </span>
-                  )}
+                  <PriorityBadge priority={task.priority} onChange={v => onPriorityChange(task.id, v)} />
                   <span
                     className="flex-1 text-sm text-[#f0f0f0] truncate cursor-pointer"
                     onClick={() => onTaskClick(task)}

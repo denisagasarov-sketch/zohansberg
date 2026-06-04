@@ -4,6 +4,7 @@ import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
+import { PriorityPicker } from './PriorityPicker'
 
 interface Props {
   task: Task | null
@@ -19,6 +20,7 @@ interface Props {
   onTaskClick: (task: Task) => void
   onAddTask: () => void
   onDropTask: (taskId: number) => void
+  onPriorityChange: (taskId: number, priority: string) => void
   pomodoroPhase?: 'work' | 'break' | 'idle'
   pomodoroRemaining?: number
   onSkipPomodoro?: () => void
@@ -40,7 +42,8 @@ function formatTime(s: number): string {
   return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, onPriorityChange, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro }: Props) {
+  const [showPrio, setShowPrio] = useState(false)
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const dirColor = direction ? getDirectionColor(direction.id) : null
   const [isDragOver, setIsDragOver] = useState(false)
@@ -95,11 +98,23 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             onClick={() => onTaskClick(task)}
           >
             <div className="flex items-start gap-2 mb-1.5">
-              {task.priority && task.priority !== 'none' && (
-                <span className="text-[13px] font-mono leading-tight mt-[3px] shrink-0" style={{ color: priorityColor(task.priority) }}>
+              <div className="relative shrink-0 mt-[3px]">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowPrio(v => !v) }}
+                  className={`text-[13px] font-mono leading-tight transition-opacity ${task.priority && task.priority !== 'none' ? '' : 'opacity-30 hover:opacity-100'}`}
+                  style={{ color: priorityColor(task.priority) }}
+                  title="Приоритет"
+                >
                   {priorityLabel(task.priority)}
-                </span>
-              )}
+                </button>
+                {showPrio && (
+                  <PriorityPicker
+                    current={task.priority}
+                    onChange={v => onPriorityChange(task.id, v)}
+                    onClose={() => setShowPrio(false)}
+                  />
+                )}
+              </div>
               <h2 className="text-xl font-bold text-[#f0f0f0] leading-tight">{task.title}</h2>
             </div>
             <div className="flex items-center gap-2 flex-wrap text-xs">

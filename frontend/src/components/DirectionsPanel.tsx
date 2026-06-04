@@ -1,8 +1,9 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
-import { PRIORITY_OPTIONS, priorityLabel, priorityColor } from '../utils/priority'
+import { priorityLabel, priorityColor } from '../utils/priority'
+import { PriorityPicker } from './PriorityPicker'
 
 interface Props {
   tasks: Task[]
@@ -22,40 +23,6 @@ interface Props {
 }
 
 type CollapseKey = number | 'none' | 'someday'
-
-function PriorityPicker({ current, onChange, onClose }: {
-  current: string
-  onChange: (v: string) => void
-  onClose: () => void
-}) {
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const el = document.getElementById('priority-picker')
-      if (el && !el.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
-
-  return (
-    <div
-      id="priority-picker"
-      className="absolute z-40 left-0 top-full mt-0.5 bg-[#1c1c1c] border border-[#383838] rounded shadow-xl py-0.5 min-w-[56px]"
-      onMouseDown={e => e.stopPropagation()}
-    >
-      {PRIORITY_OPTIONS.map(o => (
-        <button
-          key={o.value}
-          onClick={e => { e.stopPropagation(); onChange(o.value); onClose() }}
-          className={`flex items-center justify-center w-full px-3 py-1 text-xs hover:bg-[#252525] transition-colors ${current === o.value ? 'bg-[#252525]' : ''}`}
-          style={{ color: o.color }}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 const PRIORITY_RANK: Record<string, number> = { I: 1, II: 2, III: 3, none: 4 }
 

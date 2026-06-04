@@ -371,6 +371,7 @@ export default function App() {
                 onTaskClick={handleTaskClick}
                 onAddTask={handleOpenNewTask}
                 onDropTask={handleDropToNow}
+                onPriorityChange={handlePriorityChange}
                 pomodoroPhase={pomodoroEnabled ? pomodoroState.phase : 'idle'}
                 pomodoroRemaining={pomodoroState.remaining}
                 onSkipPomodoro={skipPomodoro}
@@ -388,6 +389,7 @@ export default function App() {
                   api.setDayPlan(today, newIds).catch(() => {})
                 }}
                 onAddToPlan={addToPlan}
+                onPriorityChange={handlePriorityChange}
               />
               <QueueBlock
                 tasks={tasks}
@@ -398,6 +400,7 @@ export default function App() {
                 onRemoveFromQueue={handleRemoveFromQueue}
                 onMarkDone={handleMarkDone}
                 onTakeNow={handleTakeNow}
+                onPriorityChange={handlePriorityChange}
                 planTaskIds={planTaskIds}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}

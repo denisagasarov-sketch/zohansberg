@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
-import { priorityLabel, priorityColor } from '../utils/priority'
+import { PriorityBadge } from './PriorityPicker'
 
 interface Props {
   tasks: Task[]
@@ -13,12 +13,13 @@ interface Props {
   onRemoveFromQueue: (taskId: number) => void
   onMarkDone: (taskId: number) => void
   onTakeNow: (taskId: number) => void
+  onPriorityChange: (taskId: number, priority: string) => void
   planTaskIds?: number[]
   focusMode?: boolean
   nowTaskId?: number
 }
 
-export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, onTakeNow, planTaskIds = [], focusMode, nowTaskId }: Props) {
+export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, onDropFromOutside, onRemoveFromQueue, onMarkDone, onTakeNow, onPriorityChange, planTaskIds = [], focusMode, nowTaskId }: Props) {
   function focusDimmed(task: Task) { return !!(focusMode && task.id !== nowTaskId) }
   // Exclude tasks that are in today's plan — they show in «На сегодня» instead
   const queueTasks = (tasks ?? []).filter(t => t.in_queue && !t.someday && !t.done_at && !t.deleted_at && t.slot !== 'now' && !planTaskIds.includes(t.id))
@@ -121,9 +122,7 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                 ) : null}
                 <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                 <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
-                {task.priority && task.priority !== 'none' && (
-                  <span className="text-[11px] font-mono shrink-0" style={{ color: priorityColor(task.priority) }}>{priorityLabel(task.priority)}</span>
-                )}
+                <PriorityBadge priority={task.priority} onChange={v => onPriorityChange(task.id, v)} />
                 <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
                 {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
                 {task.deadline && (
