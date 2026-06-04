@@ -45,6 +45,7 @@ const GRAV = 0.16
 const MAXHP = 100
 const MOVE_SPEED = 2.2
 const CHARGE_PER_S = 70
+const JUMP_V = -4.2     // worm hop strength
 
 interface Shell { x: number; y: number; vx: number; vy: number; w: WKind }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number }
@@ -68,6 +69,7 @@ export default function ArtilleryGame() {
   const s = useRef({
     W: 600, terrain: [] as number[],
     px: 60, py: 0, ax: 540, ay: 0,
+    pvy: 0, airborne: false, facing: 1 as 1 | -1, walkPhase: 0,
     shell: null as Shell | null,
     shooter: 'you' as 'you' | 'cpu',
     over: false,
@@ -177,8 +179,16 @@ export default function ArtilleryGame() {
     if (st.over) return
 
     if (st.shooter === 'you' && !st.shell) {
-      if (st.keys['ArrowLeft']) { st.px = Math.max(20, st.px - MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
-      if (st.keys['ArrowRight']) { st.px = Math.min(st.W * 0.5, st.px + MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
+      const onGround = !st.airborne
+      if (st.keys['ArrowLeft']) { st.px = Math.max(20, st.px - MOVE_SPEED); st.facing = -1; st.walkPhase += dt / 60; if (onGround) { st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() } }
+      if (st.keys['ArrowRight']) { st.px = Math.min(st.W - 20, st.px + MOVE_SPEED); st.facing = 1; st.walkPhase += dt / 60; if (onGround) { st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() } }
+      // jump
+      if (st.keys['w'] && onGround) { st.airborne = true; st.pvy = JUMP_V; st.keys['w'] = false; sndMove() }
+      if (st.airborne) {
+        st.pvy += GRAV; st.py += st.pvy
+        const ground = st.terrain[Math.max(0, Math.min(st.W - 1, Math.round(st.px)))]
+        if (st.py >= ground && st.pvy >= 0) { st.py = ground; st.airborne = false; st.pvy = 0 }
+      }
       if (st.charging) { st.power = Math.min(100, st.power + dt / 1000 * CHARGE_PER_S); setPower(Math.round(st.power)) }
     }
 
@@ -217,10 +227,20 @@ export default function ArtilleryGame() {
     if (st.shake > 0) c.translate((Math.random() - 0.5) * st.shake, (Math.random() - 0.5) * st.shake)
     // dynamic camera transform (zoom out for high shells), centred horizontally
     c.translate(W / 2, 0); c.scale(st.camS, st.camS); c.translate(-W / 2, -st.camTop)
-    c.fillStyle = '#000'; c.fillRect(-W, st.camTop - 40, W * 3, H + 200)
-    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, H)
-    for (let x = 0; x < W; x++) c.lineTo(x, t[x])
-    c.lineTo(W, H); c.closePath(); c.fill()
+    // sky
+    const sky = c.createLinearGradient(0, st.camTop - 40, 0, H)
+    sky.addColorStop(0, '#3a6bb0'); sky.addColorStop(1, '#9ec8e8')
+    c.fillStyle = sky; c.fillRect(-W, st.camTop - 40, W * 3, H + 200)
+    // soft clouds
+    c.fillStyle = '#ffffff44'
+    for (const [cx, cy, r] of [[W * 0.2, 40, 22], [W * 0.55, 24, 18], [W * 0.8, 50, 26]] as [number, number, number][]) {
+      c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.arc(cx + r, cy + 4, r * 0.8, 0, Math.PI * 2); c.arc(cx - r, cy + 4, r * 0.7, 0, Math.PI * 2); c.fill()
+    }
+    // ground: brown earth with a green grass cap
+    c.fillStyle = '#6b4a2b'; c.beginPath(); c.moveTo(-W, H)
+    c.lineTo(-W, t[0]); for (let x = 0; x < W; x++) c.lineTo(x, t[x]); c.lineTo(W * 2, t[W - 1]); c.lineTo(W * 2, H); c.closePath(); c.fill()
+    c.strokeStyle = '#4caf50'; c.lineWidth = 4; c.lineJoin = 'round'
+    c.beginPath(); c.moveTo(0, t[0]); for (let x = 1; x < W; x++) c.lineTo(x, t[x]); c.stroke()
 
     // Worms-style bazooka crosshair: a sight on the arc around the gun
     if (st.shooter === 'you' && !st.shell && !st.over) {
@@ -249,8 +269,8 @@ export default function ArtilleryGame() {
       }
     }
 
-    drawTank(c, st.px, st.py, st.angle, 1, st.hpP, '#000')
-    drawTank(c, st.ax, st.ay, 45, -1, st.hpC, '#000')
+    drawWorm(c, st.px, st.py, st.angle, 1, st.hpP, '#d24c4c', 'ТЫ', st.walkPhase, st.shooter === 'you' && !st.shell)
+    drawWorm(c, st.ax, st.ay, 135, -1, st.hpC, '#4c6cd2', 'ИИ', 0, false)
 
     if (st.shell) {
       c.fillStyle = '#000'; c.beginPath(); c.arc(st.shell.x, st.shell.y, st.shell.w === 'heavy' ? 5 : 3.5, 0, Math.PI * 2); c.fill()
@@ -327,11 +347,11 @@ export default function ArtilleryGame() {
   }
 
   useEffect(() => {
-    const norm = (k: string) => (k === 'й' || k === 'Й') ? 'q' : k.toLowerCase()
+    const norm = (k: string) => (k === 'й' || k === 'Й') ? 'q' : (k === 'ц' || k === 'Ц') ? 'w' : k.toLowerCase()
     const down = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'q', 'Q', 'й', 'Й'].includes(e.key)) return
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'q', 'Q', 'й', 'Й', 'w', 'W', 'ц', 'Ц'].includes(e.key)) return
       e.preventDefault()
       const st = s.current
       if (st.over) { if (e.key === ' ') reset(); return }
@@ -371,25 +391,66 @@ export default function ArtilleryGame() {
         <span className="flex-1 text-right">{msg ? msg : turn === 'you' ? 'ваш ход' : 'ход ИИ…'}</span>
       </div>
       <div className="flex items-center justify-between text-[9px] text-[#383838] mt-0.5 px-1">
-        <span>← → ход · ↑ ↓ угол · пробел — сила/огонь · Q оружие: <span className="text-[#ffd24c]">{WEAPONS[weapon].name}</span>{msg ? ' · пробел — заново' : ''}</span>
+        <span>← → ход · W прыжок · ↑ ↓ угол · пробел — сила/огонь · Q: <span className="text-[#ffd24c]">{WEAPONS[weapon].name}</span>{msg ? ' · пробел — заново' : ''}</span>
         <span>W {stats.wins} · L {stats.losses}{total ? ` · ${acc}%` : ''}</span>
       </div>
     </div>
   )
 }
 
-function drawTank(c: CanvasRenderingContext2D, x: number, y: number, ang: number, dir: number, hp: number, _col: string) {
-  c.fillStyle = '#000'
-  c.beginPath(); c.arc(x, y - 5, 8, Math.PI, 0); c.fill()
-  c.fillRect(x - 8, y - 5, 16, 5)
-  c.strokeStyle = '#000'; c.lineWidth = 3
+// A Worms-style worm: rounded body, eyes, bobbing feet, holding a bazooka.
+function drawWorm(c: CanvasRenderingContext2D, x: number, y: number, ang: number, barrelDir: 1 | -1, hp: number, color: string, label: string, walkPhase: number, showGun: boolean) {
   const a = (ang * Math.PI) / 180
-  c.beginPath(); c.moveTo(x, y - 8); c.lineTo(x + Math.cos(a) * 16 * dir, y - 8 - Math.sin(a) * 16); c.stroke()
-  c.strokeStyle = '#fff'; c.lineWidth = 1
-  c.beginPath(); c.arc(x, y - 5, 8, Math.PI, 0); c.stroke(); c.strokeRect(x - 8, y - 5, 16, 5)
-  const bw = 22
-  c.fillStyle = '#000'; c.fillRect(x - bw / 2 - 1, y - 26, bw + 2, 5)
-  c.fillStyle = '#fff'; c.fillRect(x - bw / 2, y - 25, bw * (hp / 100), 3)
+  const bx = Math.cos(a) * barrelDir, by = -Math.sin(a) // barrel unit vector
+  const face = bx >= 0 ? 1 : -1 // eyes look where the gun points horizontally
+  const bodyH = 20, bodyW = 13, cyB = y - bodyH / 2 - 2
+
+  // shadow
+  c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.ellipse(x, y, 11, 3.5, 0, 0, Math.PI * 2); c.fill()
+
+  // feet (bob while walking)
+  const bob = Math.sin(walkPhase) * 1.5
+  c.fillStyle = '#2a2a2a'
+  c.beginPath(); c.ellipse(x - 4, y - 1 + bob, 4, 2.4, 0, 0, Math.PI * 2); c.fill()
+  c.beginPath(); c.ellipse(x + 4, y - 1 - bob, 4, 2.4, 0, 0, Math.PI * 2); c.fill()
+
+  // body (rounded capsule)
+  c.fillStyle = color
+  c.beginPath()
+  c.moveTo(x - bodyW / 2, y - 2)
+  c.lineTo(x - bodyW / 2, cyB)
+  c.arc(x, cyB, bodyW / 2, Math.PI, 0)
+  c.lineTo(x + bodyW / 2, y - 2)
+  c.arc(x, y - 2, bodyW / 2, 0, Math.PI)
+  c.closePath(); c.fill()
+  // belly highlight
+  c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(x - face * 2, cyB + 2, 3.5, 6, 0, 0, Math.PI * 2); c.fill()
+
+  // eyes
+  const eyeY = cyB - 3
+  c.fillStyle = '#fff'
+  c.beginPath(); c.arc(x + face * 1 - 3, eyeY, 3, 0, Math.PI * 2); c.arc(x + face * 1 + 3, eyeY, 3, 0, Math.PI * 2); c.fill()
+  c.fillStyle = '#111'
+  c.beginPath(); c.arc(x + face * 2 - 3, eyeY, 1.4, 0, Math.PI * 2); c.arc(x + face * 2 + 3, eyeY, 1.4, 0, Math.PI * 2); c.fill()
+
+  // bazooka
+  if (showGun || true) {
+    const gx = x, gy = cyB + 2
+    c.strokeStyle = '#333'; c.lineWidth = 4; c.lineCap = 'round'
+    c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + bx * 16, gy + by * 16); c.stroke()
+    c.strokeStyle = '#777'; c.lineWidth = 1.5
+    c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + bx * 16, gy + by * 16); c.stroke()
+  }
+
+  // name + HP bar above
+  const topY = cyB - 16
+  c.font = '8px monospace'; c.textAlign = 'center'
+  c.fillStyle = color; c.fillText(label, x, topY - 4)
+  const bw = 24
+  c.fillStyle = '#000a'; c.fillRect(x - bw / 2 - 1, topY, bw + 2, 5)
+  c.fillStyle = hp > 50 ? '#4caf50' : hp > 25 ? '#ffd24c' : '#ff5c5c'
+  c.fillRect(x - bw / 2, topY + 1, bw * (Math.max(0, hp) / 100), 3)
+  c.textAlign = 'left'
 }
 
 function crater(terrain: number[], cx: number, r: number, W: number) {
