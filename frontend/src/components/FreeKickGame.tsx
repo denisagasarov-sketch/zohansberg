@@ -36,7 +36,13 @@ const FLIGHT_MS = 1600
 const CHARGE_PER_S = 75
 type Phase = 'aim' | 'fly' | 'done'
 
-interface Spot { bx: number; by: number; label: string }
+// ball texture spots (longitude, latitude) on the sphere
+const SPOTS = (() => {
+  const arr: { lon: number; lat: number }[] = [{ lon: 0, lat: 0 }]
+  for (let i = 0; i < 5; i++) arr.push({ lon: (i / 5) * Math.PI * 2, lat: -0.7 })
+  for (let i = 0; i < 5; i++) arr.push({ lon: (i / 5) * Math.PI * 2 + 0.6, lat: 0.7 })
+  return arr
+})()
 
 export default function FreeKickGame() {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -56,9 +62,10 @@ export default function FreeKickGame() {
     aimX: 0.5, aimY: 0.4, spin: 0, power: 0,
     charging: false, t: 0,
     spot: { bx: 0.5, by: 0.92, label: '' } as { bx: number; by: number; label: string },
-    ballRot: 0, rotSpeed: 0,
+    ballPhase: 0, spinSpeed: 0,
     gkX: 0, gkDir: 0, gkCommitted: false, gkJump: 0,
-    wallJump: 0,
+    gkReact: 0.42, gkReach: 1, gkSmart: false, gkLag: 120, gkFumble: 1,
+    wallJump: 0, netShake: 0,
     keys: {} as Record<string, boolean>,
   })
   const r = useRef({ aimX, aimY, spin, power, phase })
@@ -68,11 +75,10 @@ export default function FreeKickGame() {
 
   const geo = (W: number) => {
     const gw = W * 0.46, gh = H * 0.3
-    const gx = (W - gw) / 2, gy = H * 0.1
-    return { gw, gh, gx, gy, postR: 4 }
+    return { gw, gh, gx: (W - gw) / 2, gy: H * 0.1 }
   }
 
-  const newSpot = (): Spot => {
+  const newSpot = () => {
     const opts = [
       { bx: 0.5, by: 0.94, label: 'по центру' },
       { bx: 0.28, by: 0.9, label: 'слева' },
@@ -103,31 +109,28 @@ export default function FreeKickGame() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const ballStart = (W: number) => {
-    const sp = s.current.spot
-    return { x: sp.bx * W, y: sp.by * H }
-  }
+  const ballStart = (W: number) => ({ x: s.current.spot.bx * W, y: s.current.spot.by * H })
 
-  // ball screen position for progress p
   const ballPos = (W: number, p: number) => {
-    const g = geo(W)
-    const start = ballStart(W)
+    const g = geo(W), start = ballStart(W)
     const tx = g.gx + r.current.aimX * g.gw
     const ty = g.gy + r.current.aimY * g.gh
     const ease = 1 - (1 - p) * (1 - p)
     const baseX = start.x + (tx - start.x) * p
     const curve = (r.current.spin / 100) * (W * 0.26) * Math.sin(Math.PI * p)
     const x = baseX + curve
-    const sag = (1 - r.current.power / 100) * 150 * (p * p)   // weak shots drop short
-    const lift = (r.current.power / 100) * 18 * Math.sin(Math.PI * p) // slight arc
+    const sag = (1 - r.current.power / 100) * 150 * (p * p)
+    const lift = (r.current.power / 100) * 18 * Math.sin(Math.PI * p)
     const y = start.y + (ty - start.y) * ease + sag - lift
-    const scale = 1 - 0.6 * p
-    return { x, y, scale, tx, ty }
+    return { x, y, scale: 1 - 0.6 * p, tx, ty }
   }
 
   const update = (dt: number) => {
     const st = s.current, W = st.W
-    st.ballRot += (st.phase === 'fly' ? st.rotSpeed : 0.0006) * dt
+    // horizontal spin of the ball texture
+    const baseRoll = st.phase === 'fly' ? st.spinSpeed : 0.0009
+    st.ballPhase += baseRoll * dt
+    if (st.netShake > 0) st.netShake = Math.max(0, st.netShake - dt)
 
     if (st.phase === 'aim') {
       if (st.keys['ArrowLeft']) { st.aimX = Math.max(-0.05, st.aimX - dt / 1500); setAimX(st.aimX) }
@@ -141,45 +144,44 @@ export default function FreeKickGame() {
       st.t += dt / FLIGHT_MS
       const p = Math.min(1, st.t)
       const g = geo(W)
-
-      // wall jumps up early, then comes down
       st.wallJump = p < 0.6 ? Math.sin((p / 0.6) * Math.PI) * 26 : 0
 
-      // keeper reads ball direction around p=0.4 and commits to a dive
-      if (!st.gkCommitted && p >= 0.4) {
-        const b = ballPos(W, 0.45)
-        st.gkDir = Math.sign(b.x - W / 2) || (Math.random() < 0.5 ? -1 : 1)
+      // keeper commits at his (random) reaction time; smart keepers read the FINAL spot,
+      // others read the mid-flight position (so a late curl fools them)
+      if (!st.gkCommitted && p >= st.gkReact) {
+        const readP = st.gkSmart ? 0.95 : 0.5
+        const b = ballPos(W, readP)
+        let dir = Math.sign(b.x - W / 2)
+        if (Math.random() < 0.12) dir = -dir || 1 // occasional total misread
+        if (dir === 0) dir = Math.random() < 0.5 ? -1 : 1
+        st.gkDir = dir
         st.gkCommitted = true
       }
       if (st.gkCommitted) {
-        const reach = g.gw * 0.4
-        const targetX = W / 2 + st.gkDir * reach
-        st.gkX += (targetX - st.gkX) * Math.min(1, dt / 120)
+        const targetX = W / 2 + st.gkDir * g.gw * 0.4
+        st.gkX += (targetX - st.gkX) * Math.min(1, dt / st.gkLag)
         st.gkJump = Math.min(1, st.gkJump + dt / 350)
       }
 
-      // wall block (over-the-wall miss if too low through the wall zone)
       if (p >= 0.46 && p <= 0.58) {
         const b = ballPos(W, p)
-        const wallCx = (ballStart(W).x + W / 2) / 2
-        const wallHalf = W * 0.1
+        const wallCx = (ballStart(W).x + W / 2) / 2, wallHalf = W * 0.1
         const wallTopY = H * 0.56 - st.wallJump
         if (Math.abs(b.x - wallCx) < wallHalf && b.y > wallTopY) { finish('СТЕНКА', false); return }
       }
 
       if (p >= 1) {
         const b = ballPos(W, 1)
-        // posts
-        const nearLeft = Math.abs(b.x - g.gx) < 6, nearRight = Math.abs(b.x - (g.gx + g.gw)) < 6
+        const nearPost = Math.abs(b.x - g.gx) < 6 || Math.abs(b.x - (g.gx + g.gw)) < 6
         const atBarY = b.y > g.gy - 6 && b.y < g.gy + g.gh
         const inGoal = b.x > g.gx + 4 && b.x < g.gx + g.gw - 4 && b.y > g.gy + 4 && b.y < g.gy + g.gh
-        const gkHandsX = st.gkX
         const gkHandsY = g.gy + g.gh - 18 - st.gkJump * 22
-        const caught = Math.hypot(b.x - gkHandsX, b.y - gkHandsY) < W * 0.06
-        if ((nearLeft || nearRight) && atBarY) { finish('ШТАНГА', false); sndPost() }
+        const dist = Math.hypot(b.x - st.gkX, b.y - gkHandsY)
+        const caught = dist < W * 0.06 * st.gkReach * st.gkFumble
+        if (nearPost && atBarY) { finish('ШТАНГА', false); sndPost() }
         else if (!inGoal) finish('МИМО', false)
         else if (caught) finish('СЕЙВ', false)
-        else finish('⚽ ГОЛ!', true)
+        else { st.netShake = 600; finish('⚽ ГОЛ!', true) }
       }
     }
   }
@@ -198,8 +200,14 @@ export default function FreeKickGame() {
     st.charging = false; setCharging(false)
     st.t = 0; st.phase = 'fly'; setPhase('fly')
     st.gkCommitted = false; st.gkJump = 0; st.gkX = st.W / 2
-    st.rotSpeed = 0.004 + Math.abs(st.spin) / 100 * 0.02
-    if (st.spin < 0) st.rotSpeed = -st.rotSpeed
+    // randomised keeper so the same kick isn't always a goal
+    st.gkReact = 0.34 + Math.random() * 0.26   // when he commits
+    st.gkSmart = Math.random() < 0.35          // sometimes reads the real target
+    st.gkReach = 0.85 + Math.random() * 0.45   // dive reach
+    st.gkLag = 90 + Math.random() * 90         // dive speed
+    st.gkFumble = Math.random() < 0.15 ? 0.4 : 1 // occasional fumble
+    // horizontal spin speed of the ball
+    st.spinSpeed = (st.spin >= 0 ? 1 : -1) * (0.004 + Math.abs(st.spin) / 100 * 0.03)
     sndKick(); bump('shots')
   }
 
@@ -207,39 +215,39 @@ export default function FreeKickGame() {
     const st = s.current
     st.phase = 'aim'; setPhase('aim'); setMsg('')
     st.power = 0; setPower(0); st.charging = false; setCharging(false)
-    st.t = 0; st.gkX = st.W / 2; st.gkJump = 0; st.wallJump = 0
+    st.t = 0; st.gkX = st.W / 2; st.gkJump = 0; st.wallJump = 0; st.netShake = 0
     st.spot = newSpot()
-    setAimX(0.5); st.aimX = 0.5; setAimY(0.4); st.aimY = 0.4
+    st.aimX = 0.5; setAimX(0.5); st.aimY = 0.4; setAimY(0.4)
   }
 
   const render = (c: CanvasRenderingContext2D, W: number) => {
     const st = s.current, g = geo(W)
-    // sky + pitch
+    const kSize = g.gh * 0.62 // keeper proportional to goal height
+
     c.fillStyle = '#0d1a10'; c.fillRect(0, 0, W, H)
     c.fillStyle = '#16361f'; c.fillRect(0, g.gy + g.gh * 0.45, W, H)
     c.fillStyle = '#1a3d24'
     const py0 = g.gy + g.gh * 0.45
     for (let i = 0; i < 6; i++) { const y = py0 + i * (H - py0) / 6; if (i % 2 === 0) c.fillRect(0, y, W, (H - py0) / 6) }
 
-    // goal: net, posts, bar
+    // net (wobbles on goal)
+    const sh = st.netShake > 0 ? Math.sin(st.netShake / 30) * (st.netShake / 600) * 5 : 0
     c.strokeStyle = '#ffffff22'; c.lineWidth = 1
-    for (let i = 1; i < 9; i++) { const x = g.gx + (g.gw / 9) * i; c.beginPath(); c.moveTo(x, g.gy); c.lineTo(x, g.gy + g.gh); c.stroke() }
+    for (let i = 1; i < 9; i++) { const x = g.gx + (g.gw / 9) * i + sh * Math.sin(i); c.beginPath(); c.moveTo(x, g.gy); c.lineTo(x, g.gy + g.gh); c.stroke() }
     for (let i = 1; i < 5; i++) { const y = g.gy + (g.gh / 5) * i; c.beginPath(); c.moveTo(g.gx, y); c.lineTo(g.gx + g.gw, y); c.stroke() }
     c.strokeStyle = '#fff'; c.lineWidth = 5; c.lineCap = 'round'
     c.beginPath(); c.moveTo(g.gx, g.gy + g.gh); c.lineTo(g.gx, g.gy); c.lineTo(g.gx + g.gw, g.gy); c.lineTo(g.gx + g.gw, g.gy + g.gh); c.stroke()
 
-    // keeper (little man)
-    drawKeeper(c, st.gkX, g.gy + g.gh, st.gkCommitted ? st.gkDir : 0, st.gkJump)
+    drawPerson(c, st.gkX, g.gy + g.gh, kSize, st.gkCommitted ? st.gkDir : 0, st.gkJump, '#ffd24c', true)
 
-    // wall (jumping players)
+    // wall — real little men, jumping
     const wallCx = (ballStart(W).x + W / 2) / 2, wallHalf = W * 0.1, baseY = H * 0.56
     const n = 4, step = (wallHalf * 2) / n
     for (let i = 0; i < n; i++) {
       const x = wallCx - wallHalf + step * i + step / 2
-      drawWallMan(c, x, baseY - st.wallJump, step * 0.7)
+      drawPerson(c, x, baseY, kSize * 0.92, 0, st.wallJump / 26, '#3a6ad0', false)
     }
 
-    // aim marker + predicted curve
     if (st.phase === 'aim') {
       const tx = g.gx + r.current.aimX * g.gw, ty = g.gy + r.current.aimY * g.gh
       c.strokeStyle = '#ff5c5c'; c.lineWidth = 2
@@ -249,19 +257,22 @@ export default function FreeKickGame() {
       for (let i = 1; i <= 20; i++) { const b = ballPos(W, i / 20); c.beginPath(); c.arc(b.x, b.y, 1.4, 0, Math.PI * 2); c.fill() }
     }
 
-    // ball
     const bp = st.phase === 'fly' ? ballPos(W, Math.min(1, st.t)) : { x: ballStart(W).x, y: ballStart(W).y, scale: 1 }
-    drawBall(c, bp.x, bp.y, 13 * bp.scale, st.ballRot)
+    const rad = 13 * bp.scale
+    // shadow on the ground
+    const groundY = H - 6
+    const shScale = 0.4 + 0.6 * bp.scale
+    c.fillStyle = 'rgba(0,0,0,0.35)'
+    c.beginPath(); c.ellipse(bp.x, groundY, rad * 1.1 * shScale, rad * 0.4 * shScale, 0, 0, Math.PI * 2); c.fill()
+    drawBall(c, bp.x, bp.y, rad, st.ballPhase)
   }
 
-  // keyboard (RU/EN aware for A/D)
   useEffect(() => {
     const norm = (k: string) => (k === 'ф' || k === 'Ф') ? 'a' : (k === 'в' || k === 'В') ? 'd' : k.toLowerCase()
     const down = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      const allowed = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'a', 'A', 'd', 'D', 'ф', 'Ф', 'в', 'В']
-      if (!allowed.includes(e.key)) return
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'a', 'A', 'd', 'D', 'ф', 'Ф', 'в', 'В'].includes(e.key)) return
       e.preventDefault()
       const st = s.current
       if (st.phase === 'done') { if (e.key === ' ') reset(); return }
@@ -301,58 +312,49 @@ export default function FreeKickGame() {
 }
 
 // ── drawing helpers ────────────────────────────────────────────────────────────
-function drawBall(c: CanvasRenderingContext2D, x: number, y: number, rad: number, rot: number) {
-  c.save(); c.translate(x, y); c.rotate(rot)
-  c.fillStyle = '#fff'; c.beginPath(); c.arc(0, 0, rad, 0, Math.PI * 2); c.fill()
-  // center pentagon + ring of pentagons = classic football look
+
+// Football with horizontal (around vertical axis) rotation — spots wrap left↔right
+function drawBall(c: CanvasRenderingContext2D, x: number, y: number, rad: number, phase: number) {
+  c.save()
+  c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.clip()
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.fill()
   c.fillStyle = '#161616'
-  pentagon(c, 0, 0, rad * 0.36)
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 - Math.PI / 2
-    pentagon(c, Math.cos(a) * rad * 0.66, Math.sin(a) * rad * 0.66, rad * 0.2, a)
+  for (const sp of SPOTS) {
+    const a = sp.lon + phase
+    const ca = Math.cos(a)
+    if (ca <= 0.04) continue // back hemisphere hidden
+    const sx = x + Math.sin(a) * Math.cos(sp.lat) * rad
+    const sy = y + Math.sin(sp.lat) * rad
+    const pr = rad * 0.2 * ca * Math.max(0.3, Math.cos(sp.lat))
+    c.beginPath(); c.ellipse(sx, sy, pr, pr * 0.92, 0, 0, Math.PI * 2); c.fill()
   }
   c.restore()
   c.strokeStyle = '#000'; c.lineWidth = 1; c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.stroke()
-  // shine
-  c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.arc(x - rad * 0.32, y - rad * 0.32, rad * 0.18, 0, Math.PI * 2); c.fill()
+  c.fillStyle = 'rgba(255,255,255,0.45)'; c.beginPath(); c.arc(x - rad * 0.34, y - rad * 0.34, rad * 0.18, 0, Math.PI * 2); c.fill()
 }
-function pentagon(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, rot = 0) {
-  c.beginPath()
-  for (let i = 0; i < 5; i++) {
-    const a = rot + (i / 5) * Math.PI * 2 - Math.PI / 2
-    const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r
-    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py)
-  }
-  c.closePath(); c.fill()
-}
-function drawKeeper(c: CanvasRenderingContext2D, x: number, groundY: number, dive: number, jump: number) {
-  // dive: -1 left, 0 still, 1 right ; jump 0..1 raises & tilts
+
+// A little stick-figure player. dive: -1..1 lean, jump 0..1 raise.
+function drawPerson(c: CanvasRenderingContext2D, x: number, groundY: number, size: number, dive: number, jump: number, color: string, keeper: boolean) {
+  const u = size / 40 // unit scale relative to a 40px reference
   c.save()
   c.translate(x, groundY)
-  const tilt = dive * jump * 0.5
-  c.rotate(tilt)
-  const up = jump * 14
-  c.strokeStyle = '#ffd24c'; c.fillStyle = '#ffd24c'; c.lineWidth = 3; c.lineCap = 'round'
+  c.rotate(dive * jump * 0.5)
+  const up = jump * 14 * u
+  c.strokeStyle = color; c.lineWidth = 3 * u; c.lineCap = 'round'
   // legs
-  c.beginPath(); c.moveTo(0, -up); c.lineTo(-5, -up + 14); c.moveTo(0, -up); c.lineTo(5, -up + 14); c.stroke()
+  c.beginPath(); c.moveTo(0, -up); c.lineTo(-5 * u, -up + 16 * u); c.moveTo(0, -up); c.lineTo(5 * u, -up + 16 * u); c.stroke()
   // body
-  c.beginPath(); c.moveTo(0, -up - 16); c.lineTo(0, -up); c.stroke()
-  // arms reaching toward dive direction (up when jumping)
-  const ay = -up - 12
-  c.beginPath(); c.moveTo(0, ay)
-  c.lineTo(dive * 14, ay - 10 - jump * 8)
-  c.moveTo(0, ay); c.lineTo(-dive * 8, ay - 6); c.stroke()
-  // gloves
-  c.beginPath(); c.arc(dive * 14, ay - 10 - jump * 8, 3.5, 0, Math.PI * 2); c.fill()
+  c.beginPath(); c.moveTo(0, -up - 18 * u); c.lineTo(0, -up); c.stroke()
+  // arms
+  const ay = -up - 13 * u
+  if (keeper) {
+    c.beginPath(); c.moveTo(0, ay); c.lineTo(dive * 15 * u, ay - 11 * u - jump * 9 * u); c.moveTo(0, ay); c.lineTo(-dive * 9 * u, ay - 6 * u); c.stroke()
+    c.fillStyle = color; c.beginPath(); c.arc(dive * 15 * u, ay - 11 * u - jump * 9 * u, 3.5 * u, 0, Math.PI * 2); c.fill()
+  } else {
+    // wall: arms up to protect, higher when jumping
+    c.beginPath(); c.moveTo(-7 * u, ay); c.lineTo(-7 * u, ay - (6 + jump * 10) * u); c.moveTo(7 * u, ay); c.lineTo(7 * u, ay - (6 + jump * 10) * u); c.stroke()
+  }
   // head
-  c.fillStyle = '#ffe39a'; c.beginPath(); c.arc(0, -up - 22, 5, 0, Math.PI * 2); c.fill()
+  c.fillStyle = '#ffe39a'; c.beginPath(); c.arc(0, -up - 24 * u, 5 * u, 0, Math.PI * 2); c.fill()
   c.restore()
-}
-function drawWallMan(c: CanvasRenderingContext2D, x: number, feetY: number, w: number) {
-  c.fillStyle = '#3a6ad0'
-  c.fillRect(x - w * 0.28, feetY - 24, w * 0.56, 24)
-  c.fillStyle = '#ffe39a'; c.beginPath(); c.arc(x, feetY - 29, 5, 0, Math.PI * 2); c.fill()
-  // arms crossed (protect)
-  c.strokeStyle = '#3a6ad0'; c.lineWidth = 3
-  c.beginPath(); c.moveTo(x - w * 0.28, feetY - 18); c.lineTo(x + w * 0.28, feetY - 14); c.stroke()
 }
