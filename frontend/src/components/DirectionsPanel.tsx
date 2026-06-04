@@ -122,7 +122,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
         )}
       </div>
 
-      <span className={`flex-1 text-sm truncate ${muted ? 'text-[#707070]' : task.in_queue || inPlan ? 'text-[#b8b8b8]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
+      <span className={`flex-1 text-sm truncate ${muted ? 'text-[#707070]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
       {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
       {/* Plan badge takes priority over queue badge */}
       {inPlan
