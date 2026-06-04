@@ -1159,6 +1159,47 @@ app.get('/api/stats/weekly-time', (_req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Standup ──────────────────────────────────────────────────────────────────
+
+// GET /api/standup — yesterday + today sessions grouped by task
+app.get('/api/standup', (_req, res) => {
+  try {
+    const today = todayStr()
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yStr = yesterday.toISOString().slice(0, 10)
+
+    const fetch = (date) => db.prepare(`
+      SELECT t.title, COALESCE(d.name,'') AS direction,
+             SUM(ws.duration_actual) AS seconds,
+             GROUP_CONCAT(ws.note, ' | ') AS notes
+      FROM work_sessions ws
+      JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE date(ws.started_at) = ? AND ws.duration_actual > 0 AND ws.ended_at IS NOT NULL
+      GROUP BY ws.task_id
+      ORDER BY seconds DESC
+    `).all(date)
+
+    const todayDone = db.prepare(
+      `SELECT title FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL ORDER BY done_at ASC`
+    ).all(today).map(r => r.title)
+
+    const todayPlan = db.prepare(`
+      SELECT t.title FROM day_plan dp JOIN tasks t ON t.id = dp.task_id
+      WHERE dp.date = ? AND t.done_at IS NULL AND t.deleted_at IS NULL
+      ORDER BY dp.order_index ASC
+    `).all(today).map(r => r.title)
+
+    res.json({
+      yesterday: fetch(yStr),
+      today: fetch(today),
+      today_done: todayDone,
+      today_plan: todayPlan,
+    })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 // GET /api/export/sessions.csv?period=week|month|all

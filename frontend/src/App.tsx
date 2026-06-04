@@ -6,6 +6,7 @@ import { useTimer } from './hooks/useTimer'
 import { usePomodoro } from './hooks/usePomodoro'
 import Header from './components/Header'
 import BreakScreen from './components/BreakScreen'
+import StandupModal from './components/modals/StandupModal'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
 import DirectionsPanel from './components/DirectionsPanel'
@@ -37,6 +38,7 @@ export default function App() {
   const [showFocusSwitch, setShowFocusSwitch] = useState(false)
   const [showEveningSummary, setShowEveningSummary] = useState(false)
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+  const [showStandup, setShowStandup] = useState(false)
   const [showMorningPlan, setShowMorningPlan] = useState(false)
   const [planTaskIds, setPlanTaskIds] = useState<number[]>([])
   const [planTasks, setPlanTasks] = useState<any[]>([])
@@ -300,6 +302,7 @@ export default function App() {
           if (t) setSelectedTask(t)
         }}
         onEndDay={() => setShowEveningSummary(true)}
+        onStandup={() => setShowStandup(true)}
         isTimerActive={timerState.isRunning || timerState.isPaused}
       />
 
@@ -477,6 +480,8 @@ export default function App() {
           onClose={() => setShowMorningPlan(false)}
         />
       )}
+
+      {showStandup && <StandupModal onClose={() => setShowStandup(false)} />}
 
       {/* Break screen — shown when timer is paused and break screen is enabled */}
       {timerState.isPaused && localStorage.getItem('break_screen_enabled') !== 'false' && (

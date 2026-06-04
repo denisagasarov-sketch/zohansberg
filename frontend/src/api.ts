@@ -117,6 +117,7 @@ export const api = {
 
   getWeeklyTime: () => req<{ direction_id: number | null; seconds: number }[]>('GET', '/stats/weekly-time'),
   getWeeklySummary: () => req<any>('GET', '/weekly-summary'),
+  getStandup: () => req<any>('GET', '/standup'),
 
   // Day plan
   getDayPlan: (date: string) =>
