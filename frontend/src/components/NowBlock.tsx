@@ -76,13 +76,16 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] mb-3 uppercase">Сейчас</div>
 
       {!task ? (
-        <div className="flex flex-col items-center gap-3 py-4">
+        <div className="flex flex-col items-center gap-2 py-4">
           {isDragOver
             ? <p className="text-[#5060a0] text-sm">Отпустите, чтобы взять в работу</p>
-            : <p className="text-[#666] text-sm">Ничего в работе — добавьте задачу</p>
+            : <p className="text-[#666] text-sm">Что в фокусе прямо сейчас?</p>
           }
           {!isDragOver && (
-            <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Добавить задачу</button>
+            <>
+              <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Новая задача</button>
+              <p className="text-[11px] text-[#444]">или перетащите из направлений / очереди</p>
+            </>
           )}
         </div>
       ) : (

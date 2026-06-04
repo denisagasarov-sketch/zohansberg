@@ -15,6 +15,7 @@ interface Props {
   onAddToQueue: (taskId: number) => void
   onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
+  onChangeDirection: (taskId: number, directionId: number | null) => void
   onUpdateDirection: (id: number, data: Partial<Direction>) => void
   weeklyTime?: Record<number, number>
   planTaskIds?: number[]
@@ -132,9 +133,10 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, weeklyTime = {}, planTaskIds = [], focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onChangeDirection, onUpdateDirection, weeklyTime = {}, planTaskIds = [], focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [dragOverDir, setDragOverDir] = useState<number | 'none' | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
   const [prioritySorted, setPrioritySorted] = useState<Set<CollapseKey>>(new Set())
   const [showNoPrio, setShowNoPrio] = useState<Set<number>>(new Set())
@@ -189,6 +191,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
 
   const handleDrop = (e: React.DragEvent, targetId: number) => {
     e.preventDefault()
+    setDragOverDir(null)
     const raw = e.dataTransfer.getData(DRAG_TASK_KEY)
     const sourceId = parseInt(raw, 10) || draggingIdRef.current
     draggingIdRef.current = null
@@ -199,9 +202,13 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     const targetTask = tasks.find(t => t.id === targetId)
     if (!sourceTask || !targetTask) return
 
-    // Only same-direction reordering; ignore queue tasks and cross-direction
-    if (sourceTask.in_queue || sourceTask.direction_id !== targetTask.direction_id) return
+    // Cross-direction (or from queue): move the task into the target's direction
+    if (sourceTask.in_queue || sourceTask.direction_id !== targetTask.direction_id) {
+      onChangeDirection(sourceId, targetTask.direction_id ?? null)
+      return
+    }
 
+    // Same direction: reorder
     const dirTasks = sortDirectionTasks(
       activeTasks.filter(t => t.direction_id === sourceTask.direction_id)
     )
@@ -212,13 +219,29 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     onReorderInDirection(sourceTask.direction_id, ids)
   }
 
+  // Drop onto a direction's empty area / header — move task into that direction
+  const handleDirDrop = (e: React.DragEvent, directionId: number | null) => {
+    e.preventDefault()
+    setDragOverDir(null)
+    const raw = e.dataTransfer.getData(DRAG_TASK_KEY)
+    const sourceId = parseInt(raw, 10) || draggingIdRef.current
+    draggingIdRef.current = null
+    setDraggingId(null)
+    if (!sourceId) return
+    const sourceTask = tasks.find(t => t.id === sourceId)
+    if (!sourceTask) return
+    if (sourceTask.direction_id !== directionId || sourceTask.in_queue) {
+      onChangeDirection(sourceId, directionId)
+    }
+  }
+
   const sortedDirs = [...(directions ?? [])].sort((a, b) => a.order_index - b.order_index)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase px-1 mb-3 sticky top-0 bg-[#181818] py-1">Направления</div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1" onDragEnd={() => { setDragOverDir(null); setDraggingId(null); draggingIdRef.current = null }}>
         {sortedDirs.map(dir => {
           const color = getDirectionColor(dir.id)
           const isByPriority = prioritySorted.has(dir.id)
@@ -230,7 +253,13 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
           const noPrioOpen = showNoPrio.has(dir.id)
           const isCollapsed = collapsed.has(dir.id)
           return (
-            <div key={dir.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
+            <div
+              key={dir.id}
+              className={`bg-[#1c1c1c] border rounded-lg overflow-hidden transition-colors ${dragOverDir === dir.id ? 'border-[#5060a0]' : 'border-[#252525]'}`}
+              onDragOver={e => { e.preventDefault(); setDragOverDir(dir.id) }}
+              onDragLeave={e => { if (!(e.currentTarget as Element).contains(e.relatedTarget as Node)) setDragOverDir(null) }}
+              onDrop={e => handleDirDrop(e, dir.id)}
+            >
               <div
                 className="flex items-center justify-between px-3 py-2 select-none"
                 style={{ backgroundColor: color + '1a' }}
@@ -377,7 +406,12 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
           const noDirNoPrioOpen = showNoPrio.has(-1)
           const isCollapsed = collapsed.has('none')
           return (
-            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg overflow-hidden">
+            <div
+              className={`bg-[#1c1c1c] border rounded-lg overflow-hidden transition-colors ${dragOverDir === 'none' ? 'border-[#5060a0]' : 'border-[#252525]'}`}
+              onDragOver={e => { e.preventDefault(); setDragOverDir('none') }}
+              onDragLeave={e => { if (!(e.currentTarget as Element).contains(e.relatedTarget as Node)) setDragOverDir(null) }}
+              onDrop={e => handleDirDrop(e, null)}
+            >
               <div
                 className="flex items-center justify-between px-3 py-2 select-none"
               >

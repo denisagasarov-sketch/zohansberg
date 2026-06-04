@@ -327,6 +327,12 @@ export default function App() {
     await updateTask(taskId, { priority } as any)
   }, [updateTask])
 
+  const handleChangeDirection = useCallback(async (taskId: number, directionId: number | null) => {
+    // Move into a direction: drop out of the queue so it lives under that direction
+    await updateTask(taskId, { direction_id: directionId, in_queue: false } as any)
+    removeFromPlan(taskId)
+  }, [updateTask, removeFromPlan])
+
   const handleFocusSwitchConfirm = useCallback(() => {
     setShowFocusSwitch(false)
     if (pendingFocusTask) setSelectedTask(pendingFocusTask)
@@ -420,6 +426,7 @@ export default function App() {
                 onAddToQueue={handleAddToQueue}
                 onMarkDone={handleMarkDone}
                 onPriorityChange={handlePriorityChange}
+                onChangeDirection={handleChangeDirection}
                 onUpdateDirection={(id, data) => api.updateDirection(id, data).then(refresh).catch(() => {})}
                 weeklyTime={weeklyTime}
                 planTaskIds={planTaskIds}
