@@ -1200,6 +1200,49 @@ app.get('/api/standup', (_req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/monthly-summary?months=1|3 — stats for last N months
+app.get('/api/monthly-summary', (req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 1
+    const since = months === 1
+      ? `date('now','start of month')`
+      : `date('now','-${months - 1} months','start of month')`
+
+    const done_count = db.prepare(
+      `SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) >= ${since} AND deleted_at IS NULL`
+    ).get().n
+
+    const time_seconds = db.prepare(
+      `SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= ${since}`
+    ).get().s
+
+    const by_direction = db.prepare(`
+      SELECT t.direction_id, COALESCE(d.name,'Без направления') AS direction_name,
+             SUM(ws.duration_actual) AS seconds,
+             COUNT(DISTINCT ws.task_id) AS task_count
+      FROM work_sessions ws
+      LEFT JOIN tasks t ON t.id = ws.task_id
+      LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE date(ws.started_at) >= ${since} AND ws.duration_actual > 0
+      GROUP BY t.direction_id ORDER BY seconds DESC
+    `).all()
+
+    const done_tasks = db.prepare(`
+      SELECT t.title, COALESCE(d.name,'') AS direction
+      FROM tasks t LEFT JOIN directions d ON d.id = t.direction_id
+      WHERE date(t.done_at) >= ${since} AND t.deleted_at IS NULL
+      ORDER BY t.done_at ASC LIMIT 30
+    `).all()
+
+    // Active days (days with at least one session)
+    const active_days = db.prepare(
+      `SELECT COUNT(DISTINCT date(started_at)) AS n FROM work_sessions WHERE date(started_at) >= ${since}`
+    ).get().n
+
+    res.json({ done_count, time_seconds, by_direction, done_tasks, active_days })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 // GET /api/export/sessions.csv?period=week|month|all

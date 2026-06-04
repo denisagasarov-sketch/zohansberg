@@ -7,6 +7,7 @@ import { usePomodoro } from './hooks/usePomodoro'
 import Header from './components/Header'
 import BreakScreen from './components/BreakScreen'
 import StandupModal from './components/modals/StandupModal'
+import MonthlyReviewModal from './components/modals/MonthlyReviewModal'
 import HorizonScreen from './components/HorizonScreen'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
@@ -39,6 +40,8 @@ export default function App() {
   const [showFocusSwitch, setShowFocusSwitch] = useState(false)
   const [showEveningSummary, setShowEveningSummary] = useState(false)
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+  const [showMonthlyReview, setShowMonthlyReview] = useState(false)
+  const [isQuarterlyReview, setIsQuarterlyReview] = useState(false)
   const [showStandup, setShowStandup] = useState(false)
   const [showMorningPlan, setShowMorningPlan] = useState(false)
   const [planTaskIds, setPlanTaskIds] = useState<number[]>([])
@@ -102,6 +105,19 @@ export default function App() {
       if (!localStorage.getItem(weekKey)) {
         setShowWeeklyReview(true)
         localStorage.setItem(weekKey, '1')
+      }
+    }
+
+    // Monthly/quarterly review (1st–3rd of month)
+    const dom = now.getDate()
+    if (dom <= 3) {
+      const month = now.getMonth() // 0=Jan, 3=Apr, 6=Jul, 9=Oct
+      const isQ1 = [0, 3, 6, 9].includes(month)
+      const monthKey = `monthly_review_${now.getFullYear()}_${month}`
+      if (!localStorage.getItem(monthKey)) {
+        setIsQuarterlyReview(isQ1)
+        setShowMonthlyReview(true)
+        localStorage.setItem(monthKey, '1')
       }
     }
   }, [])
@@ -478,6 +494,16 @@ export default function App() {
           directions={directions}
           onClose={() => setShowWeeklyReview(false)}
           onLater={() => setShowWeeklyReview(false)}
+        />
+      )}
+
+      {showMonthlyReview && (
+        <MonthlyReviewModal
+          isQuarterly={isQuarterlyReview}
+          tasks={tasks}
+          directions={directions}
+          onClose={() => setShowMonthlyReview(false)}
+          onLater={() => setShowMonthlyReview(false)}
         />
       )}
 
