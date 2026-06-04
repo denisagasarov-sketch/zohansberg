@@ -34,6 +34,8 @@ export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow
     draggingIdRef.current = taskId
     setDraggingId(taskId)
     e.dataTransfer.setData(DRAG_KEY, String(taskId))
+    // Also expose the shared key so the task can be dragged out into Сейчас/Следом/directions
+    e.dataTransfer.setData(DRAG_TASK_KEY, String(taskId))
     e.dataTransfer.effectAllowed = 'move'
   }
 
