@@ -5,7 +5,7 @@ import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
 import { PriorityPicker } from './PriorityPicker'
-import GradientScales from './GradientScales'
+import GelBalls from './GelBalls'
 
 interface Props {
   task: Task | null
@@ -77,19 +77,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
       <div className="text-[10px] font-semibold tracking-widest text-[#383838] mb-3 uppercase">Сейчас</div>
 
       {!task ? (
-        <div className="flex flex-col items-center gap-3 py-3">
-          {isDragOver ? (
-            <p className="text-[#5060a0] text-sm py-6">Отпустите, чтобы взять в работу</p>
-          ) : (
-            <>
-              <GradientScales />
-              <div className="flex items-center gap-3">
-                <p className="text-[#666] text-sm">Что в фокусе прямо сейчас?</p>
-                <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Новая задача</button>
-              </div>
-            </>
-          )}
-        </div>
+        <GelBalls />
       ) : (
         <>
           {/* Task title row */}
