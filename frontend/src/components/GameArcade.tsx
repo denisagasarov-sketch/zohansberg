@@ -1,11 +1,15 @@
-import { useState } from 'react'
-import FreeKick3D from './FreeKick3D'
+import { useState, lazy, Suspense } from 'react'
 import ArtilleryGame from './ArtilleryGame'
+import ErrorBoundary from './ErrorBoundary'
+
+// 3D game is loaded lazily so three.js stays out of the main bundle —
+// if it fails to load/run, only the game falls back, the app keeps working.
+const FreeKick3D = lazy(() => import('./FreeKick3D'))
 
 type Game = 'kick' | 'arty'
 
 export default function GameArcade() {
-  const [game, setGame] = useState<Game>(() => (localStorage.getItem('arcade_game') as Game) || 'kick')
+  const [game, setGame] = useState<Game>(() => (localStorage.getItem('arcade_game') as Game) || 'arty')
   const pick = (g: Game) => { setGame(g); localStorage.setItem('arcade_game', g) }
 
   const tab = (g: Game, label: string) => (
@@ -21,7 +25,13 @@ export default function GameArcade() {
         {tab('kick', '⚽ Штрафной 3D')}
         {tab('arty', '💥 Артиллерия')}
       </div>
-      {game === 'kick' ? <FreeKick3D /> : <ArtilleryGame />}
+      {game === 'kick' ? (
+        <ErrorBoundary fallback={<div className="text-[12px] text-[#777] text-center py-10">3D-режим не запустился в этом окружении</div>}>
+          <Suspense fallback={<div className="text-[12px] text-[#666] text-center py-10">Загрузка 3D…</div>}>
+            <FreeKick3D />
+          </Suspense>
+        </ErrorBoundary>
+      ) : <ArtilleryGame />}
     </div>
   )
 }
