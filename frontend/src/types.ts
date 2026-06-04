@@ -56,4 +56,4 @@ export interface Settings {
   claude_api_key?: string
 }
 
-export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash'
+export type Screen = 'main' | 'settings' | 'archive' | 'stats' | 'journal' | 'trash' | 'horizon'

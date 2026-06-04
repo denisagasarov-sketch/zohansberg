@@ -7,6 +7,7 @@ import { usePomodoro } from './hooks/usePomodoro'
 import Header from './components/Header'
 import BreakScreen from './components/BreakScreen'
 import StandupModal from './components/modals/StandupModal'
+import HorizonScreen from './components/HorizonScreen'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
 import DirectionsPanel from './components/DirectionsPanel'
@@ -401,6 +402,14 @@ export default function App() {
 
         {screen === 'journal' && (
           <JournalScreen onClose={() => setScreen('main')} />
+        )}
+        {screen === 'horizon' && (
+          <HorizonScreen
+            tasks={tasks}
+            directions={directions}
+            onClose={() => setScreen('main')}
+            onTaskClick={handleTaskClick}
+          />
         )}
       </div>
 
