@@ -125,9 +125,9 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
       {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
       {/* Plan badge takes priority over queue badge */}
       {inPlan
-        ? <span className="text-[9px] text-[#60a060] shrink-0" title="В плане на сегодня">сег</span>
+        ? <span className="text-[9px] text-[#60a060] shrink-0" title="В плане на сегодня">сегодня</span>
         : task.in_queue
-          ? <span className="text-[9px] text-[#6070b0] shrink-0" title="В очереди «Следом»">слд</span>
+          ? <span className="text-[9px] text-[#6070b0] shrink-0" title="В очереди «Следом»">следом</span>
           : null}
       {task.deadline && (() => {
         const d = new Date(task.deadline)
