@@ -113,9 +113,12 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                 className={`group relative flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''} ${focusDimmed(task) ? 'opacity-30 blur-[3px]' : ''}`}
                 onClick={() => onTaskClick(task)}
               >
-                {task.duration_fact > 0 && (
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#5060a0]/60 rounded-r" />
-                )}
+                {/* Direction color stripe (left edge); fallback to a faint mark if task was worked on */}
+                {c ? (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ backgroundColor: c }} />
+                ) : task.duration_fact > 0 ? (
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#5060a0]/40 rounded-r" />
+                ) : null}
                 <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                 <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
                 {task.priority && task.priority !== 'none' && (
@@ -128,16 +131,8 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                     {new Date(task.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                   </span>
                 )}
-                {task.duration_plan != null && (
+                {task.duration_plan != null && task.duration_plan > 0 && (
                   <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
-                )}
-                {dir && c && (
-                  <span
-                    className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
-                    style={{ color: c, backgroundColor: c + '28' }}
-                  >
-                    {dir.name}
-                  </span>
                 )}
                 <button
                   onClick={e => { e.stopPropagation(); onTakeNow(task.id) }}

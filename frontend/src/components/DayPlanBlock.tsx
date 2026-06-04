@@ -101,8 +101,9 @@ export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow
                   onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
                   onDrop={e => handleRowDrop(e, task.id)}
                   onDragEnd={handleDragEnd}
-                  className={`group flex items-center gap-3 px-4 py-2 hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''}`}
+                  className={`group relative flex items-center gap-3 px-4 py-2 hover:bg-[#252525]/40 transition-colors ${draggingId === task.id ? 'opacity-40' : ''}`}
                 >
+                  {c && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ backgroundColor: c }} />}
                   <span className="text-[#383838] text-[10px] cursor-grab select-none shrink-0">⠿</span>
                   {task.priority && task.priority !== 'none' && (
                     <span className="text-[11px] font-mono shrink-0" style={{ color: priorityColor(task.priority) }}>
@@ -115,14 +116,6 @@ export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow
                   >
                     {task.title}
                   </span>
-                  {dir && c && (
-                    <span
-                      className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
-                      style={{ color: c, backgroundColor: c + '28' }}
-                    >
-                      {dir.name}
-                    </span>
-                  )}
                   <button
                     onClick={e => { e.stopPropagation(); onTakeNow(task.id) }}
                     className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#5060a0] text-[10px] leading-none shrink-0 transition-opacity px-0.5"
