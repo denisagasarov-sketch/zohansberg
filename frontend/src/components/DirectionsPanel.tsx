@@ -123,8 +123,12 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
 
       <span className={`flex-1 text-sm truncate ${task.in_queue || inPlan ? 'text-[#b8b8b8]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
       {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
-      {task.in_queue && <span className="text-[9px] text-[#5060a0]/50 shrink-0" title="В очереди «Следом»">↓</span>}
-      {!task.in_queue && inPlan && <span className="text-[9px] text-[#508050]/50 shrink-0" title="В плане на сегодня">◎</span>}
+      {/* Plan badge takes priority over queue badge */}
+      {inPlan
+        ? <span className="text-[9px] text-[#60a060] shrink-0" title="В плане на сегодня">сег</span>
+        : task.in_queue
+          ? <span className="text-[9px] text-[#6070b0] shrink-0" title="В очереди «Следом»">слд</span>
+          : null}
       {task.deadline && (() => {
         const d = new Date(task.deadline)
         const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -133,7 +137,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
           ? <span className="text-[10px] text-red-500 font-bold animate-blink shrink-0">! {dateStr}</span>
           : <span className="text-[10px] text-[#b8900a] font-bold shrink-0">{dateStr}</span>
       })()}
-      {task.duration_plan != null && (
+      {task.duration_plan != null && task.duration_plan > 0 && (
         <span className="text-[10px] text-[#666] shrink-0">{task.duration_plan}ч</span>
       )}
       {task.slot === 'now' && <span className="text-[10px] text-[#5060a0] shrink-0">▶</span>}
