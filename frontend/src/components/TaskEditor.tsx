@@ -134,7 +134,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         deadline: deadline || null,
         duration_plan: durationPlan ? parseFloat(durationPlan) : null,
         notes: notes || null,
-        recurrence: recurrence || null,
+        recurrence: (recurrence || null) as Task['recurrence'],
         someday: someday as any,
         ...(someday ? { in_queue: false as any } : {}),
       }
