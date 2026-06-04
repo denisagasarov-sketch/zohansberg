@@ -366,6 +366,13 @@ export default function App() {
                   setPlanTaskIds(newIds)
                   api.setDayPlan(today, newIds).catch(() => {})
                 }}
+                onAddToPlan={taskId => {
+                  if (planTaskIds.includes(taskId)) return
+                  const today = new Date().toISOString().slice(0, 10)
+                  const newIds = [...planTaskIds, taskId]
+                  setPlanTaskIds(newIds)
+                  api.setDayPlan(today, newIds).catch(() => {})
+                }}
               />
               <QueueBlock
                 tasks={tasks}
