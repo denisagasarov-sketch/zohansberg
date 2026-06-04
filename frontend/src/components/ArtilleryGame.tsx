@@ -44,7 +44,6 @@ const H = 340
 const GRAV = 0.16
 const MAXHP = 100
 const MOVE_SPEED = 2.2
-const TURN_MS = 5000
 const CHARGE_PER_S = 70
 
 interface Shell { x: number; y: number; vx: number; vy: number; w: WKind }
@@ -60,7 +59,6 @@ export default function ArtilleryGame() {
   const [hpP, setHpP] = useState(MAXHP)
   const [hpC, setHpC] = useState(MAXHP)
   const [turn, setTurn] = useState<'you' | 'cpu'>('you')
-  const [remaining, setRemaining] = useState(TURN_MS)
   const [msg, setMsg] = useState('')
   const [round, setRound] = useState(0)
   const [stats, setStats] = useState<Stats>(loadStats)
@@ -75,7 +73,6 @@ export default function ArtilleryGame() {
     over: false,
     charging: false, power: 0, angle: 50,
     hpP: MAXHP, hpC: MAXHP,
-    turnEnd: 0,
     cpuErr: null as number | null,
     cpuMoving: false, cpuMoveTarget: 0,
     weapon: 'normal' as WKind,
@@ -104,9 +101,9 @@ export default function ArtilleryGame() {
     st.px = 60; st.ax = W - 60; st.py = t[st.px]; st.ay = t[st.ax]
     st.shell = null; st.over = false; st.shooter = 'you'; st.cpuErr = null
     st.hpP = MAXHP; st.hpC = MAXHP; st.charging = false; st.power = 0; st.angle = 50
-    st.turnEnd = Date.now() + TURN_MS; st.parts = []; st.shake = 0; st.cpuMoving = false
+    st.parts = []; st.shake = 0; st.cpuMoving = false
     st.wind = (Math.random() - 0.5) * 0.1
-    setHpP(MAXHP); setHpC(MAXHP); setAngle(50); setPower(0); setTurn('you'); setMsg(''); setRemaining(TURN_MS)
+    setHpP(MAXHP); setHpC(MAXHP); setAngle(50); setPower(0); setTurn('you'); setMsg('')
     setWind(st.wind)
 
     let raf = 0, last = performance.now()
@@ -118,7 +115,8 @@ export default function ArtilleryGame() {
 
   const passTurn = (to: 'you' | 'cpu') => {
     const st = s.current
-    st.shooter = to; setTurn(to); st.turnEnd = Date.now() + TURN_MS; setRemaining(TURN_MS)
+    st.shooter = to; setTurn(to)
+    if (to === 'you') { st.power = 0; setPower(0) }   // reset power each of your turns
     // shifting wind each turn
     st.wind += (Math.random() - 0.5) * 0.04; st.wind = Math.max(-0.12, Math.min(0.12, st.wind)); setWind(st.wind)
     if (to === 'cpu') setTimeout(cpuStart, 500)
@@ -172,8 +170,6 @@ export default function ArtilleryGame() {
       if (st.keys['ArrowLeft']) { st.px = Math.max(20, st.px - MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
       if (st.keys['ArrowRight']) { st.px = Math.min(st.W * 0.5, st.px + MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
       if (st.charging) { st.power = Math.min(100, st.power + dt / 1000 * CHARGE_PER_S); setPower(Math.round(st.power)) }
-      const rem = st.turnEnd - Date.now(); setRemaining(Math.max(0, rem))
-      if (rem <= 0) { st.power = 0; setPower(0); st.charging = false; setCharging(false); passTurn('cpu') }
     }
 
     // cpu walking to its chosen spot before firing
@@ -299,7 +295,7 @@ export default function ArtilleryGame() {
       st.keys[nk] = true
       if (e.key === 'ArrowUp') { st.angle = Math.min(89, st.angle + 2); setAngle(st.angle) }
       else if (e.key === 'ArrowDown') { st.angle = Math.max(1, st.angle - 2); setAngle(st.angle) }
-      else if (e.key === ' ' && !st.charging) { st.charging = true; setCharging(true) }
+      else if (e.key === ' ' && !st.charging) { st.power = 0; setPower(0); st.charging = true; setCharging(true) }
     }
     const up = (e: KeyboardEvent) => {
       const st = s.current
@@ -325,7 +321,7 @@ export default function ArtilleryGame() {
         <span>HP {hpP}</span>
         <span className="text-[#666]">ИИ {hpC}</span>
         <span className="text-[#5cc8ff]">ветер {windDir}</span>
-        <span className="flex-1 text-right">{msg ? msg : turn === 'you' ? `ход · ${(remaining / 1000).toFixed(1)}с` : 'ход ИИ…'}</span>
+        <span className="flex-1 text-right">{msg ? msg : turn === 'you' ? 'ваш ход' : 'ход ИИ…'}</span>
       </div>
       <div className="flex items-center justify-between text-[9px] text-[#383838] mt-0.5 px-1">
         <span>← → ход · ↑ ↓ угол · пробел — сила/огонь · Q оружие: <span className="text-[#ffd24c]">{WEAPONS[weapon].name}</span>{msg ? ' · пробел — заново' : ''}</span>
