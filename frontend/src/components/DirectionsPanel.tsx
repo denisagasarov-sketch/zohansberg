@@ -16,6 +16,7 @@ interface Props {
   onPriorityChange: (taskId: number, priority: string) => void
   onUpdateDirection: (id: number, data: Partial<Direction>) => void
   weeklyTime?: Record<number, number>
+  planTaskIds?: number[]
   focusMode?: boolean
   nowTaskId?: number
 }
@@ -80,11 +81,12 @@ interface TaskRowProps {
   onMarkDone: (taskId: number) => void
   onPriorityChange: (taskId: number, priority: string) => void
   draggingId: number | null
+  inPlan?: boolean
   focusMode?: boolean
   nowTaskId?: number
 }
 
-function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onMarkDone, onPriorityChange, draggingId, focusMode, nowTaskId }: TaskRowProps) {
+function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddToQueue, onMarkDone, onPriorityChange, draggingId, inPlan, focusMode, nowTaskId }: TaskRowProps) {
   const dimmed = focusMode && task.id !== nowTaskId
   const [showPicker, setShowPicker] = useState(false)
 
@@ -119,8 +121,10 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
         )}
       </div>
 
-      <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+      <span className={`flex-1 text-sm truncate ${task.in_queue || inPlan ? 'text-[#b8b8b8]' : 'text-[#f0f0f0]'}`}>{task.title}</span>
       {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
+      {task.in_queue && <span className="text-[9px] text-[#5060a0]/50 shrink-0" title="В очереди «Следом»">↓</span>}
+      {!task.in_queue && inPlan && <span className="text-[9px] text-[#508050]/50 shrink-0" title="В плане на сегодня">◎</span>}
       {task.deadline && (() => {
         const d = new Date(task.deadline)
         const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -156,7 +160,7 @@ function saveCollapsed(s: Set<CollapseKey>) {
   localStorage.setItem('collapsed_dirs', JSON.stringify([...s]))
 }
 
-export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, weeklyTime = {}, focusMode, nowTaskId }: Props) {
+export default function DirectionsPanel({ tasks, directions, onTaskClick, onReorder, onReorderInDirection, onMoveToQueue, onAddToQueue, onMarkDone, onPriorityChange, onUpdateDirection, weeklyTime = {}, planTaskIds = [], focusMode, nowTaskId }: Props) {
   const draggingIdRef = useRef<number | null>(null)
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState<Set<CollapseKey>>(loadCollapsed)
@@ -326,6 +330,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                           onMarkDone={onMarkDone}
                           onPriorityChange={onPriorityChange}
                           draggingId={draggingId}
+                          inPlan={planTaskIds.includes(task.id)}
                           focusMode={focusMode}
                           nowTaskId={nowTaskId}
                         />
@@ -378,6 +383,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                       onMarkDone={onMarkDone}
                       onPriorityChange={onPriorityChange}
                       draggingId={draggingId}
+                      inPlan={planTaskIds.includes(task.id)}
                       focusMode={focusMode}
                       nowTaskId={nowTaskId}
                     />

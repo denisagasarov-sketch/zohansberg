@@ -13,7 +13,8 @@ interface Props {
 export default function DayPlanBlock({ planTaskIds, tasks, directions, onTakeNow, onMarkDone }: Props) {
   const planTasks = planTaskIds
     .map(id => tasks.find(t => t.id === id))
-    .filter((t): t is Task => !!t && !t.done_at && !t.deleted_at)
+    // Exclude done, deleted, tasks already in queue (they show in Следом), and tasks currently in Сейчас
+    .filter((t): t is Task => !!t && !t.done_at && !t.deleted_at && !t.in_queue && t.slot !== 'now')
 
   if (planTasks.length === 0) return null
 

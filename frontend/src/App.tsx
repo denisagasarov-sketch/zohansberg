@@ -390,6 +390,7 @@ export default function App() {
                 onPriorityChange={handlePriorityChange}
                 onUpdateDirection={(id, data) => api.updateDirection(id, data).then(refresh).catch(() => {})}
                 weeklyTime={weeklyTime}
+                planTaskIds={planTaskIds}
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
