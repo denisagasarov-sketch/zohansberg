@@ -38,7 +38,6 @@ const NOTES = [
 
 const STEPS = 16
 const KEY_MAP: Record<string, number> = {
-  // play notes C4..C5 with the home/number rows
   z: 7, x: 6, c: 5, v: 4, b: 3, n: 2, m: 1, ',': 0,
 }
 
@@ -46,23 +45,30 @@ function emptyGrid(): boolean[][] {
   return NOTES.map(() => Array(STEPS).fill(false))
 }
 
-interface SavedPattern {
-  id: number
-  name: string
-  bpm: number
-  grid: boolean[][]
+function fmtDur(ms: number) {
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
+
+// ── Saved items: a 16-step loop, or a free-length performance track ───────────
+
+interface RecEvent { t: number; note: number }
+type Saved =
+  | { id: number; kind: 'loop'; name: string; bpm: number; grid: boolean[][] }
+  | { id: number; kind: 'track'; name: string; duration: number; events: RecEvent[] }
 
 const STORE_KEY = 'piano_patterns'
 
-function loadPatterns(): SavedPattern[] {
+function loadSaved(): Saved[] {
   try {
     const raw = localStorage.getItem(STORE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const list = raw ? JSON.parse(raw) : []
+    // migrate old loop-only entries (no `kind`)
+    return list.map((p: any) => p.kind ? p : { ...p, kind: 'loop' })
   } catch { return [] }
 }
 
-function savePatterns(list: SavedPattern[]) {
+function persist(list: Saved[]) {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(list)) } catch {}
 }
 
@@ -72,22 +78,33 @@ export default function PianoSequencer() {
   const [bpm, setBpm] = useState(120)
   const [step, setStep] = useState(0)
   const [recording, setRecording] = useState(false)
-  const [saved, setSaved] = useState<SavedPattern[]>(loadPatterns)
+  const [recMs, setRecMs] = useState(0)
+  const [playingTrackId, setPlayingTrackId] = useState<number | null>(null)
+  const [saved, setSaved] = useState<Saved[]>(loadSaved)
 
   const stepRef = useRef(0)
   const gridRef = useRef(grid)
   gridRef.current = grid
-  const recRef = useRef(recording)
-  recRef.current = recording
-  const playRef = useRef(playing)
-  playRef.current = playing
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // performance recording
+  const recStartRef = useRef(0)
+  const recEventsRef = useRef<RecEvent[]>([])
+  const recTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordingRef = useRef(false)
+  recordingRef.current = recording
+
+  // track playback timeouts
+  const trackTimeouts = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  // drag-paint state
+  const paintRef = useRef<{ active: boolean; mode: boolean } | null>(null)
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
   }, [])
 
-  // Sequencer loop — 16th notes at the given BPM
+  // Step-sequencer loop — 16th notes
   useEffect(() => {
     if (!playing) { clearTimer(); return }
     const stepMs = (60 / bpm / 4) * 1000
@@ -105,22 +122,44 @@ export default function PianoSequencer() {
     return clearTimer
   }, [playing, bpm, clearTimer])
 
-  useEffect(() => () => clearTimer(), [clearTimer])
+  useEffect(() => () => {
+    clearTimer()
+    if (recTickRef.current) clearInterval(recTickRef.current)
+    trackTimeouts.current.forEach(clearTimeout)
+  }, [clearTimer])
 
-  const toggleCell = (row: number, col: number) => {
-    setGrid(prev => prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? !c : c) : r))
+  // Global mouseup ends drag-paint
+  useEffect(() => {
+    const up = () => { paintRef.current = null }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
+
+  const paintCell = (row: number, col: number, mode: boolean) => {
+    setGrid(prev => {
+      if (prev[row][col] === mode) return prev
+      return prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? mode : c) : r)
+    })
+  }
+
+  const onCellDown = (row: number, col: number) => {
+    const mode = !grid[row][col]
+    paintRef.current = { active: true, mode }
+    paintCell(row, col, mode)
+  }
+
+  const onCellEnter = (row: number, col: number) => {
+    if (paintRef.current?.active) paintCell(row, col, paintRef.current.mode)
   }
 
   const playKey = useCallback((row: number) => {
     blip(NOTES[row].freq)
-    // Live-record into the currently playing step
-    if (playRef.current && recRef.current) {
-      const col = stepRef.current
-      setGrid(prev => prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? true : c) : r))
+    if (recordingRef.current) {
+      recEventsRef.current.push({ t: Date.now() - recStartRef.current, note: row })
     }
   }, [])
 
-  // Keyboard play (z x c v b n m ,)
+  // Keyboard play
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.repeat) return
@@ -138,32 +177,65 @@ export default function PianoSequencer() {
     setPlaying(p => !p)
   }
 
-  const hasNotes = grid.some(r => r.some(Boolean))
-
-  const handleSave = () => {
-    if (!hasNotes) return
-    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-    const entry: SavedPattern = {
-      id: Date.now(),
-      name: `Запись ${saved.length + 1} · ${time}`,
-      bpm,
-      grid: grid.map(r => [...r]),
+  // ── Performance recording ──
+  const toggleRec = () => {
+    if (!recording) {
+      recStartRef.current = Date.now()
+      recEventsRef.current = []
+      setRecMs(0)
+      setRecording(true)
+      recTickRef.current = setInterval(() => setRecMs(Date.now() - recStartRef.current), 200)
+    } else {
+      setRecording(false)
+      if (recTickRef.current) { clearInterval(recTickRef.current); recTickRef.current = null }
+      const duration = Date.now() - recStartRef.current
+      const events = recEventsRef.current
+      if (events.length > 0) {
+        const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        const trackN = saved.filter(s => s.kind === 'track').length + 1
+        const entry: Saved = { id: Date.now(), kind: 'track', name: `Трек ${trackN} · ${time}`, duration, events }
+        const next = [entry, ...saved]
+        setSaved(next); persist(next)
+      }
     }
-    const next = [entry, ...saved]
-    setSaved(next)
-    savePatterns(next)
   }
 
-  const handleLoad = (p: SavedPattern) => {
+  const hasNotes = grid.some(r => r.some(Boolean))
+
+  const handleSaveLoop = () => {
+    if (!hasNotes) return
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    const loopN = saved.filter(s => s.kind === 'loop').length + 1
+    const entry: Saved = { id: Date.now(), kind: 'loop', name: `Луп ${loopN} · ${time}`, bpm, grid: grid.map(r => [...r]) }
+    const next = [entry, ...saved]
+    setSaved(next); persist(next)
+  }
+
+  const handleLoadLoop = (p: Extract<Saved, { kind: 'loop' }>) => {
     setPlaying(false)
     setGrid(p.grid.map(r => [...r]))
     setBpm(p.bpm)
   }
 
+  const stopTrack = () => {
+    trackTimeouts.current.forEach(clearTimeout)
+    trackTimeouts.current = []
+    setPlayingTrackId(null)
+  }
+
+  const playTrack = (track: Extract<Saved, { kind: 'track' }>) => {
+    stopTrack()
+    setPlayingTrackId(track.id)
+    track.events.forEach(ev => {
+      trackTimeouts.current.push(setTimeout(() => blip(NOTES[ev.note].freq), ev.t))
+    })
+    trackTimeouts.current.push(setTimeout(() => setPlayingTrackId(null), track.duration + 250))
+  }
+
   const handleDelete = (id: number) => {
+    if (playingTrackId === id) stopTrack()
     const next = saved.filter(p => p.id !== id)
-    setSaved(next)
-    savePatterns(next)
+    setSaved(next); persist(next)
   }
 
   return (
@@ -175,12 +247,12 @@ export default function PianoSequencer() {
           className={`px-2 py-0.5 rounded text-[11px] transition-colors ${playing ? 'bg-[#5060a0] text-white' : 'bg-[#252525] text-[#999] hover:bg-[#383838]'}`}
         >{playing ? '⏸ стоп' : '▶ луп'}</button>
         <button
-          onClick={() => setRecording(r => !r)}
+          onClick={toggleRec}
           className={`px-2 py-0.5 rounded text-[11px] transition-colors ${recording ? 'bg-[#a04050] text-white' : 'bg-[#252525] text-[#999] hover:bg-[#383838]'}`}
-          title="Запись игры в луп"
-        >● rec</button>
+          title="Запись живой игры в отдельный трек"
+        >{recording ? `● ${fmtDur(recMs)}` : '● rec'}</button>
         <button
-          onClick={handleSave}
+          onClick={handleSaveLoop}
           disabled={!hasNotes}
           className="px-2 py-0.5 rounded text-[11px] bg-[#252525] text-[#999] hover:bg-[#383838] disabled:opacity-40 transition-colors"
           title="Сохранить луп"
@@ -202,8 +274,8 @@ export default function PianoSequencer() {
         <span className="text-[11px] font-mono text-[#999] w-7 text-right">{bpm}</span>
       </div>
 
-      {/* Step grid */}
-      <div className="space-y-0.5">
+      {/* Step grid (drag to paint / erase) */}
+      <div className="space-y-0.5 select-none">
         {NOTES.map((note, row) => (
           <div key={note.name} className="flex items-center gap-1">
             <button
@@ -219,7 +291,8 @@ export default function PianoSequencer() {
                 return (
                   <button
                     key={col}
-                    onClick={() => toggleCell(row, col)}
+                    onMouseDown={() => onCellDown(row, col)}
+                    onMouseEnter={() => onCellEnter(row, col)}
                     className={`flex-1 h-3.5 rounded-[2px] transition-colors ${
                       active
                         ? 'bg-[#5060a0]'
@@ -235,19 +308,27 @@ export default function PianoSequencer() {
         ))}
       </div>
 
-      <p className="text-[9px] text-[#383838] mt-2">Клик по сетке — нота. Клавиши z x c v b n m , — играть. ● rec пишет игру в луп.</p>
+      <p className="text-[9px] text-[#383838] mt-2">Зажми и веди мышкой — рисуй/стирай ноты. z x c v b n m , — играть. ● rec пишет игру в трек.</p>
 
-      {/* Saved recordings */}
+      {/* Saved loops & tracks */}
       {saved.length > 0 && (
         <div className="mt-2 pt-2 border-t border-[#252525] space-y-1">
           <div className="text-[9px] font-semibold tracking-widest text-[#383838] uppercase">Записи</div>
           {saved.map(p => (
             <div key={p.id} className="flex items-center gap-2 group">
-              <button
-                onClick={() => handleLoad(p)}
-                className="flex-1 text-left text-[11px] text-[#999] hover:text-[#8090c8] transition-colors truncate"
-                title="Загрузить в секвенсор"
-              >▶ {p.name} · {p.bpm} BPM</button>
+              {p.kind === 'loop' ? (
+                <button
+                  onClick={() => handleLoadLoop(p)}
+                  className="flex-1 text-left text-[11px] text-[#999] hover:text-[#8090c8] transition-colors truncate"
+                  title="Загрузить луп в секвенсор"
+                >▦ {p.name} · {p.bpm} BPM</button>
+              ) : (
+                <button
+                  onClick={() => playingTrackId === p.id ? stopTrack() : playTrack(p)}
+                  className="flex-1 text-left text-[11px] text-[#999] hover:text-[#8090c8] transition-colors truncate"
+                  title="Воспроизвести трек"
+                >{playingTrackId === p.id ? '⏸' : '▶'} {p.name} · {fmtDur(p.duration)}</button>
+              )}
               <button
                 onClick={() => handleDelete(p.id)}
                 className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#a04050] text-xs transition-all shrink-0"
