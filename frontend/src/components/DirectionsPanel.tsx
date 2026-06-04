@@ -189,7 +189,8 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
     })
   }, [])
 
-  const activeTasks = (tasks ?? []).filter(t => t.slot !== 'now' && !t.in_queue && !t.someday && !t.done_at && !t.deleted_at)
+  // Show all non-done tasks (including queued and planned) — indicated with ↓/◎ icons
+  const activeTasks = (tasks ?? []).filter(t => t.slot !== 'now' && !t.someday && !t.done_at && !t.deleted_at)
   const somedayTasks = (tasks ?? []).filter(t => t.someday && !t.done_at && !t.deleted_at)
 
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
