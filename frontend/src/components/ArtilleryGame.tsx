@@ -78,6 +78,7 @@ export default function ArtilleryGame() {
     weapon: 'normal' as WKind,
     wind: 0,
     parts: [] as Particle[], shake: 0,
+    camS: 1, camTop: 0,
     keys: {} as Record<string, boolean>,
   })
   const angleRef = useRef(angle); angleRef.current = angle
@@ -101,7 +102,7 @@ export default function ArtilleryGame() {
     st.px = 60; st.ax = W - 60; st.py = t[st.px]; st.ay = t[st.ax]
     st.shell = null; st.over = false; st.shooter = 'you'; st.cpuErr = null
     st.hpP = MAXHP; st.hpC = MAXHP; st.charging = false; st.power = 0; st.angle = 50
-    st.parts = []; st.shake = 0; st.cpuMoving = false
+    st.parts = []; st.shake = 0; st.cpuMoving = false; st.camS = 1; st.camTop = 0
     st.wind = (Math.random() - 0.5) * 0.1
     setHpP(MAXHP); setHpC(MAXHP); setAngle(50); setPower(0); setTurn('you'); setMsg('')
     setWind(st.wind)
@@ -164,6 +165,15 @@ export default function ArtilleryGame() {
     for (const p of st.parts) { p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= dt / 600 }
     st.parts = st.parts.filter(p => p.life > 0)
     if (st.shake > 0) st.shake = Math.max(0, st.shake - dt / 30)
+
+    // dynamic camera: zoom out so a high-flying shell stays visible
+    const shY = st.shell ? st.shell.y : H
+    const visibleTop = Math.min(0, shY - 40)
+    const targetS = H / (H - visibleTop)
+    const ease = Math.min(1, dt / 120)
+    st.camS += (targetS - st.camS) * ease
+    st.camTop += (visibleTop - st.camTop) * ease
+
     if (st.over) return
 
     if (st.shooter === 'you' && !st.shell) {
@@ -205,7 +215,9 @@ export default function ArtilleryGame() {
     const st = s.current, W = st.W, t = st.terrain
     c.save()
     if (st.shake > 0) c.translate((Math.random() - 0.5) * st.shake, (Math.random() - 0.5) * st.shake)
-    c.fillStyle = '#000'; c.fillRect(-20, -20, W + 40, H + 40)
+    // dynamic camera transform (zoom out for high shells), centred horizontally
+    c.translate(W / 2, 0); c.scale(st.camS, st.camS); c.translate(-W / 2, -st.camTop)
+    c.fillStyle = '#000'; c.fillRect(-W, st.camTop - 40, W * 3, H + 200)
     c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, H)
     for (let x = 0; x < W; x++) c.lineTo(x, t[x])
     c.lineTo(W, H); c.closePath(); c.fill()
@@ -327,8 +339,9 @@ export default function ArtilleryGame() {
       if (nk === 'q') { cycleWeapon(); return }
       if (turnRef.current !== 'you' || st.shell) return
       st.keys[nk] = true
-      if (e.key === 'ArrowUp') { st.angle = Math.min(89, st.angle + 2); setAngle(st.angle) }
-      else if (e.key === 'ArrowDown') { st.angle = Math.max(1, st.angle - 2); setAngle(st.angle) }
+      // faster vertical; allow negative & backward (over-the-head) angles, e.g. to lob with the wind
+      if (e.key === 'ArrowUp') { st.angle = Math.min(170, st.angle + 5); setAngle(st.angle) }
+      else if (e.key === 'ArrowDown') { st.angle = Math.max(-80, st.angle - 5); setAngle(st.angle) }
       else if (e.key === ' ' && !st.charging) { st.power = 0; setPower(0); st.charging = true; setCharging(true) }
     }
     const up = (e: KeyboardEvent) => {
