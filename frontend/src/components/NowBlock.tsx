@@ -5,7 +5,7 @@ import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
 import { PriorityPicker } from './PriorityPicker'
-import PianoSequencer from './PianoSequencer'
+import GradientScales from './GradientScales'
 
 interface Props {
   task: Task | null
@@ -82,11 +82,11 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             <p className="text-[#5060a0] text-sm py-6">Отпустите, чтобы взять в работу</p>
           ) : (
             <>
+              <GradientScales />
               <div className="flex items-center gap-3">
                 <p className="text-[#666] text-sm">Что в фокусе прямо сейчас?</p>
                 <button onClick={onAddTask} className="px-3 py-1.5 bg-[#5060a0] hover:bg-[#8090c8] transition-colors rounded text-sm text-white">+ Новая задача</button>
               </div>
-              <PianoSequencer />
             </>
           )}
         </div>
