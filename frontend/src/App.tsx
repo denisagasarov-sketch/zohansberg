@@ -66,39 +66,57 @@ export default function App() {
     }).catch(() => {})
   }, [])
 
-  // Show weekly review on Fri/Sat/Sun after 17:00 (once per week)
-  useEffect(() => {
-    const now = new Date()
-    const day = now.getDay() // 0=Sun, 5=Fri, 6=Sat
-    if (![0, 5, 6].includes(day) || now.getHours() < 17) return
-    const weekKey = `weekly_review_${now.getFullYear()}_${Math.ceil(now.getDate() / 7)}_${now.getMonth()}`
-    if (!localStorage.getItem(weekKey)) {
-      setShowWeeklyReview(true)
-      localStorage.setItem(weekKey, '1')
-    }
-  }, [])
+  // --- Day-transition checks (run on mount + whenever date changes) ---
 
-  // Show checkin modal if no checkin recorded today
-  useEffect(() => {
+  const checkDayTransitions = useCallback((today: string) => {
+    // Check-in
     api.getTodayCheckin().then(r => {
       if (!r.exists) setShowCheckin(true)
     }).catch(() => {})
-  }, [])
 
-  // Load today's plan + show morning modal if plan exists and not yet seen today
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    // Morning plan
     api.getDayPlan(today).then(rows => {
-      if (rows.length === 0) return
       setPlanTaskIds(rows.map((r: any) => r.task_id))
       setPlanTasks(rows)
-      const key = `morning_plan_shown_${today}`
-      if (!localStorage.getItem(key)) {
-        setShowMorningPlan(true)
-        localStorage.setItem(key, '1')
+      if (rows.length > 0) {
+        const key = `morning_plan_shown_${today}`
+        if (!localStorage.getItem(key)) {
+          setShowMorningPlan(true)
+          localStorage.setItem(key, '1')
+        }
       }
     }).catch(() => {})
+
+    // Weekly review (Fri/Sat/Sun after 17:00)
+    const now = new Date()
+    const day = now.getDay()
+    if ([0, 5, 6].includes(day) && now.getHours() >= 17) {
+      const weekKey = `weekly_review_${now.getFullYear()}_${Math.ceil(now.getDate() / 7)}_${now.getMonth()}`
+      if (!localStorage.getItem(weekKey)) {
+        setShowWeeklyReview(true)
+        localStorage.setItem(weekKey, '1')
+      }
+    }
   }, [])
+
+  // Run on mount
+  useEffect(() => {
+    checkDayTransitions(new Date().toISOString().slice(0, 10))
+  }, [checkDayTransitions])
+
+  // Detect midnight — re-run checks when date changes while app is open
+  useEffect(() => {
+    let lastDate = new Date().toISOString().slice(0, 10)
+    const id = setInterval(() => {
+      const today = new Date().toISOString().slice(0, 10)
+      if (today !== lastDate) {
+        lastDate = today
+        refresh()
+        checkDayTransitions(today)
+      }
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [checkDayTransitions, refresh])
 
   // Show evening summary after 19:00
   useEffect(() => {
