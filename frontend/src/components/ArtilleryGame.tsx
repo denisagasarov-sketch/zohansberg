@@ -23,7 +23,6 @@ const sndWin = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.14, 'squa
 const sndLose = () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.18, 'square', 0.15, i * 0.12))
 const sndMove = () => tone(120, 0.03, 'square', 0.05)
 
-// ── stats ──
 interface Stats { wins: number; losses: number; shots: number; hits: number }
 const STAT_KEY = 'artillery_stats'
 function loadStats(): Stats {
@@ -32,17 +31,24 @@ function loadStats(): Stats {
 }
 function saveStats(s: Stats) { try { localStorage.setItem(STAT_KEY, JSON.stringify(s)) } catch {} }
 
-// ── game constants ──
+// weapons
+type WKind = 'normal' | 'heavy' | 'cluster'
+const WEAPONS: Record<WKind, { name: string; r: number; dmg: number; vmul: number; cluster?: boolean }> = {
+  normal: { name: 'снаряд', r: 22, dmg: 46, vmul: 1 },
+  heavy: { name: 'тяжёлый', r: 34, dmg: 72, vmul: 0.9 },
+  cluster: { name: 'кластер', r: 16, dmg: 28, vmul: 1, cluster: true },
+}
+const WORDER: WKind[] = ['normal', 'heavy', 'cluster']
+
 const H = 340
 const GRAV = 0.16
 const MAXHP = 100
-const DMG_R = 46
-const MAX_DMG = 46
 const MOVE_SPEED = 2.2
 const TURN_MS = 5000
 const CHARGE_PER_S = 70
 
-interface Shell { x: number; y: number; vx: number; vy: number }
+interface Shell { x: number; y: number; vx: number; vy: number; w: WKind }
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number }
 
 export default function ArtilleryGame() {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -58,6 +64,8 @@ export default function ArtilleryGame() {
   const [msg, setMsg] = useState('')
   const [round, setRound] = useState(0)
   const [stats, setStats] = useState<Stats>(loadStats)
+  const [weapon, setWeapon] = useState<WKind>('normal')
+  const [wind, setWind] = useState(0)
 
   const s = useRef({
     W: 600, terrain: [] as number[],
@@ -65,17 +73,21 @@ export default function ArtilleryGame() {
     shell: null as Shell | null,
     shooter: 'you' as 'you' | 'cpu',
     over: false,
-    charging: false, chargeStart: 0,
-    angle: 50, power: 0,
+    charging: false, power: 0, angle: 50,
     hpP: MAXHP, hpC: MAXHP,
     turnEnd: 0,
     cpuErr: null as number | null,
+    cpuMoving: false, cpuMoveTarget: 0,
+    weapon: 'normal' as WKind,
+    wind: 0,
+    parts: [] as Particle[], shake: 0,
     keys: {} as Record<string, boolean>,
   })
   const angleRef = useRef(angle); angleRef.current = angle
   const turnRef = useRef(turn); turnRef.current = turn
 
-  // ── setup terrain + main loop ──
+  const bumpStat = (k: keyof Stats) => setStats(p => { const n = { ...p, [k]: p[k] + 1 }; saveStats(n); return n })
+
   useEffect(() => {
     const canvas = canvasRef.current!, c = canvas.getContext('2d')!
     const W = Math.max(360, Math.floor(wrapRef.current?.clientWidth ?? 600))
@@ -87,44 +99,59 @@ export default function ArtilleryGame() {
 
     const t: number[] = []
     const base = H * 0.6, ph = Math.random() * 6
-    for (let x = 0; x < W; x++) {
-      t.push(base + Math.sin(x * 0.009 + ph) * 40 + Math.sin(x * 0.035 + ph * 2) * 16 + Math.sin(x * 0.08) * 6)
-    }
+    for (let x = 0; x < W; x++) t.push(base + Math.sin(x * 0.009 + ph) * 40 + Math.sin(x * 0.035 + ph * 2) * 16 + Math.sin(x * 0.08) * 6)
     st.terrain = t
-    st.px = 60; st.ax = W - 60
-    st.py = t[st.px]; st.ay = t[st.ax]
+    st.px = 60; st.ax = W - 60; st.py = t[st.px]; st.ay = t[st.ax]
     st.shell = null; st.over = false; st.shooter = 'you'; st.cpuErr = null
     st.hpP = MAXHP; st.hpC = MAXHP; st.charging = false; st.power = 0; st.angle = 50
-    st.turnEnd = Date.now() + TURN_MS
+    st.turnEnd = Date.now() + TURN_MS; st.parts = []; st.shake = 0; st.cpuMoving = false
+    st.wind = (Math.random() - 0.5) * 0.1
     setHpP(MAXHP); setHpC(MAXHP); setAngle(50); setPower(0); setTurn('you'); setMsg(''); setRemaining(TURN_MS)
+    setWind(st.wind)
 
-    let raf = 0
-    const loop = () => { update(); render(c); raf = requestAnimationFrame(loop) }
-    loop()
+    let raf = 0, last = performance.now()
+    const loop = (now: number) => { const dt = Math.min(40, now - last); last = now; update(dt); render(c); raf = requestAnimationFrame(loop) }
+    raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round])
 
   const passTurn = (to: 'you' | 'cpu') => {
     const st = s.current
-    st.shooter = to; setTurn(to)
-    st.turnEnd = Date.now() + TURN_MS; setRemaining(TURN_MS)
-    if (to === 'cpu') setTimeout(cpuTurn, 600)
+    st.shooter = to; setTurn(to); st.turnEnd = Date.now() + TURN_MS; setRemaining(TURN_MS)
+    // shifting wind each turn
+    st.wind += (Math.random() - 0.5) * 0.04; st.wind = Math.max(-0.12, Math.min(0.12, st.wind)); setWind(st.wind)
+    if (to === 'cpu') setTimeout(cpuStart, 500)
   }
 
-  const explode = (bx: number, by: number) => {
+  const spawnBoom = (x: number, y: number, n: number) => {
     const st = s.current
-    sndBoom()
-    crater(st.terrain, bx, 22, st.W)
-    st.py = st.terrain[Math.round(st.px)]; st.ay = st.terrain[Math.round(st.ax)]
-    const hit = (tx: number, ty: number) => {
-      const d = Math.hypot(bx - tx, by - ty)
-      return d < DMG_R ? Math.round((1 - d / DMG_R) * MAX_DMG) : 0
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3
+      st.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 1, max: 1 })
     }
+    st.shake = 12
+  }
+
+  const doDamage = (bx: number, by: number, w: WKind) => {
+    const st = s.current, cfg = WEAPONS[w]
+    crater(st.terrain, bx, cfg.r, st.W)
+    st.py = st.terrain[Math.round(st.px)]; st.ay = st.terrain[Math.round(st.ax)]
+    const hit = (tx: number, ty: number) => { const d = Math.hypot(bx - tx, by - ty); return d < cfg.r + 14 ? Math.round((1 - d / (cfg.r + 14)) * cfg.dmg) : 0 }
     const dp = hit(st.px, st.py - 8), dc = hit(st.ax, st.ay - 8)
     if (st.shooter === 'you' && dc > 0) bumpStat('hits')
     st.hpP = Math.max(0, st.hpP - dp); st.hpC = Math.max(0, st.hpC - dc)
     setHpP(st.hpP); setHpC(st.hpC)
+  }
+
+  const explode = (bx: number, by: number, w: WKind) => {
+    sndBoom(); spawnBoom(bx, by, 18)
+    doDamage(bx, by, w)
+    if (WEAPONS[w].cluster) {
+      // shrapnel craters around impact
+      for (const off of [-26, 26]) { doDamage(bx + off, s.current.terrain[Math.max(0, Math.min(s.current.W - 1, Math.round(bx + off)))], w); spawnBoom(bx + off, by, 8) }
+    }
+    const st = s.current
     if (st.hpP <= 0 || st.hpC <= 0) {
       st.over = true
       if (st.hpC <= 0 && st.hpP > 0) { setMsg('🏆 ПОБЕДА'); sndWin(); bumpStat('wins') }
@@ -133,24 +160,32 @@ export default function ArtilleryGame() {
     }
   }
 
-  const update = () => {
+  const update = (dt: number) => {
     const st = s.current
+    // particles
+    for (const p of st.parts) { p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= dt / 600 }
+    st.parts = st.parts.filter(p => p.life > 0)
+    if (st.shake > 0) st.shake = Math.max(0, st.shake - dt / 30)
     if (st.over) return
 
     if (st.shooter === 'you' && !st.shell) {
       if (st.keys['ArrowLeft']) { st.px = Math.max(20, st.px - MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
       if (st.keys['ArrowRight']) { st.px = Math.min(st.W * 0.5, st.px + MOVE_SPEED); st.py = st.terrain[Math.round(st.px)]; if (Math.random() < 0.3) sndMove() }
-      if (st.charging) {
-        const p = Math.min(100, (Date.now() - st.chargeStart) / 1000 * CHARGE_PER_S)
-        st.power = p; setPower(Math.round(p))
-      }
-      const rem = st.turnEnd - Date.now()
-      setRemaining(Math.max(0, rem))
+      if (st.charging) { st.power = Math.min(100, st.power + dt / 1000 * CHARGE_PER_S); setPower(Math.round(st.power)) }
+      const rem = st.turnEnd - Date.now(); setRemaining(Math.max(0, rem))
       if (rem <= 0) { st.power = 0; setPower(0); st.charging = false; setCharging(false); passTurn('cpu') }
+    }
+
+    // cpu walking to its chosen spot before firing
+    if (st.cpuMoving) {
+      const d = st.cpuMoveTarget - st.ax
+      if (Math.abs(d) < MOVE_SPEED) { st.ax = st.cpuMoveTarget; st.cpuMoving = false; setTimeout(cpuShoot, 250) }
+      else { st.ax += Math.sign(d) * MOVE_SPEED; st.ay = st.terrain[Math.round(st.ax)]; if (Math.random() < 0.3) sndMove() }
     }
 
     const sh = st.shell
     if (sh) {
+      sh.vx += st.wind * dt / 16
       sh.x += sh.vx; sh.y += sh.vy; sh.vy += GRAV
       const ix = Math.round(sh.x)
       const ground = ix >= 0 && ix < st.W && sh.y >= st.terrain[ix]
@@ -159,7 +194,7 @@ export default function ArtilleryGame() {
       const ty = st.shooter === 'you' ? st.ay : st.py
       const direct = Math.hypot(sh.x - tx, sh.y - (ty - 8)) < 10
       if (direct || ground) {
-        explode(sh.x, ground ? st.terrain[ix] : sh.y)
+        explode(sh.x, ground ? st.terrain[ix] : sh.y, sh.w)
         if (st.shooter === 'cpu') st.cpuErr = sh.x - st.px
         st.shell = null
         if (!st.over) passTurn(st.shooter === 'you' ? 'cpu' : 'you')
@@ -172,114 +207,135 @@ export default function ArtilleryGame() {
 
   const render = (c: CanvasRenderingContext2D) => {
     const st = s.current, W = st.W, t = st.terrain
-    c.fillStyle = '#000'; c.fillRect(0, 0, W, H)
+    c.save()
+    if (st.shake > 0) c.translate((Math.random() - 0.5) * st.shake, (Math.random() - 0.5) * st.shake)
+    c.fillStyle = '#000'; c.fillRect(-20, -20, W + 40, H + 40)
     c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, H)
     for (let x = 0; x < W; x++) c.lineTo(x, t[x])
     c.lineTo(W, H); c.closePath(); c.fill()
 
+    // yellow aiming trajectory (player turn) with wind
     if (st.shooter === 'you' && !st.shell && !st.over) {
-      const v = (st.power || 1) * 0.2, a = (st.angle * Math.PI) / 180
+      const v = (st.power || 1) * 0.2 * WEAPONS[st.weapon].vmul, a = (st.angle * Math.PI) / 180
       let x = st.px + 16, y = st.py - 12, vx = Math.cos(a) * v, vy = -Math.sin(a) * v
-      c.fillStyle = '#000'
-      for (let i = 0; i < 140; i++) {
-        x += vx; y += vy; vy += GRAV
-        if (i % 5 === 0) { c.beginPath(); c.arc(x, y, 1.5, 0, Math.PI * 2); c.fill() }
+      c.fillStyle = '#ffd24c'
+      for (let i = 0; i < 150; i++) {
+        vx += st.wind / 16; x += vx; y += vy; vy += GRAV
+        if (i % 5 === 0) { c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill() }
         if (x < 0 || x > W || y > t[Math.max(0, Math.min(W - 1, Math.round(x)))]) break
       }
     }
 
-    drawTank(c, st.px, st.py, st.angle, 1, st.hpP)
-    drawTank(c, st.ax, st.ay, 45, -1, st.hpC)
+    drawTank(c, st.px, st.py, st.angle, 1, st.hpP, '#000')
+    drawTank(c, st.ax, st.ay, 45, -1, st.hpC, '#000')
 
     if (st.shell) {
-      c.fillStyle = '#000'; c.beginPath(); c.arc(st.shell.x, st.shell.y, 3.5, 0, Math.PI * 2); c.fill()
+      c.fillStyle = '#000'; c.beginPath(); c.arc(st.shell.x, st.shell.y, st.shell.w === 'heavy' ? 5 : 3.5, 0, Math.PI * 2); c.fill()
       c.strokeStyle = '#fff'; c.lineWidth = 1; c.stroke()
     }
+    // particles
+    for (const p of st.parts) { c.fillStyle = p.life > 0.5 ? '#000' : '#555'; const sz = 2 + p.life * 2; c.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz) }
+    c.restore()
   }
 
   const fire = () => {
     const st = s.current
     if (st.shell || st.over || st.shooter !== 'you') return
-    launch('you', st.angle, Math.max(8, st.power))
-    st.charging = false; setCharging(false)
-    bumpStat('shots')
+    launch('you', st.angle, Math.max(8, st.power), st.weapon)
+    st.charging = false; setCharging(false); bumpStat('shots')
   }
 
-  const launch = (who: 'you' | 'cpu', ang: number, pow: number) => {
+  const launch = (who: 'you' | 'cpu', ang: number, pow: number, w: WKind) => {
     const st = s.current
-    const v = pow * 0.2, a = (ang * Math.PI) / 180, dir = who === 'you' ? 1 : -1
-    const gx = who === 'you' ? st.px : st.ax
-    const gy = who === 'you' ? st.py : st.ay
-    st.shell = { x: gx + dir * 16, y: gy - 12, vx: Math.cos(a) * v * dir, vy: -Math.sin(a) * v }
+    const v = pow * 0.2 * WEAPONS[w].vmul, a = (ang * Math.PI) / 180, dir = who === 'you' ? 1 : -1
+    const gx = who === 'you' ? st.px : st.ax, gy = who === 'you' ? st.py : st.ay
+    st.shell = { x: gx + dir * 16, y: gy - 12, vx: Math.cos(a) * v * dir, vy: -Math.sin(a) * v, w }
     sndFire()
   }
 
-  const cpuTurn = () => {
+  // CPU: optionally reposition, then fire with wind-aware aim
+  const cpuStart = () => {
+    const st = s.current
+    if (st.over) return
+    if (Math.random() < 0.6) {
+      const delta = (Math.random() - 0.5) * 120
+      st.cpuMoveTarget = Math.max(st.W * 0.55, Math.min(st.W - 24, st.ax + delta))
+      st.cpuMoving = true
+    } else setTimeout(cpuShoot, 200)
+  }
+
+  const cpuShoot = () => {
     const st = s.current
     if (st.over) return
     const dist = Math.abs(st.ax - st.px)
-    const ang = 45 + (Math.random() * 12 - 6)
-    let pow = Math.min(100, Math.sqrt(dist * GRAV / Math.sin(2 * ang * Math.PI / 180)) / 0.2)
-    if (st.cpuErr != null) pow -= st.cpuErr * 0.22
-    else pow += (Math.random() - 0.5) * 8
-    pow = Math.max(20, Math.min(100, pow + (Math.random() - 0.5) * 6))
-    launch('cpu', ang, pow)
+    const ang = 45 + (Math.random() * 8 - 4)            // tighter angle band
+    let pow = Math.sqrt(dist * GRAV / Math.sin(2 * ang * Math.PI / 180)) / (0.2 * WEAPONS.normal.vmul)
+    pow -= st.wind * 60                                  // compensate wind toward player (player is left)
+    if (st.cpuErr != null) pow -= st.cpuErr * 0.3        // strong correction from last miss
+    else pow += (Math.random() - 0.5) * 5
+    pow = Math.max(20, Math.min(100, pow + (Math.random() - 0.5) * 3)) // small spread → accurate
+    launch('cpu', ang, pow, 'normal')
   }
 
-  const bumpStat = (k: keyof Stats) => {
-    setStats(prev => { const n = { ...prev, [k]: prev[k] + 1 }; saveStats(n); return n })
+  const reset = () => setRound(r => r + 1)
+  const cycleWeapon = () => {
+    const st = s.current
+    const i = (WORDER.indexOf(st.weapon) + 1) % WORDER.length
+    st.weapon = WORDER[i]; setWeapon(st.weapon)
   }
 
-  // ── keyboard ──
   useEffect(() => {
+    const norm = (k: string) => (k === 'й' || k === 'Й') ? 'q' : k.toLowerCase()
     const down = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'q', 'Q', 'й', 'Й'].includes(e.key)) return
       e.preventDefault()
       const st = s.current
-      if (st.over) { if (e.key === ' ') setRound(r => r + 1); return }
+      if (st.over) { if (e.key === ' ') reset(); return }
+      const nk = e.key.startsWith('Arrow') ? e.key : norm(e.key)
+      if (nk === 'q') { cycleWeapon(); return }
       if (turnRef.current !== 'you' || st.shell) return
-      st.keys[e.key] = true
+      st.keys[nk] = true
       if (e.key === 'ArrowUp') { st.angle = Math.min(89, st.angle + 2); setAngle(st.angle) }
       else if (e.key === 'ArrowDown') { st.angle = Math.max(1, st.angle - 2); setAngle(st.angle) }
-      else if (e.key === ' ' && !st.charging) { st.charging = true; setCharging(true); st.chargeStart = Date.now() }
+      else if (e.key === ' ' && !st.charging) { st.charging = true; setCharging(true) }
     }
     const up = (e: KeyboardEvent) => {
       const st = s.current
-      st.keys[e.key] = false
+      const nk = e.key.startsWith('Arrow') ? e.key : norm(e.key)
+      st.keys[nk] = false
       if (e.key === ' ' && st.charging && turnRef.current === 'you' && !st.over) fire()
     }
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up)
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const total = stats.wins + stats.losses
   const acc = stats.shots ? Math.round((stats.hits / stats.shots) * 100) : 0
+  const windDir = wind > 0.005 ? `→ ${Math.abs(Math.round(wind * 100))}` : wind < -0.005 ? `← ${Math.abs(Math.round(wind * 100))}` : 'штиль'
 
   return (
     <div ref={wrapRef} className="w-full" onClick={e => e.stopPropagation()}>
       <canvas ref={canvasRef} style={{ width: '100%', height: H, display: 'block', imageRendering: 'pixelated', border: '1px solid #252525', borderRadius: 6 }} />
       <div className="flex items-center gap-3 text-[11px] font-mono text-[#999] mt-1 px-1">
         <span>УГОЛ {angle}°</span>
-        <span className={charging ? 'text-[#5060a0]' : ''}>СИЛА {Math.round(power)}</span>
+        <span className={charging ? 'text-[#ffd24c]' : ''}>СИЛА {Math.round(power)}</span>
         <span>HP {hpP}</span>
         <span className="text-[#666]">ИИ {hpC}</span>
-        <span className="flex-1 text-right">
-          {msg ? msg : turn === 'you' ? `твой ход · ${(remaining / 1000).toFixed(1)}с` : 'ход ИИ…'}
-        </span>
+        <span className="text-[#5cc8ff]">ветер {windDir}</span>
+        <span className="flex-1 text-right">{msg ? msg : turn === 'you' ? `ход · ${(remaining / 1000).toFixed(1)}с` : 'ход ИИ…'}</span>
       </div>
       <div className="flex items-center justify-between text-[9px] text-[#383838] mt-0.5 px-1">
-        <span>← → ходьба · ↑ ↓ угол · пробел (держать) — сила/огонь{msg ? ' · пробел — заново' : ''}</span>
-        <span>W {stats.wins} · L {stats.losses}{total ? ` · точность ${acc}%` : ''}</span>
+        <span>← → ход · ↑ ↓ угол · пробел — сила/огонь · Q оружие: <span className="text-[#ffd24c]">{WEAPONS[weapon].name}</span>{msg ? ' · пробел — заново' : ''}</span>
+        <span>W {stats.wins} · L {stats.losses}{total ? ` · ${acc}%` : ''}</span>
       </div>
     </div>
   )
 }
 
-function drawTank(c: CanvasRenderingContext2D, x: number, y: number, ang: number, dir: number, hp: number) {
+function drawTank(c: CanvasRenderingContext2D, x: number, y: number, ang: number, dir: number, hp: number, _col: string) {
   c.fillStyle = '#000'
   c.beginPath(); c.arc(x, y - 5, 8, Math.PI, 0); c.fill()
   c.fillRect(x - 8, y - 5, 16, 5)
