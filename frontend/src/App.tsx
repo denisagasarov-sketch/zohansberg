@@ -79,10 +79,14 @@ export default function App() {
   // --- Day-transition checks (run on mount + whenever date changes) ---
 
   const checkDayTransitions = useCallback((today: string) => {
+    const flag = (key: string) => localStorage.getItem(key) !== 'false'
+
     // Check-in
-    api.getTodayCheckin().then(r => {
-      if (!r.exists) setShowCheckin(true)
-    }).catch(() => {})
+    if (flag('checkin_enabled')) {
+      api.getTodayCheckin().then(r => {
+        if (!r.exists) setShowCheckin(true)
+      }).catch(() => {})
+    }
 
     // Morning plan
     api.getDayPlan(today).then(rows => {
@@ -97,10 +101,11 @@ export default function App() {
       }
     }).catch(() => {})
 
-    // Weekly review (Fri/Sat/Sun after 17:00)
     const now = new Date()
     const day = now.getDay()
-    if ([0, 5, 6].includes(day) && now.getHours() >= 17) {
+
+    // Weekly review (Fri/Sat/Sun after 17:00)
+    if (flag('weekly_review_enabled') && [0, 5, 6].includes(day) && now.getHours() >= 17) {
       const weekKey = `weekly_review_${now.getFullYear()}_${Math.ceil(now.getDate() / 7)}_${now.getMonth()}`
       if (!localStorage.getItem(weekKey)) {
         setShowWeeklyReview(true)
@@ -109,15 +114,17 @@ export default function App() {
     }
 
     // Monthly/quarterly review (1st–3rd of month)
-    const dom = now.getDate()
-    if (dom <= 3) {
-      const month = now.getMonth() // 0=Jan, 3=Apr, 6=Jul, 9=Oct
-      const isQ1 = [0, 3, 6, 9].includes(month)
-      const monthKey = `monthly_review_${now.getFullYear()}_${month}`
-      if (!localStorage.getItem(monthKey)) {
-        setIsQuarterlyReview(isQ1)
-        setShowMonthlyReview(true)
-        localStorage.setItem(monthKey, '1')
+    if (flag('monthly_review_enabled')) {
+      const dom = now.getDate()
+      if (dom <= 3) {
+        const month = now.getMonth()
+        const isQ1 = [0, 3, 6, 9].includes(month)
+        const monthKey = `monthly_review_${now.getFullYear()}_${month}`
+        if (!localStorage.getItem(monthKey)) {
+          setIsQuarterlyReview(isQ1)
+          setShowMonthlyReview(true)
+          localStorage.setItem(monthKey, '1')
+        }
       }
     }
   }, [])
@@ -144,6 +151,7 @@ export default function App() {
   // Show evening summary after 19:00
   useEffect(() => {
     const check = () => {
+      if (localStorage.getItem('evening_enabled') === 'false') return
       const now = new Date()
       if (now.getHours() < 19) return
       const today = now.toISOString().slice(0, 10)

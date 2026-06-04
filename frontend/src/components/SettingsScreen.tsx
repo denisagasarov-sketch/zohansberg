@@ -333,6 +333,17 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
             <ToggleSetting storageKey="break_screen_enabled" defaultOn label="Экран перерыва" desc="Показывать экран с подсказками когда таймер на паузе" />
           </div>
         </section>
+
+        {/* Ritual settings */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Ритуалы</h2>
+          <div className="space-y-3">
+            <ToggleSetting storageKey="checkin_enabled" defaultOn label="Утренний чек-ин" desc="Вопрос о настроении и цели на день при открытии" />
+            <ToggleSetting storageKey="evening_enabled" defaultOn label="Вечерний итог" desc="Итог дня после 19:00 + план на завтра" />
+            <ToggleSetting storageKey="weekly_review_enabled" defaultOn label="Еженедельный обзор" desc="Обзор недели в пятницу/субботу/воскресенье после 17:00" />
+            <ToggleSetting storageKey="monthly_review_enabled" defaultOn label="Месячный и квартальный обзор" desc="Обзор месяца 1–3 числа каждого месяца" />
+          </div>
+        </section>
       </div>
     </div>
   )
