@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import FreeKickGame from './FreeKickGame'
+import FreeKick3D from './FreeKick3D'
 import ArtilleryGame from './ArtilleryGame'
 
 type Game = 'kick' | 'arty'
@@ -18,10 +18,10 @@ export default function GameArcade() {
   return (
     <div className="w-full" onClick={e => e.stopPropagation()}>
       <div className="flex gap-1.5 justify-center mb-2">
-        {tab('kick', '⚽ Штрафной')}
+        {tab('kick', '⚽ Штрафной 3D')}
         {tab('arty', '💥 Артиллерия')}
       </div>
-      {game === 'kick' ? <FreeKickGame /> : <ArtilleryGame />}
+      {game === 'kick' ? <FreeKick3D /> : <ArtilleryGame />}
     </div>
   )
 }
