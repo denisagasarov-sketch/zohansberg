@@ -282,7 +282,8 @@ export default function ArtilleryGame() {
     const ang = 45 + (Math.random() * 8 - 4)            // tighter angle band
     let pow = Math.sqrt(dist * GRAV / Math.sin(2 * ang * Math.PI / 180)) / (0.2 * WEAPONS.normal.vmul)
     pow -= st.wind * 60                                  // compensate wind toward player (player is left)
-    if (st.cpuErr != null) pow -= st.cpuErr * 0.3        // strong correction from last miss
+    // last shot landed at sh.x; err>0 = short (right of player) → needs MORE power
+    if (st.cpuErr != null) pow += Math.max(-30, Math.min(30, st.cpuErr * 0.25))
     else pow += (Math.random() - 0.5) * 5
     pow = Math.max(20, Math.min(100, pow + (Math.random() - 0.5) * 3)) // small spread → accurate
     launch('cpu', ang, pow, 'normal')
