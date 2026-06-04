@@ -12,6 +12,7 @@ import TaskEditor from './components/TaskEditor'
 import AfterDoneModal from './components/modals/AfterDoneModal'
 import TimerSwitchModal from './components/modals/TimerSwitchModal'
 import CheckinModal from './components/modals/CheckinModal'
+import SessionIntentModal from './components/modals/SessionIntentModal'
 import FocusSwitchModal from './components/modals/FocusSwitchModal'
 import EveningSummaryModal from './components/modals/EveningSummaryModal'
 import WeeklyReviewModal from './components/modals/WeeklyReviewModal'
@@ -39,6 +40,8 @@ export default function App() {
   const [planTaskIds, setPlanTaskIds] = useState<number[]>([])
   const [planTasks, setPlanTasks] = useState<any[]>([])
   const [postStopSessionId, setPostStopSessionId] = useState<number | null>(null)
+  const [pendingStartTaskId, setPendingStartTaskId] = useState<number | null>(null)
+  const [sessionIntent, setSessionIntent] = useState('')
   const [todayTime, setTodayTime] = useState(0)
   const [weeklyTime, setWeeklyTime] = useState<Record<number, number>>({})
   const quickInputRef = useRef<HTMLInputElement | null>(null)
@@ -166,7 +169,12 @@ export default function App() {
 
   const handleStartTimer = useCallback(() => {
     if (!nowTask) return
-    start(nowTask.id)
+    const intentEnabled = localStorage.getItem('intent_enabled') !== 'false'
+    if (intentEnabled) {
+      setPendingStartTaskId(nowTask.id)
+    } else {
+      start(nowTask.id)
+    }
   }, [nowTask, start])
 
   const handlePauseTimer = useCallback(() => { pause() }, [pause])
@@ -469,10 +477,27 @@ export default function App() {
         />
       )}
 
+      {pendingStartTaskId !== null && nowTask && (
+        <SessionIntentModal
+          taskTitle={nowTask.title}
+          onStart={intent => {
+            setSessionIntent(intent)
+            setPendingStartTaskId(null)
+            start(pendingStartTaskId)
+          }}
+          onSkip={() => {
+            setSessionIntent('')
+            setPendingStartTaskId(null)
+            start(pendingStartTaskId!)
+          }}
+        />
+      )}
+
       {postStopSessionId !== null && (
         <SessionNoteModal
           sessionId={postStopSessionId}
-          onClose={() => setPostStopSessionId(null)}
+          intent={sessionIntent || undefined}
+          onClose={() => { setPostStopSessionId(null); setSessionIntent('') }}
         />
       )}
     </div>
