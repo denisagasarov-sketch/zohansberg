@@ -235,6 +235,25 @@ export default function App() {
     await refresh()
   }, [nowTask, timerState.isRunning, timerState.isPaused, stop, refresh])
 
+  // --- Day-plan helpers (keep Сейчас / На сегодня / Следом mutually exclusive) ---
+  const removeFromPlan = useCallback((taskId: number) => {
+    if (!planTaskIds.includes(taskId)) return
+    const today = new Date().toISOString().slice(0, 10)
+    const newIds = planTaskIds.filter(id => id !== taskId)
+    setPlanTaskIds(newIds)
+    api.setDayPlan(today, newIds).catch(() => {})
+  }, [planTaskIds])
+
+  const addToPlan = useCallback(async (taskId: number) => {
+    // Move into today's plan: drop out of the queue and the now-slot
+    await updateTask(taskId, { in_queue: false, slot: 'queue' } as any)
+    if (planTaskIds.includes(taskId)) return
+    const today = new Date().toISOString().slice(0, 10)
+    const newIds = [...planTaskIds, taskId]
+    setPlanTaskIds(newIds)
+    api.setDayPlan(today, newIds).catch(() => {})
+  }, [planTaskIds, updateTask])
+
   const handleTakeNow = useCallback(async (taskId: number) => {
     if (timerState.isRunning) {
       setPendingSwitchTaskId(taskId)
@@ -242,8 +261,9 @@ export default function App() {
       return
     }
     await takeNow(taskId)
+    removeFromPlan(taskId)
     setSelectedTask(undefined)
-  }, [timerState.isRunning, takeNow])
+  }, [timerState.isRunning, takeNow, removeFromPlan])
 
   const handleTimerSwitchConfirm = useCallback(async () => {
     setShowTimerSwitch(false)
@@ -288,7 +308,8 @@ export default function App() {
     const update: any = { in_queue: true }
     if (task?.slot === 'now') update.slot = 'queue'
     await updateTask(taskId, update)
-  }, [updateTask, tasks])
+    removeFromPlan(taskId)
+  }, [updateTask, tasks, removeFromPlan])
 
   const handleRemoveFromQueue = useCallback(async (taskId: number) => {
     await updateTask(taskId, { in_queue: false } as any)
@@ -366,13 +387,7 @@ export default function App() {
                   setPlanTaskIds(newIds)
                   api.setDayPlan(today, newIds).catch(() => {})
                 }}
-                onAddToPlan={taskId => {
-                  if (planTaskIds.includes(taskId)) return
-                  const today = new Date().toISOString().slice(0, 10)
-                  const newIds = [...planTaskIds, taskId]
-                  setPlanTaskIds(newIds)
-                  api.setDayPlan(today, newIds).catch(() => {})
-                }}
+                onAddToPlan={addToPlan}
               />
               <QueueBlock
                 tasks={tasks}
