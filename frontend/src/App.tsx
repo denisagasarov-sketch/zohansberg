@@ -360,6 +360,12 @@ export default function App() {
                 directions={directions}
                 onTakeNow={handleTakeNow}
                 onMarkDone={handleMarkDone}
+                onTaskClick={handleTaskClick}
+                onReorder={newIds => {
+                  const today = new Date().toISOString().slice(0, 10)
+                  setPlanTaskIds(newIds)
+                  api.setDayPlan(today, newIds).catch(() => {})
+                }}
               />
               <QueueBlock
                 tasks={tasks}
