@@ -275,17 +275,35 @@ export default function ArtilleryGame() {
     } else setTimeout(cpuShoot, 200)
   }
 
+  // Replicate the real shell physics to find where a shot lands (x on impact)
+  const simulateLanding = (ang: number, pow: number) => {
+    const st = s.current
+    const v = pow * 0.2 * WEAPONS.normal.vmul, a = (ang * Math.PI) / 180
+    let x = st.ax - 16, y = st.ay - 12
+    let vx = Math.cos(a) * v * -1, vy = -Math.sin(a) * v
+    for (let i = 0; i < 600; i++) {
+      vx += st.wind            // dt≈16 → wind*dt/16 ≈ wind
+      x += vx; y += vy; vy += GRAV
+      const ix = Math.round(x)
+      if (x < -30 || x > st.W + 30 || y > H + 60) return x
+      if (ix >= 0 && ix < st.W && y >= st.terrain[ix]) return x
+    }
+    return x
+  }
+
   const cpuShoot = () => {
     const st = s.current
     if (st.over) return
-    const dist = Math.abs(st.ax - st.px)
-    const ang = 45 + (Math.random() * 8 - 4)            // tighter angle band
-    let pow = Math.sqrt(dist * GRAV / Math.sin(2 * ang * Math.PI / 180)) / (0.2 * WEAPONS.normal.vmul)
-    pow -= st.wind * 60                                  // compensate wind toward player (player is left)
-    // last shot landed at sh.x; err>0 = short (right of player) → needs MORE power
-    if (st.cpuErr != null) pow += Math.max(-30, Math.min(30, st.cpuErr * 0.25))
-    else pow += (Math.random() - 0.5) * 5
-    pow = Math.max(20, Math.min(100, pow + (Math.random() - 0.5) * 3)) // small spread → accurate
+    const ang = 45 + (Math.random() * 8 - 4)
+    // scan power for the shot that lands closest to the player
+    let bestPow = 60, bestErr = Infinity
+    for (let p = 20; p <= 100; p += 1.5) {
+      const land = simulateLanding(ang, p)
+      const err = Math.abs(land - st.px)
+      if (err < bestErr) { bestErr = err; bestPow = p }
+    }
+    // difficulty: add aim error (harder later, but never a runaway)
+    const pow = Math.max(20, Math.min(100, bestPow + (Math.random() - 0.5) * 10))
     launch('cpu', ang, pow, 'normal')
   }
 
