@@ -1,7 +1,7 @@
 {
   "account": "vlada_kliuiko",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-12T08:31:40.530389+00:00",
+  "run_timestamp": "2026-05-19T15:00:50.378192+00:00",
   "detection_method": "actor_field",
   "source_ref": "posts.resultsType=posts.isPinned",
   "posts_checked": 30,
@@ -12,28 +12,28 @@
     {
       "position": 1,
       "url": {
-        "value": "https://www.instagram.com/p/DTKl6n3jWnB/",
+        "value": "https://www.instagram.com/p/DF2bxZHtdW8/",
         "data_status": "ok",
         "source_ref": "posts_actor.url",
         "confidence": "high",
         "notes": ""
       },
       "content_id": {
-        "value": "3804019591526312385",
+        "value": "3564158296593388988",
         "data_status": "ok",
         "source_ref": "posts_actor.id",
         "confidence": "high",
         "notes": ""
       },
       "shortcode": {
-        "value": "DTKl6n3jWnB",
+        "value": "DF2bxZHtdW8",
         "data_status": "ok",
         "source_ref": "posts_actor.shortCode",
         "confidence": "high",
         "notes": ""
       },
       "caption_preview": {
-        "value": "Тенденции маркетинга в 2026: как прогнозировать результаты еще до старта и работы и стать специалистом, которому платят выше рынка \n\n🤌🏼 Что изменится в маркетинге в 2026 и почему большинство это проспит\n🤌🏼 Как использовать ИИ так, чтобы ваш контент отличался от того, что выдают копирайтеры и маркето",
+        "value": "Мы с командой помогаем малым и средним бизнесам, экспертам и блогерам масштабироваться и добиваться успеха на рынках ЕС и СНГ уже более 6 лет. \n\nСреди наших клиентов — крупные строительные компании, отели, рестораны, медицинские центры и многие другие компании.\n\nБолее тысячи успешных проектов и кейс",
         "data_status": "ok",
         "source_ref": "posts_actor.caption",
         "confidence": "high",
@@ -47,14 +47,14 @@
         "notes": ""
       },
       "timestamp": {
-        "value": "2026-01-06T10:15:24.000Z",
+        "value": "2025-02-09T11:33:20.000Z",
         "data_status": "ok",
         "source_ref": "posts_actor.timestamp",
         "confidence": "high",
         "notes": ""
       },
       "type": {
-        "value": "Video",
+        "value": "Sidecar",
         "data_status": "ok",
         "source_ref": "posts_actor.type",
         "confidence": "high",
@@ -116,28 +116,28 @@
     {
       "position": 3,
       "url": {
-        "value": "https://www.instagram.com/p/DF2bxZHtdW8/",
+        "value": "https://www.instagram.com/p/DTKl6n3jWnB/",
         "data_status": "ok",
         "source_ref": "posts_actor.url",
         "confidence": "high",
         "notes": ""
       },
       "content_id": {
-        "value": "3564158296593388988",
+        "value": "3804019591526312385",
         "data_status": "ok",
         "source_ref": "posts_actor.id",
         "confidence": "high",
         "notes": ""
       },
       "shortcode": {
-        "value": "DF2bxZHtdW8",
+        "value": "DTKl6n3jWnB",
         "data_status": "ok",
         "source_ref": "posts_actor.shortCode",
         "confidence": "high",
         "notes": ""
       },
       "caption_preview": {
-        "value": "Мы с командой помогаем малым и средним бизнесам, экспертам и блогерам масштабироваться и добиваться успеха на рынках ЕС и СНГ уже более 6 лет. \n\nСреди наших клиентов — крупные строительные компании, отели, рестораны, медицинские центры и многие другие компании.\n\nБолее тысячи успешных проектов и кейс",
+        "value": "Тенденции маркетинга в 2026: как прогнозировать результаты еще до старта и работы и стать специалистом, которому платят выше рынка \n\n🤌🏼 Что изменится в маркетинге в 2026 и почему большинство это проспит\n🤌🏼 Как использовать ИИ так, чтобы ваш контент отличался от того, что выдают копирайтеры и маркето",
         "data_status": "ok",
         "source_ref": "posts_actor.caption",
         "confidence": "high",
@@ -151,14 +151,14 @@
         "notes": ""
       },
       "timestamp": {
-        "value": "2025-02-09T11:33:20.000Z",
+        "value": "2026-01-06T10:15:24.000Z",
         "data_status": "ok",
         "source_ref": "posts_actor.timestamp",
         "confidence": "high",
         "notes": ""
       },
       "type": {
-        "value": "Sidecar",
+        "value": "Video",
         "data_status": "ok",
         "source_ref": "posts_actor.type",
         "confidence": "high",

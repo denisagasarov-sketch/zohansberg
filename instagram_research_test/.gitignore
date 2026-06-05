@@ -24,3 +24,8 @@ analysis/stage5a2c_cache/
 data/*/tmp/
 __pycache__/
 *.pyc
+
+.env.*
+.venv/
+.claude/
+cleanup_dead_stages.sh

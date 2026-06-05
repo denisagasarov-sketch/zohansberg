@@ -1,12 +1,12 @@
 {
   "account": "vlada_kliuiko",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-12T08:31:40.530389+00:00",
+  "run_timestamp": "2026-05-19T15:00:50.378192+00:00",
   "planned_apify_calls": 2,
   "actual_apify_calls": 2,
   "apify_run_ids": [
-    "LcvRSvIx3WKi4ddeg",
-    "mb7nRCP9dYNifWYM9"
+    "IxgBusANWIa8Se4Gg",
+    "OIRydc8gm8FD943pm"
   ],
   "profile_url": {
     "value": "https://www.instagram.com/vlada_kliuiko/",
@@ -51,21 +51,21 @@
     "notes": ""
   },
   "followers_count": {
-    "value": 39773,
+    "value": 40200,
     "data_status": "ok",
     "source_ref": "details_actor.apify/instagram-scraper",
     "confidence": "high",
     "notes": ""
   },
   "following_count": {
-    "value": 869,
+    "value": 867,
     "data_status": "ok",
     "source_ref": "details_actor.apify/instagram-scraper",
     "confidence": "high",
     "notes": ""
   },
   "posts_count": {
-    "value": 1386,
+    "value": 1390,
     "data_status": "ok",
     "source_ref": "details_actor.apify/instagram-scraper",
     "confidence": "high",
