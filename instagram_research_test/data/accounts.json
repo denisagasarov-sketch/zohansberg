@@ -1,10 +1,16 @@
 {
   "accounts": [
-    "https://www.instagram.com/vlada_kliuiko/"
+    {
+      "username": "vlada_kliuiko",
+      "url": "https://www.instagram.com/vlada_kliuiko/"
+    }
   ],
-  "posts_limit": 5,
-  "highlights_limit": 1,
-  "mode": "actor_inspection",
-  "posts_sheet_types": ["photo", "carousel"],
+  "posts_limit": 50,
+  "highlights_limit": 5,
+  "mode": "",
+  "posts_sheet_types": [
+    "photo",
+    "carousel"
+  ],
   "posts_refresh_days": null
 }

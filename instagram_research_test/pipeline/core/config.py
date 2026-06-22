@@ -17,12 +17,26 @@ def load_env() -> None:
 
 
 def get_account(username: str) -> dict:
-    """Возвращает конфиг аккаунта из accounts.json."""
+    """Возвращает конфиг аккаунта из accounts.json.
+
+    Структура accounts.json:
+    {
+        "accounts": [{"username": "vlada_kliuiko", "url": "..."}, ...],
+        "posts_limit": 50,
+        ...
+    }
+    """
     data = json.loads(_ACCOUNTS_PATH.read_text(encoding="utf-8"))
-    accounts = data if isinstance(data, list) else [data]
-    for acc in accounts:
+    for acc in data.get("accounts", []):
         if acc.get("username") == username:
-            return acc
+            return {
+                **acc,
+                "posts_limit":        data.get("posts_limit", 50),
+                "highlights_limit":   data.get("highlights_limit", 5),
+                "mode":               data.get("mode", ""),
+                "posts_sheet_types":  data.get("posts_sheet_types", ["photo", "carousel"]),
+                "posts_refresh_days": data.get("posts_refresh_days"),
+            }
     raise ValueError(f"Аккаунт '{username}' не найден в accounts.json")
 
 
