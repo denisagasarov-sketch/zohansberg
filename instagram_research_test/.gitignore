@@ -32,3 +32,4 @@ cleanup_dead_stages.sh
 instagram_research_test/data/*/raw/
 instagram_research_test/data/*/tmp/
 instagram_research_test/report/
+cleanup_v2.sh
