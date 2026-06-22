@@ -21,6 +21,12 @@ from pipeline.stages.collect_posts import collect as collect_posts
 from pipeline.stages.collect_profile import collect as collect_profile
 from pipeline.stages.collect_reels import collect as collect_reels
 from pipeline.stages.collect_stories import collect as collect_stories
+from pipeline.stages.collect_pinned_details import collect as collect_pinned_details
+from pipeline.stages.analyze_pinned_posts import analyze as analyze_pinned_posts
+from pipeline.stages.analyze_pinned_visuals import analyze as analyze_pinned_visuals
+from pipeline.stages.classify_profile_link import classify as classify_profile_link
+from pipeline.stages.analyze_landing import analyze as analyze_landing
+from pipeline.stages.analyze_highlights import analyze as analyze_highlights
 from pipeline.stages.write_sheets import write as write_sheets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -36,6 +42,30 @@ class Stage:
 
 def _profile(username: str, dry_run: bool) -> dict:
     return collect_profile(username=username, dry_run=dry_run)
+
+
+def _pinned_details(username: str, dry_run: bool) -> dict:
+    return collect_pinned_details(username=username, dry_run=dry_run)
+
+
+def _analyze_pinned_posts(username: str, dry_run: bool) -> dict:
+    return analyze_pinned_posts(username=username, dry_run=dry_run)
+
+
+def _analyze_pinned_visuals(username: str, dry_run: bool) -> dict:
+    return analyze_pinned_visuals(username=username, dry_run=dry_run)
+
+
+def _classify_link(username: str, dry_run: bool) -> dict:
+    return classify_profile_link(username=username, dry_run=dry_run)
+
+
+def _analyze_landing(username: str, dry_run: bool) -> dict:
+    return analyze_landing(username=username, dry_run=dry_run)
+
+
+def _analyze_highlights(username: str, dry_run: bool) -> dict:
+    return analyze_highlights(username=username, dry_run=dry_run)
 
 
 def _bio(username: str, dry_run: bool) -> dict:
@@ -81,9 +111,15 @@ def _write_sheets(username: str, dry_run: bool) -> dict:
 
 STAGES = (
     Stage("01", "collect_profile", _profile),
+    Stage("02", "collect_pinned_details", _pinned_details),
+    Stage("03", "analyze_pinned_posts", _analyze_pinned_posts),
+    Stage("04", "analyze_pinned_visuals", _analyze_pinned_visuals),
     Stage("05", "analyze_bio", _bio),
+    Stage("06", "classify_profile_link", _classify_link),
+    Stage("07", "analyze_landing", _analyze_landing),
     Stage("08", "collect_highlights", _highlights),
     Stage("09", "collect_stories", _stories),
+    Stage("10", "analyze_highlights", _analyze_highlights),
     Stage("11", "collect_reels", _reels),
     Stage("12", "analyze_reels", _analyze_reels),
     Stage("13", "collect_posts", _posts),
