@@ -29,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 MODEL = "gpt-4o"
+FILTER_MODEL = "gpt-4o-mini"
 MAX_SLIDES = 10
 MAX_CONTENT_BYTES = 200 * 1024 * 1024
 
@@ -41,10 +42,31 @@ _DOWNLOAD_HEADERS = {
     "Referer": "https://www.instagram.com/",
 }
 
+FILTER_SYSTEM_PROMPT = """\
+Ты фильтруешь посты Instagram. Отвечай только JSON: {"is_relevant": true/false, "reason": "одно слово"}
+Мусор = поздравления с праздниками, личные путешествия без экспертной ценности, бытовой контент.
+Не мусор = экспертный контент, кейсы, продажи, обучение, провокация, соцдоки, тренды."""
+
 SYSTEM_PROMPT = """\
 Ты аналитик контента Instagram. Анализируешь посты конкурентов.
 Все значения полей пиши на русском языке.
-Отвечай ТОЛЬКО валидным JSON. Никакого текста до или после JSON."""
+Отвечай ТОЛЬКО валидным JSON. Никакого текста до или после JSON.
+
+СПРАВОЧНИК МЕХАНИК ПОДАЧИ (используй только эти):
+- Обучение / польза — инструкция, как сделать, шаги, разбор
+- Кейс / история клиента — имя/ситуация → процесс → результат с цифрой
+- Личная история — автор рассказывает про себя, прошедшее время, эмоция+вывод
+- Боли аудитории — начинается с проблемы читателя, "знакомо?", симптомы
+- Провокация / мнение — спорное утверждение, "все думают X, но на самом деле"
+- Разбор ошибки — "не делай", "чаще всего", неправильный путь и почему
+- Чек-лист / список — нумерация, тире, карусель с пунктами
+- Экспертный факт — цифра или нестандартный факт в первом абзаце
+- Продуктовый пост — цена, формат, что входит, как купить
+- Анонс / событие — дата, "скоро", "открываю набор"
+- Отзыв / соцдок — скриншот или цитата клиента как основа
+- Диагностика — "проверь себя", вопросы с вариантами
+- Интрига / сериал — обрыв на кульминации, "расскажу в следующий раз"
+- За кулисами — процесс изнутри, черновики, рабочие моменты"""
 
 USER_PROMPT_TEMPLATE = """\
 Проанализируй пост конкурента.
@@ -62,18 +84,23 @@ Caption:
 
 Верни JSON со всеми полями (каждое обязательно, значения на русском):
 
-"title" — первая строка caption или текст на обложке если информативнее
+"title" — текст написанный на обложке поста (первый слайд карусели или единственное фото). Считывать только с изображения через Vision, не из caption. Если на обложке нет текста или пост не содержит изображения — "нет заголовка".
 "topic" — главная тема одной строкой
-"mechanic" — разбор ошибки / кейс / чек-лист / миф / продуктовый пост / личная история / факт / анонс / другое
+"mechanic" — выбери одну механику из СПРАВОЧНИКА МЕХАНИК ПОДАЧИ выше
 "summary" — о чём пост, 1-2 предложения
-"hook" — первый абзац caption дословно до первого переноса строки
-"structure" — X → Y → Z максимум 4 элемента
+"hook_type" — тип хука из списка: провокационный вопрос / шок-факт / обещание пользы / интрига и недосказанность / противоречие и антитезис / идентификация с болью / история с поворотом / социальное доказательство / прямой призыв / без хука
+"hook_text" — дословно первая строка caption до первого переноса строки (не перефразировать)
+"structure" — структура поста в формате: [блок] конкретное содержание → [блок] конкретное содержание → ...
+Блоки: проблема / инсайт / история / аргумент / пример / CTA / продажа
+Пример: "проблема: таргет не работает без сильного оффера → инсайт: оффер это не скидка, а трансформация → пример: кейс Маши +300к → CTA: напиши в директ"
+Не писать абстрактно ("проблема → решение"), всегда конкретное содержание каждого блока.
 "selling_insert" — фраза к покупке; "не найдено" если нет
 "cta" — точная CTA-фраза; "не найдено" если нет
 "cta_destination" — директ / комментарии / бот / сайт / ссылка в bio / "не найдено"
 "has_lead_magnet" — да / нет
 "lead_magnet_name" — название; "" если нет
 "lead_magnet_how" — через коммент / в директ / по ссылке; "" если нет
+"rubric" — рубрика поста из списка: Экспертный контент / Кейсы и результаты / Личное и за кулисами / Продажи и анонсы / Соцдоки и отзывы / Тренды и рынок / Провокация и мнение / Обучение и польза / Праздники и поздравления / AI и технологии
 "what_worked" — опиши какие приёмы, триггеры, формулировки, структура или механики могли повлиять на реакцию. Минимум 3-4 конкретных наблюдения.
 "what_to_test" — одна конкретная тактика для применения. Называй точный формат, механику или хук. Одно предложение."""
 
@@ -99,6 +126,24 @@ def _parse_json(raw_text: str) -> tuple[dict, str | None]:
         return json.loads(raw_text), None
     except json.JSONDecodeError as e:
         return {}, str(e)
+
+
+def _is_relevant(caption: str) -> tuple[bool, str]:
+    """GPT-4o-mini фильтр мусорных постов. Возвращает (is_relevant, reason)."""
+    snippet = caption[:300]
+    messages = [
+        {"role": "system", "content": FILTER_SYSTEM_PROMPT},
+        {"role": "user", "content": snippet or "(нет caption)"},
+    ]
+    try:
+        raw_text = chat(messages, model=FILTER_MODEL, max_tokens=50)
+        parsed, err = _parse_json(raw_text)
+        if err:
+            return True, ""
+        return bool(parsed.get("is_relevant", True)), str(parsed.get("reason", ""))
+    except Exception as e:
+        logger.warning("Фильтр: ошибка %s — пост не фильтруется", e)
+        return True, ""
 
 
 def _load_posts_index(username: str) -> tuple[list, dict]:
@@ -347,11 +392,12 @@ def _analyze_with_gpt(
 
 
 def _postprocess(result: dict, mechanic_note: str) -> None:
-    result.setdefault("title", "")
+    result.setdefault("title", "нет заголовка")
     result.setdefault("topic", "")
     result.setdefault("mechanic", "")
     result.setdefault("summary", "")
-    result.setdefault("hook", "")
+    result.setdefault("hook_type", "без хука")
+    result.setdefault("hook_text", "")
     result.setdefault("structure", "")
     result.setdefault("selling_insert", "не найдено")
     result.setdefault("cta", "не найдено")
@@ -359,27 +405,31 @@ def _postprocess(result: dict, mechanic_note: str) -> None:
     result.setdefault("has_lead_magnet", "нет")
     result.setdefault("lead_magnet_name", "")
     result.setdefault("lead_magnet_how", "")
+    result.setdefault("rubric", "")
     result.setdefault("what_worked", "")
     result.setdefault("what_to_test", "")
     for f in ("selling_insert", "cta", "cta_destination"):
         if not result[f]:
             result[f] = "не найдено"
+    if not result["title"]:
+        result["title"] = "нет заголовка"
     if mechanic_note and mechanic_note not in (result.get("mechanic") or ""):
         result["mechanic"] = f"{result['mechanic']} {mechanic_note}".strip()
 
 
 def _build_row(username: str, m: dict, avg_err: float, result: dict) -> dict:
     url = m["url"]
-    title = result.get("title") or ""
     return {
         "Дата выгрузки": datetime.utcnow().strftime("%d.%m.%Y"),
         "post_type": m["post_type"],
         "Конкурент": username,
-        "Ссылка на пост + заголовок": f"{url} | {title}",
+        "Ссылка на пост": url,
+        "Заголовок поста": result.get("title", "нет заголовка"),
         "Тема поста": result.get("topic", ""),
         "Механика подачи": result.get("mechanic", ""),
         "Кратко о чем пост": result.get("summary", ""),
-        "Хук / первый абзац": result.get("hook", ""),
+        "Тип хука": result.get("hook_type", "без хука"),
+        "Хук / первый абзац": result.get("hook_text", ""),
         "Структура поста": result.get("structure", ""),
         "Продающая вставка": result.get("selling_insert", "не найдено"),
         "Какой CTA": result.get("cta", "не найдено"),
@@ -387,6 +437,7 @@ def _build_row(username: str, m: dict, avg_err: float, result: dict) -> dict:
         "Есть лид-магнит": result.get("has_lead_magnet", "нет"),
         "Какой лид-магнит": result.get("lead_magnet_name", ""),
         "Как получить?": result.get("lead_magnet_how", ""),
+        "Рубрика": result.get("rubric", ""),
         "Просмотры": m["views"],
         "Лайки": m["likes"],
         "Комментарии": m["comments"],
@@ -396,6 +447,39 @@ def _build_row(username: str, m: dict, avg_err: float, result: dict) -> dict:
         "ERR выше среднего?": m["err_above_avg"],
         "Что могло сработать": result.get("what_worked", ""),
         "Что можно протестировать у себя": result.get("what_to_test", ""),
+    }
+
+
+def _build_filtered_row(username: str, m: dict, reason: str) -> dict:
+    """Строка таблицы для отфильтрованного поста."""
+    return {
+        "Дата выгрузки": datetime.utcnow().strftime("%d.%m.%Y"),
+        "post_type": m["post_type"],
+        "Конкурент": username,
+        "Ссылка на пост": m["url"],
+        "Заголовок поста": "filtered_out",
+        "Тема поста": reason,
+        "Механика подачи": "",
+        "Кратко о чем пост": "",
+        "Тип хука": "",
+        "Хук / первый абзац": "",
+        "Структура поста": "",
+        "Продающая вставка": "",
+        "Какой CTA": "",
+        "Куда ведет CTA": "",
+        "Есть лид-магнит": "",
+        "Какой лид-магнит": "",
+        "Как получить?": "",
+        "Рубрика": "",
+        "Просмотры": m["views"],
+        "Лайки": m["likes"],
+        "Комментарии": m["comments"],
+        "Репосты": m["reposts"],
+        "ERR": str(m["err"]).replace(".", ",") + "%",
+        "Средний ERR": "",
+        "ERR выше среднего?": "",
+        "Что могло сработать": "",
+        "Что можно протестировать у себя": "",
     }
 
 
@@ -423,10 +507,19 @@ def analyze(username: str, dry_run: bool = False) -> dict:
     rows: list[dict] = []
     ok_count = 0
     fail_count = 0
+    filtered_count = 0
 
     for i, (post, m) in enumerate(zip(posts, metrics)):
         pos = i + 1
         logger.info("[%d/%d] %s | %s", pos, len(posts), m["post_type"], m["url"])
+
+        # Правка 1: фильтрация мусора через gpt-4o-mini
+        relevant, reason = _is_relevant(m["caption"])
+        if not relevant:
+            logger.info("  FILTERED: %s", reason)
+            filtered_count += 1
+            rows.append(_build_filtered_row(username, m, reason))
+            continue
 
         post_id = post.get("id") or post.get("shortCode") or f"post_{i}"
         tmp_dir = tmp_base / str(post_id)
@@ -468,6 +561,7 @@ def analyze(username: str, dry_run: bool = False) -> dict:
         "posts_analyzed": len(posts),
         "posts_ok": ok_count,
         "posts_failed": fail_count,
+        "filtered_count": filtered_count,
         "avg_err": avg_err,
         "rows": rows,
     }
@@ -477,7 +571,7 @@ def analyze(username: str, dry_run: bool = False) -> dict:
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n=== Stage 14: Analyze Posts | @{username} ===")
-    print(f"Проанализировано: {ok_count}/{len(posts)} | failed: {fail_count} | avg_err: {avg_err}%")
+    print(f"Проанализировано: {ok_count}/{len(posts)} | failed: {fail_count} | filtered: {filtered_count} | avg_err: {avg_err}%")
     print(f"Сохранено: {output_path}")
     return output
 

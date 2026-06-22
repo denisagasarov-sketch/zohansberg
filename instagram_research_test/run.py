@@ -89,10 +89,9 @@ def _analyze_reels(username: str, dry_run: bool) -> dict:
 
 
 def _posts(username: str, dry_run: bool) -> dict:
-    account = get_account(username)
     return collect_posts(
         username=username,
-        limit=account["posts_limit"],
+        limit=200,
         dry_run=dry_run,
     )
 
