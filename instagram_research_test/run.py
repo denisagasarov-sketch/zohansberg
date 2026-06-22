@@ -1,11 +1,155 @@
-"""
-Единственная точка входа пайплайна.
+"""Единственная точка входа нового пайплайна.
 
 Использование:
-  python run.py --account vlada_kliuiko
-  python run.py --account vlada_kliuiko --stages 01,03,13,14
-  python run.py --account vlada_kliuiko --from-stage 13 --dry-run
+  python3 run.py --account vlada_kliuiko
+  python3 run.py --account vlada_kliuiko --stages 01,05,08
+  python3 run.py --account vlada_kliuiko --from-stage 11 --dry-run
 """
-# TODO: реализовать в шаге 5
+
+import argparse
+import logging
+from dataclasses import dataclass
+from typing import Callable
+
+from pipeline.core.config import get_account
+from pipeline.stages.analyze_bio import analyze as analyze_bio
+from pipeline.stages.collect_highlights import collect as collect_highlights
+from pipeline.stages.collect_posts import collect as collect_posts
+from pipeline.stages.collect_profile import collect as collect_profile
+from pipeline.stages.collect_reels import collect as collect_reels
+from pipeline.stages.collect_stories import collect as collect_stories
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Stage:
+    number: str
+    name: str
+    runner: Callable[[str, bool], dict]
+
+
+def _profile(username: str, dry_run: bool) -> dict:
+    return collect_profile(username=username, dry_run=dry_run)
+
+
+def _bio(username: str, dry_run: bool) -> dict:
+    return analyze_bio(username=username, dry_run=dry_run)
+
+
+def _highlights(username: str, dry_run: bool) -> dict:
+    return collect_highlights(username=username, limit=None, dry_run=dry_run)
+
+
+def _stories(username: str, dry_run: bool) -> dict:
+    return collect_stories(username=username, limit=None, dry_run=dry_run)
+
+
+def _reels(username: str, dry_run: bool) -> dict:
+    return collect_reels(username=username, dry_run=dry_run)
+
+
+def _posts(username: str, dry_run: bool) -> dict:
+    account = get_account(username)
+    return collect_posts(
+        username=username,
+        limit=account["posts_limit"],
+        dry_run=dry_run,
+    )
+
+
+STAGES = (
+    Stage("01", "collect_profile", _profile),
+    Stage("05", "analyze_bio", _bio),
+    Stage("08", "collect_highlights", _highlights),
+    Stage("09", "collect_stories", _stories),
+    Stage("11", "collect_reels", _reels),
+    Stage("13", "collect_posts", _posts),
+)
+STAGES_BY_NUMBER = {stage.number: stage for stage in STAGES}
+
+
+def _normalize_stage_number(value: str) -> str:
+    stripped = value.strip()
+    if not stripped.isdigit():
+        raise ValueError(f"Некорректный номер стейджа: {value!r}")
+    return f"{int(stripped):02d}"
+
+
+def select_stages(stages: str | None, from_stage: str | None) -> list[Stage]:
+    if stages:
+        requested = [_normalize_stage_number(value) for value in stages.split(",") if value.strip()]
+        if not requested:
+            raise ValueError("--stages не содержит номеров")
+        unavailable = [number for number in requested if number not in STAGES_BY_NUMBER]
+        if unavailable:
+            available = ", ".join(stage.number for stage in STAGES)
+            raise ValueError(
+                f"Стейджи ещё не перенесены или неизвестны: {', '.join(unavailable)}. "
+                f"Доступны: {available}"
+            )
+        return [STAGES_BY_NUMBER[number] for number in requested]
+
+    if from_stage:
+        start = _normalize_stage_number(from_stage)
+        if start not in STAGES_BY_NUMBER:
+            available = ", ".join(stage.number for stage in STAGES)
+            raise ValueError(f"Стейдж {start} недоступен. Доступны: {available}")
+        start_index = next(index for index, stage in enumerate(STAGES) if stage.number == start)
+        return list(STAGES[start_index:])
+
+    return list(STAGES)
+
+
+def run_pipeline(username: str, selected: list[Stage], dry_run: bool = False) -> list[dict]:
+    get_account(username)
+    results = []
+
+    logger.info(
+        "Pipeline | @%s | stages=%s | dry_run=%s",
+        username,
+        ",".join(stage.number for stage in selected),
+        dry_run,
+    )
+    for index, stage in enumerate(selected, start=1):
+        logger.info("[%d/%d] %s %s", index, len(selected), stage.number, stage.name)
+        try:
+            result = stage.runner(username, dry_run)
+        except Exception as error:
+            logger.error("Stage %s %s failed: %s", stage.number, stage.name, error)
+            raise RuntimeError(
+                f"Стейдж {stage.number} ({stage.name}) завершился с ошибкой"
+            ) from error
+        results.append({
+            "number": stage.number,
+            "name": stage.name,
+            "status": "dry_run" if dry_run else "ok",
+            "result": result,
+        })
+
+    print("\n=== Pipeline Summary ===")
+    print(f"Аккаунт: @{username}")
+    for item in results:
+        print(f"{item['number']} {item['name']}: {item['status']}")
+    return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Instagram competitor research pipeline")
+    parser.add_argument("--account", required=True, help="Instagram username")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--stages", help="Номера через запятую, например 01,05,08")
+    selection.add_argument("--from-stage", help="Запустить с указанного номера")
+    parser.add_argument("--dry-run", action="store_true", help="Не вызывать внешние API")
+    args = parser.parse_args()
+
+    try:
+        selected = select_stages(args.stages, args.from_stage)
+        run_pipeline(args.account, selected, args.dry_run)
+    except (ValueError, FileNotFoundError, EnvironmentError, RuntimeError) as error:
+        parser.error(str(error))
+
+
 if __name__ == "__main__":
-    raise NotImplementedError("run.py будет реализован в шаге 5")
+    main()
