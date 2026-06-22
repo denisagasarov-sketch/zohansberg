@@ -13,11 +13,15 @@ from typing import Callable
 
 from pipeline.core.config import get_account
 from pipeline.stages.analyze_bio import analyze as analyze_bio
+from pipeline.stages.analyze_posts import analyze as analyze_posts
+from pipeline.stages.analyze_reels import analyze as analyze_reels
+from pipeline.stages.build_payload import build as build_payload
 from pipeline.stages.collect_highlights import collect as collect_highlights
 from pipeline.stages.collect_posts import collect as collect_posts
 from pipeline.stages.collect_profile import collect as collect_profile
 from pipeline.stages.collect_reels import collect as collect_reels
 from pipeline.stages.collect_stories import collect as collect_stories
+from pipeline.stages.write_sheets import write as write_sheets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -50,6 +54,10 @@ def _reels(username: str, dry_run: bool) -> dict:
     return collect_reels(username=username, dry_run=dry_run)
 
 
+def _analyze_reels(username: str, dry_run: bool) -> dict:
+    return analyze_reels(username=username, dry_run=dry_run)
+
+
 def _posts(username: str, dry_run: bool) -> dict:
     account = get_account(username)
     return collect_posts(
@@ -59,13 +67,29 @@ def _posts(username: str, dry_run: bool) -> dict:
     )
 
 
+def _analyze_posts(username: str, dry_run: bool) -> dict:
+    return analyze_posts(username=username, dry_run=dry_run)
+
+
+def _build_payload(username: str, dry_run: bool) -> dict:
+    return build_payload(username=username, dry_run=dry_run)
+
+
+def _write_sheets(username: str, dry_run: bool) -> dict:
+    return write_sheets(username=username, dry_run=dry_run)
+
+
 STAGES = (
     Stage("01", "collect_profile", _profile),
     Stage("05", "analyze_bio", _bio),
     Stage("08", "collect_highlights", _highlights),
     Stage("09", "collect_stories", _stories),
     Stage("11", "collect_reels", _reels),
+    Stage("12", "analyze_reels", _analyze_reels),
     Stage("13", "collect_posts", _posts),
+    Stage("14", "analyze_posts", _analyze_posts),
+    Stage("15", "build_payload", _build_payload),
+    Stage("16", "write_sheets", _write_sheets),
 )
 STAGES_BY_NUMBER = {stage.number: stage for stage in STAGES}
 
