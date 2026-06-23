@@ -488,6 +488,9 @@ def analyze(username: str, dry_run: bool = False) -> dict:
     get_account(username)
     posts, _url_to_raw = _load_posts_index(username)
 
+    allowed_types = get_account(username).get("posts_sheet_types", ["photo", "carousel"])
+    posts = [p for p in posts if _post_type(p.get("type", "Image")) in allowed_types]
+
     logger.info(
         "[14] analyze_posts | @%s | posts=%d | dry_run=%s",
         username, len(posts), dry_run,
