@@ -53,6 +53,7 @@ def collect(
     post_types: list = None,       # None = все типы; ["photo", "carousel", "video"]
     content_mode: str = "period",  # "period" или "count"
     target_count: int = 30,        # используется когда content_mode="count"
+    exclude_codes: list = None,    # shortCode постов, уже записанных в таблицу (режим append)
 ) -> dict:
     """
     Собирает индекс постов аккаунта.
@@ -136,6 +137,21 @@ def collect(
             if _post_type(item.get("type", "Image")) in post_types
         ]
         logger.info("Тип-фильтр: %d → %d (разрешены: %s)", before, len(raw_items), post_types)
+
+    # ------------------------------------------------------------------
+    # Дедупликация (режим append): исключаем посты, уже записанные в таблицу
+    # ------------------------------------------------------------------
+    if exclude_codes:
+        exclude_set = {str(c).strip() for c in exclude_codes if str(c).strip()}
+        before = len(raw_items)
+        raw_items = [
+            item for item in raw_items
+            if (item.get("shortCode") or "") not in exclude_set
+        ]
+        logger.info(
+            "Дедуп-фильтр: %d → %d (исключено уже записанных: %d)",
+            before, len(raw_items), before - len(raw_items),
+        )
 
     # ------------------------------------------------------------------
     # Сохраняем сырые данные

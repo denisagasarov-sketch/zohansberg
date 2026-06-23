@@ -109,6 +109,9 @@ def _posts(username: str, dry_run: bool) -> dict:
     target_count = _env_int("PIPELINE_TARGET_COUNT", 30)
     post_types_raw = os.environ.get("PIPELINE_POST_TYPES", "")
     post_types = [p.strip() for p in post_types_raw.split(",") if p.strip()] or None
+    # Дедупликация append: shortCode постов, уже записанных в таблицу (бот заполняет).
+    exclude_raw = os.environ.get("PIPELINE_EXCLUDE_SHORTCODES", "")
+    exclude_codes = [c.strip() for c in exclude_raw.split(",") if c.strip()] or None
     return collect_posts(
         username=username,
         limit=200,
@@ -117,6 +120,7 @@ def _posts(username: str, dry_run: bool) -> dict:
         post_types=post_types,
         content_mode=content_mode,
         target_count=target_count,
+        exclude_codes=exclude_codes,
     )
 
 

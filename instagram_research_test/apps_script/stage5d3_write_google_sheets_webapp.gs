@@ -80,9 +80,9 @@ function doPost(e) {
       );
       return _jsonResponse(response);
     }
-    if (mode !== "validate" && mode !== "write" && mode !== "delete_account") {
+    if (mode !== "validate" && mode !== "write" && mode !== "delete_account" && mode !== "get_sheet_data") {
       response.errors.push(
-        "Unknown mode: '" + mode + "'. Supported modes: validate, write, delete_account."
+        "Unknown mode: '" + mode + "'. Supported modes: validate, write, delete_account, get_sheet_data."
       );
       return _jsonResponse(response);
     }
@@ -105,6 +105,12 @@ function doPost(e) {
     // delete_account — отдельная ветка: не требует start_row и sheets payload
     if (mode === "delete_account") {
       return _handleDeleteAccount(body, response, spreadsheetId);
+    }
+
+    // get_sheet_data — read-only: вернуть значения одной колонки листа.
+    // Используется ботом для дедупликации (список уже записанных постов).
+    if (mode === "get_sheet_data") {
+      return _handleGetSheetData(body, response, spreadsheetId);
     }
 
     // Validate start_row
@@ -384,6 +390,106 @@ function _handleDeleteAccount(body, response, spreadsheetId) {
   }
 
   return _jsonResponse(response);
+}
+
+
+// ---------------------------------------------------------------------------
+// get_sheet_data — read-only: вернуть значения одной колонки листа
+// ---------------------------------------------------------------------------
+//
+// Запрос: { mode: "get_sheet_data", sheet_name: "Посты", column: "Ссылка" }
+// column можно задать как часть заголовка ("Ссылка" найдёт "Ссылка на пост"),
+// букву колонки ("C") или 1-based индекс ("3").
+// Возвращает response.data — массив непустых значений начиная с row 3.
+// Операция не изменяет таблицу.
+function _handleGetSheetData(body, response, spreadsheetId) {
+  var sheetName = (body.sheet_name || "").toString().trim();
+  var column    = (body.column || "").toString().trim();
+  if (!sheetName) {
+    response.errors.push("get_sheet_data requires 'sheet_name'.");
+    return _jsonResponse(response);
+  }
+  if (!column) {
+    response.errors.push("get_sheet_data requires 'column' (header text, letter, or 1-based index).");
+    return _jsonResponse(response);
+  }
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(spreadsheetId);
+  } catch (openErr) {
+    response.errors.push("Cannot open spreadsheet: " + openErr.message);
+    return _jsonResponse(response);
+  }
+  response.spreadsheet_name = ss.getName();
+  response.spreadsheet_url  = ss.getUrl();
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    response.errors.push("Sheet '" + sheetName + "' not found.");
+    return _jsonResponse(response);
+  }
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  var colIndex = _resolveColumn(sheet, column, lastCol);
+  if (colIndex < 1) {
+    response.errors.push("Column '" + column + "' not found in sheet '" + sheetName + "'.");
+    return _jsonResponse(response);
+  }
+
+  var values = [];
+  if (lastRow >= REQUIRED_START_ROW) {
+    var raw = sheet.getRange(REQUIRED_START_ROW, colIndex, lastRow - REQUIRED_START_ROW + 1, 1)
+                   .getValues();
+    for (var i = 0; i < raw.length; i++) {
+      var v = String(raw[i][0] || "").trim();
+      if (v !== "") values.push(v);
+    }
+  }
+
+  response.sheet_name   = sheetName;
+  response.column       = column;
+  response.column_index = colIndex;
+  response.data         = values;
+  response.ok           = true;
+  return _jsonResponse(response);
+}
+
+
+// Находит 1-based индекс колонки по заголовку (подстрока), номеру или букве.
+// Возвращает -1, если не найдено.
+function _resolveColumn(sheet, column, lastCol) {
+  // 1) Поиск по тексту заголовка в строках 1..(REQUIRED_START_ROW-1).
+  var headerRows = REQUIRED_START_ROW - 1;
+  if (headerRows >= 1 && lastCol >= 1) {
+    var hdr    = sheet.getRange(1, 1, headerRows, lastCol).getValues();
+    var needle = column.toLowerCase();
+    for (var r = 0; r < hdr.length; r++) {
+      for (var c = 0; c < hdr[r].length; c++) {
+        var cell = String(hdr[r][c] || "").trim().toLowerCase();
+        if (cell !== "" && cell.indexOf(needle) !== -1) {
+          return c + 1;
+        }
+      }
+    }
+  }
+  // 2) Чистое число → 1-based индекс.
+  if (/^[0-9]+$/.test(column)) {
+    var n = parseInt(column, 10);
+    if (n >= 1 && n <= lastCol) return n;
+  }
+  // 3) Буквы колонки (A, B, ... AA).
+  if (/^[A-Za-z]+$/.test(column)) {
+    var idx = 0;
+    var up  = column.toUpperCase();
+    for (var k = 0; k < up.length; k++) {
+      idx = idx * 26 + (up.charCodeAt(k) - 64);
+    }
+    if (idx >= 1 && idx <= lastCol) return idx;
+  }
+  return -1;
 }
 
 
