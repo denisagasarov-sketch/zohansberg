@@ -2,7 +2,7 @@
  * Stage 5D-3: Google Sheets Write Web App
  *
  * Exposes doPost(e) only.
- * Supported modes: "validate", "write"
+ * Supported modes: "validate", "write", "delete_account"
  * Rejected modes:  "append", "clear", "sync", and any unknown mode.
  *
  * Required Script Property (Project Settings → Script Properties):
@@ -45,6 +45,7 @@ function doPost(e) {
     only_sheet: null,
     allow_empty_clear: false,
     sheets: {},
+    deleted_rows_total: 0,
     errors: [],
     warnings: []
   };
@@ -79,9 +80,9 @@ function doPost(e) {
       );
       return _jsonResponse(response);
     }
-    if (mode !== "validate" && mode !== "write") {
+    if (mode !== "validate" && mode !== "write" && mode !== "delete_account") {
       response.errors.push(
-        "Unknown mode: '" + mode + "'. Supported modes: validate, write."
+        "Unknown mode: '" + mode + "'. Supported modes: validate, write, delete_account."
       );
       return _jsonResponse(response);
     }
@@ -99,6 +100,11 @@ function doPost(e) {
         "', expected '" + EXPECTED_SPREADSHEET_ID + "'."
       );
       return _jsonResponse(response);
+    }
+
+    // delete_account — отдельная ветка: не требует start_row и sheets payload
+    if (mode === "delete_account") {
+      return _handleDeleteAccount(body, response, spreadsheetId);
     }
 
     // Validate start_row
@@ -290,6 +296,91 @@ function doPost(e) {
 
   } catch (topErr) {
     response.errors.push("Unexpected error: " + topErr.message);
+  }
+
+  return _jsonResponse(response);
+}
+
+
+// ---------------------------------------------------------------------------
+// Delete account handler
+// ---------------------------------------------------------------------------
+
+/**
+ * Physically removes all data rows of one account across every sheet.
+ *
+ * Safety:
+ *   - account_label must be >= 2 chars after trim (prevents wiping a sheet).
+ *   - Rows 1-2 (headers/hints) are NEVER touched.
+ *   - Match by indexOf in column A (URL like https://instagram.com/<username>/).
+ *   - Rows deleted bottom-up via deleteRow so indices stay valid.
+ *   - LockService serialises with writes.
+ */
+function _handleDeleteAccount(body, response, spreadsheetId) {
+  var accountLabel = (body.account_label || "").toString().trim();
+  if (accountLabel.length < 2) {
+    response.errors.push(
+      "delete_account requires 'account_label' of at least 2 characters " +
+      "(got '" + accountLabel + "'). Refusing to delete to avoid wiping a sheet."
+    );
+    return _jsonResponse(response);
+  }
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(spreadsheetId);
+  } catch (openErr) {
+    response.errors.push("Cannot open spreadsheet: " + openErr.message);
+    return _jsonResponse(response);
+  }
+  response.spreadsheet_name = ss.getName();
+  response.spreadsheet_url  = ss.getUrl();
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+
+    var sheets = ss.getSheets();
+    var totalDeleted = 0;
+
+    for (var si = 0; si < sheets.length; si++) {
+      var sheet     = sheets[si];
+      var sheetName = sheet.getName();
+      var lastRow   = sheet.getLastRow();
+      var perSheet  = { deleted_rows: 0, deleted_at_rows: [] };
+
+      if (lastRow >= REQUIRED_START_ROW) {
+        // Read column A from row 3 down
+        var colA = sheet.getRange(REQUIRED_START_ROW, 1, lastRow - REQUIRED_START_ROW + 1, 1)
+                        .getValues();
+        // Collect matching absolute row numbers
+        var matchRows = [];
+        for (var ri = 0; ri < colA.length; ri++) {
+          var cellVal = String(colA[ri][0] || "").trim();
+          if (cellVal !== "" && cellVal.indexOf(accountLabel) !== -1) {
+            matchRows.push(REQUIRED_START_ROW + ri);
+          }
+        }
+        // Delete bottom-up so earlier indices remain valid
+        for (var mi = matchRows.length - 1; mi >= 0; mi--) {
+          sheet.deleteRow(matchRows[mi]);
+        }
+        perSheet.deleted_rows    = matchRows.length;
+        perSheet.deleted_at_rows = matchRows;
+        totalDeleted += matchRows.length;
+      }
+
+      response.sheets[sheetName] = perSheet;
+    }
+
+    response.deleted_rows_total = totalDeleted;
+    response.ok = true;
+
+  } catch (lockErr) {
+    response.errors.push("Could not acquire lock for delete: " + lockErr.message);
+    response.ok = false;
+  } finally {
+    lock.releaseLock();
   }
 
   return _jsonResponse(response);
