@@ -1,10 +1,11 @@
-"""Telegram bot for running the Instagram competitor research pipeline."""
+"""Telegram bot for Instagram competitor research pipeline."""
 
 import asyncio
 import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -20,50 +21,320 @@ from telegram.ext import (
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(),
-    ]
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
-BASE        = Path(__file__).parent.parent
-SCRIPTS_DIR = Path(__file__).parent
+BASE            = Path(__file__).parent.parent.parent  # zohansberg-instagram-test/
+RESEARCH_DIR    = BASE / "instagram_research_test"
+ACCOUNTS_PATH   = RESEARCH_DIR / "data" / "accounts.json"
+RUN_PY          = RESEARCH_DIR / "run.py"
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
+SHEET_TAB_POSTS = f"{SPREADSHEET_URL}#gid=0"
 
-load_dotenv(BASE / ".env", override=True)
+load_dotenv(RESEARCH_DIR / ".env", override=True)
 
+# ---------------------------------------------------------------------------
+# Global job state (one job at a time)
+# ---------------------------------------------------------------------------
 current_job: dict = {
-    "account":             None,
-    "started_at":          None,
-    "running":             False,
-    "chat_id":             None,
+    "running": False,
+    "account": None,
+    "started_at": None,
+    "chat_id": None,
     "apify_balance_before": None,
+    "progress_msg_id": None,
 }
 
+# ---------------------------------------------------------------------------
+# Access control
+# ---------------------------------------------------------------------------
 
 def get_allowed_ids() -> set:
     raw = os.environ.get("TELEGRAM_ALLOWED_IDS", "")
-    if not raw.strip():
-        return set()
-    return {int(x.strip()) for x in raw.split(",") if x.strip().isdigit()}
+    return {int(x.strip()) for x in raw.split(",") if x.strip().isdigit()} if raw.strip() else set()
 
 
 def is_allowed(update: Update) -> bool:
     return update.effective_chat.id in get_allowed_ids()
 
 
-def validate_username(username: str):
+def validate_username(username: str) -> str | None:
     username = username.lstrip("@").strip()
-    if not re.match(r'^[a-zA-Z0-9._]{1,30}$', username):
-        return None
-    return username
+    return username if re.match(r'^[a-zA-Z0-9._]{1,30}$', username) else None
 
+# ---------------------------------------------------------------------------
+# accounts.json helpers
+# ---------------------------------------------------------------------------
+
+def _load_accounts() -> list[dict]:
+    try:
+        data = json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8"))
+        return data.get("accounts", [])
+    except Exception:
+        return []
+
+
+def _ensure_account(username: str) -> None:
+    try:
+        data = json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8"))
+        existing = [a["username"] for a in data.get("accounts", [])]
+        if username not in existing:
+            data.setdefault("accounts", []).append({
+                "username": username,
+                "url": f"https://www.instagram.com/{username}/",
+            })
+            ACCOUNTS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info("Added %s to accounts.json", username)
+    except Exception as e:
+        logger.warning("Could not update accounts.json: %s", e)
+
+# ---------------------------------------------------------------------------
+# Default settings
+# ---------------------------------------------------------------------------
+
+_BLOCK_LABELS = {
+    "01-04": "Профиль и закрепы (01-04)",
+    "05":    "Bio анализ (05)",
+    "06-07": "Ссылка и лендинг (06-07)",
+    "08-10": "Хайлайты (08-10)",
+    "11-12": "Reels (11-12)",
+    "13-14": "Посты (13-14)",
+}
+_BLOCK_STAGES = {
+    "01-04": ["01", "02", "03", "04"],
+    "05":    ["05"],
+    "06-07": ["06", "07"],
+    "08-10": ["08", "09", "10"],
+    "11-12": ["11", "12"],
+    "13-14": ["13", "14"],
+}
+_SHEET_LABELS = {
+    "prof": "Описание профиля",
+    "pins": "Закрепы",
+    "hi":   "Хайлайты",
+    "re":   "Reels",
+    "po":   "Посты",
+    "fu":   "Воронка",
+    "la":   "Лендинг",
+}
+
+# Apify cost estimates per block (USD)
+_APIFY_COSTS = {"01-04": 0.05, "08-10": 0.10, "11-12": 0.05, "13-14": 0.10}
+# OpenAI cost estimates per block (USD)
+_OPENAI_COSTS = {"03": 0.05, "04": 0.03, "05": 0.02, "07": 0.05, "10": 0.08, "12": 0.08, "14": 0.15}
+
+
+def _default_settings() -> dict:
+    return {
+        "blocks":         {k: True  for k in _BLOCK_LABELS},
+        "post_types":     {"photo": True, "carousel": True, "video": False},
+        "content_mode":   "period",
+        "months_back":    6,
+        "target_count":   30,
+        "content_filter": "all",
+        "sheets":         {k: True for k in _SHEET_LABELS},
+    }
+
+
+def _get_settings(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    if "settings" not in context.user_data:
+        context.user_data["settings"] = _default_settings()
+    return context.user_data["settings"]
+
+
+def _build_stages_list(settings: dict) -> list[str]:
+    stages = []
+    for block_key, enabled in settings["blocks"].items():
+        if enabled:
+            stages.extend(_BLOCK_STAGES[block_key])
+    stages += ["15", "15b", "16"]
+    # deduplicate preserving order
+    seen = set()
+    result = []
+    for s in stages:
+        if s not in seen:
+            seen.add(s)
+            result.append(s)
+    return result
+
+# ---------------------------------------------------------------------------
+# Cost estimate
+# ---------------------------------------------------------------------------
+
+def _estimate_cost(settings: dict) -> str:
+    apify_total  = 0.0
+    openai_total = 0.0
+    apify_parts  = []
+    openai_parts = []
+
+    for block_key, enabled in settings["blocks"].items():
+        if not enabled:
+            continue
+        a = _APIFY_COSTS.get(block_key, 0)
+        if a:
+            apify_total += a
+            apify_parts.append(f"{_BLOCK_LABELS[block_key].split('(')[0].strip()} ${a:.2f}")
+        for stage in _BLOCK_STAGES[block_key]:
+            o = _OPENAI_COSTS.get(stage, 0)
+            if o:
+                openai_total += o
+                openai_parts.append(f"stage {stage} ${o:.2f}")
+
+    lines = ["💰 Смета:"]
+    if apify_parts:
+        lines.append(f"Apify: ~${apify_total:.2f}\n  " + "\n  ".join(apify_parts))
+    else:
+        lines.append("Apify: $0 (Apify не используется)")
+    if openai_parts:
+        lines.append(f"OpenAI: ~${openai_total:.2f}\n  " + "\n  ".join(openai_parts))
+    else:
+        lines.append("OpenAI: $0")
+    lines.append(f"Итого: ~${apify_total + openai_total:.2f}")
+    return "\n".join(lines)
+
+# ---------------------------------------------------------------------------
+# Settings screen builders
+# ---------------------------------------------------------------------------
+
+def _ck(val: bool) -> str:
+    return "☑" if val else "☐"
+
+
+def _settings_text(username: str, settings: dict) -> str:
+    s = settings
+    pt = s["post_types"]
+    cm = "За период" if s["content_mode"] == "period" else "Кол-во штук"
+    mo = s["months_back"]
+    tc = s["target_count"]
+    cf_labels = {"all": "Все", "professional": "Проф", "personal": "Личный"}
+    cf = cf_labels.get(s["content_filter"], s["content_filter"])
+
+    block_lines = "\n".join(
+        f"{_ck(s['blocks'][k])} {label}"
+        for k, label in _BLOCK_LABELS.items()
+    )
+    sheet_lines = "\n".join(
+        f"{_ck(s['sheets'][k])} {label}"
+        for k, label in _SHEET_LABELS.items()
+    )
+
+    return (
+        f"=== Настройки анализа @{username} ===\n\n"
+        f"БЛОКИ:\n{block_lines}\n\n"
+        f"ПОСТЫ — фильтры:\n"
+        f"{_ck(pt['photo'])} Фото  {_ck(pt['carousel'])} Карусель  {_ck(pt['video'])} Видео\n"
+        f"Режим: {cm}   Период: {mo}м   Кол-во: {tc}\n"
+        f"Контент: {cf}\n\n"
+        f"ЗАПИСЬ В ТАБЛИЦУ:\n{sheet_lines}"
+    )
+
+
+def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
+    s = settings
+    pt = s["post_types"]
+    cf = s["content_filter"]
+    mo = s["months_back"]
+    cm = s["content_mode"]
+
+    def tb(key):
+        return _ck(s["blocks"][key])
+
+    rows = [
+        # Blocks row 1-2
+        [
+            InlineKeyboardButton(f"{tb('01-04')} Профиль/закрепы", callback_data="tbl:01-04"),
+            InlineKeyboardButton(f"{tb('05')} Bio",                callback_data="tbl:05"),
+        ],
+        [
+            InlineKeyboardButton(f"{tb('06-07')} Ссылка/лендинг", callback_data="tbl:06-07"),
+            InlineKeyboardButton(f"{tb('08-10')} Хайлайты",       callback_data="tbl:08-10"),
+        ],
+        [
+            InlineKeyboardButton(f"{tb('11-12')} Reels",          callback_data="tbl:11-12"),
+            InlineKeyboardButton(f"{tb('13-14')} Посты",          callback_data="tbl:13-14"),
+        ],
+        # Post types
+        [
+            InlineKeyboardButton(f"{_ck(pt['photo'])} Фото",      callback_data="tpt:photo"),
+            InlineKeyboardButton(f"{_ck(pt['carousel'])} Кар.",   callback_data="tpt:carousel"),
+            InlineKeyboardButton(f"{_ck(pt['video'])} Видео",     callback_data="tpt:video"),
+        ],
+        # Content mode
+        [
+            InlineKeyboardButton(
+                f"{'▶' if cm=='period' else '·'} За период",
+                callback_data="scm:period",
+            ),
+            InlineKeyboardButton(
+                f"{'▶' if cm=='count' else '·'} Кол-во штук",
+                callback_data="scm:count",
+            ),
+        ],
+        # Months
+        [
+            InlineKeyboardButton(f"{'[' if mo==1  else ''}1м{']'  if mo==1  else ''}", callback_data="smo:1"),
+            InlineKeyboardButton(f"{'[' if mo==3  else ''}3м{']'  if mo==3  else ''}", callback_data="smo:3"),
+            InlineKeyboardButton(f"{'[' if mo==6  else ''}6м{']'  if mo==6  else ''}", callback_data="smo:6"),
+            InlineKeyboardButton(f"{'[' if mo==12 else ''}12м{']' if mo==12 else ''}", callback_data="smo:12"),
+        ],
+        # Content filter
+        [
+            InlineKeyboardButton(f"{'▶' if cf=='all'          else '·'} Все",     callback_data="scf:all"),
+            InlineKeyboardButton(f"{'▶' if cf=='professional' else '·'} Проф",   callback_data="scf:professional"),
+            InlineKeyboardButton(f"{'▶' if cf=='personal'     else '·'} Личный", callback_data="scf:personal"),
+        ],
+        # Sheets row 1
+        [
+            InlineKeyboardButton(f"{_ck(s['sheets']['prof'])} Профиль", callback_data="tsh:prof"),
+            InlineKeyboardButton(f"{_ck(s['sheets']['pins'])} Закрепы", callback_data="tsh:pins"),
+            InlineKeyboardButton(f"{_ck(s['sheets']['hi'])} Хайлайты", callback_data="tsh:hi"),
+        ],
+        # Sheets row 2
+        [
+            InlineKeyboardButton(f"{_ck(s['sheets']['re'])} Reels",   callback_data="tsh:re"),
+            InlineKeyboardButton(f"{_ck(s['sheets']['po'])} Посты",   callback_data="tsh:po"),
+            InlineKeyboardButton(f"{_ck(s['sheets']['fu'])} Воронка", callback_data="tsh:fu"),
+            InlineKeyboardButton(f"{_ck(s['sheets']['la'])} Лендинг", callback_data="tsh:la"),
+        ],
+        # Actions
+        [
+            InlineKeyboardButton("💰 Смета",   callback_data="action:estimate"),
+            InlineKeyboardButton("🧪 Dry-run", callback_data="action:dryrun"),
+            InlineKeyboardButton("🚀 Запустить", callback_data="action:launch"),
+        ],
+        [InlineKeyboardButton("← Назад", callback_data="main_menu")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+# ---------------------------------------------------------------------------
+# Main menu / account selection
+# ---------------------------------------------------------------------------
+
+def _main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔍 Анализ конкурента", callback_data="show_accounts"),
+    ]])
+
+
+def _accounts_keyboard() -> InlineKeyboardMarkup:
+    accounts = _load_accounts()
+    rows = []
+    for acc in accounts[:10]:
+        uname = acc.get("username", "")
+        rows.append([InlineKeyboardButton(f"@{uname}", callback_data=f"acc:{uname}")])
+    rows.append([InlineKeyboardButton("➕ Добавить новый", callback_data="acc_new")])
+    rows.append([InlineKeyboardButton("← Назад", callback_data="main_menu")])
+    return InlineKeyboardMarkup(rows)
+
+# ---------------------------------------------------------------------------
+# Apify balance
+# ---------------------------------------------------------------------------
 
 async def _get_apify_balance() -> float | None:
-    """Return current Apify monthly spend in USD, or None on failure."""
     try:
         from dotenv import dotenv_values
-        token = dotenv_values(BASE / ".env").get("APIFY_TOKEN", "")
+        token = dotenv_values(RESEARCH_DIR / ".env").get("APIFY_TOKEN", "")
         if not token:
             return None
         async with httpx.AsyncClient(timeout=5) as client:
@@ -75,305 +346,208 @@ async def _get_apify_balance() -> float | None:
     except Exception:
         return None
 
+# ---------------------------------------------------------------------------
+# Progress parsing from log
+# ---------------------------------------------------------------------------
 
-def _build_stages_summary(username: str) -> str:
-    """Read normalized/output files and build a numbered per-stage summary string."""
-    norm = BASE / "instagram_research_test" / "data" / username / "normalized"
-    out  = BASE / "instagram_research_test" / "data" / username / "normalized"
+_STAGE_NAMES = {
+    "01": "collect_profile",    "02": "collect_pinned_details",
+    "03": "analyze_pinned_posts", "04": "analyze_pinned_visuals",
+    "05": "analyze_bio",        "06": "classify_profile_link",
+    "07": "analyze_landing",    "08": "collect_highlights",
+    "09": "collect_stories",    "10": "analyze_highlights",
+    "11": "collect_reels",      "12": "analyze_reels",
+    "13": "collect_posts",      "14": "analyze_posts",
+    "15": "build_payload",      "15b": "prepare_sheets",
+    "16": "write_sheets",
+}
+
+
+def _parse_progress(log_path: Path, stages: list[str]) -> str:
+    done: set[str] = set()
+    current: str | None = None
+
+    if log_path.exists():
+        try:
+            text = log_path.read_text(encoding="utf-8", errors="ignore")
+            for line in text.splitlines():
+                # "[1/N] 01 collect_profile" — stage started
+                m = re.search(r'\[(\d+)/\d+\] (\w+) (\w+)', line)
+                if m:
+                    current = m.group(2)
+                # "01 collect_profile: ok" — stage done
+                m2 = re.search(r'^(\w+) \w+: (ok|dry_run)$', line.strip())
+                if m2:
+                    done.add(m2.group(1))
+                    if current == m2.group(1):
+                        current = None
+        except Exception:
+            pass
+
     lines = []
-
-    def _j(path):
-        try:
-            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-        except Exception:
-            return None
-
-    # 1. Профиль и закрепы
-    pi = _j(norm / "pinned_posts_index.json")
-    if pi:
-        n = len(pi.get("pinned_posts") or [])
-        lines.append(f"1. Профиль и закрепы — ✅ {n} закрепа найдено")
-    else:
-        lines.append("1. Профиль и закрепы — ⏭ пропущен")
-
-    # 2. Детали закрепов
-    a2b = _j(norm / "stage5a2b_pinned_posts_details.json")
-    if a2b:
-        posts = a2b.get("posts") or []
-        n_sidecar = sum(1 for p in posts if p.get("media_type") == "Sidecar")
-        detail = f"есть {n_sidecar} карусели" if n_sidecar else "нет каруселей"
-        lines.append(f"2. Детали закрепов — ✅ {len(posts)} поста, {detail}")
-    else:
-        lines.append("2. Детали закрепов — ⏭ пропущен")
-
-    # 3. Семантика закрепов
-    a2c = _j(norm / "stage5a2c_pinned_posts_semantic.json")
-    if a2c:
-        posts = a2c.get("posts") or []
-        n_cta  = sum(1 for p in posts if (p.get("google_sheet_fields") or {}).get("Какой CTA"))
-        n_role = sum(1 for p in posts if (p.get("google_sheet_fields") or {}).get("Роль в воронке"))
-        lines.append(f"3. Семантика закрепов — ✅ {len(posts)} поста, CTA у {n_cta}, роль у {n_role}")
-    else:
-        lines.append("3. Семантика закрепов — ⏭ пропущен")
-
-    # 4. Валидация семантики
-    a2c_fix = _j(norm / "stage5a2c_pinned_posts_semantic_fixed.json")
-    if a2c_fix:
-        n_notes = sum(len(p.get("postprocessing_notes") or []) for p in (a2c_fix.get("posts") or []))
-        if n_notes:
-            lines.append(f"4. Валидация семантики — ⚠️ {n_notes} правки применены")
+    for s in stages:
+        name = _STAGE_NAMES.get(s, s)
+        if s in done:
+            lines.append(f"✅ {s} {name}")
+        elif s == current:
+            lines.append(f"⚙️ {s} {name}...")
         else:
-            lines.append("4. Валидация семантики — ✅ правок не потребовалось")
-    elif a2c:
-        lines.append("4. Валидация семантики — ✅ правок не потребовалось")
-    else:
-        lines.append("4. Валидация семантики — ⏭ пропущен")
-
-    # 5. Хуки с обложек
-    a2d = _j(norm / "stage5a2d_pinned_hooks.json")
-    if a2d:
-        posts = a2d.get("posts") or []
-        n_ok = sum(1 for p in posts if (p.get("hook") or {}).get("data_status") == "ok")
-        lines.append(f"5. Хуки с обложек — ✅ {n_ok}/{len(posts)} хуков извлечено")
-    else:
-        lines.append("5. Хуки с обложек — ⏭ пропущен")
-
-    # 6. Анализ bio
-    a2e = _j(norm / "stage5a2e_bio_semantic.json")
-    if a2e:
-        _ru = {"dlya_kogo": "аудитория", "obeshchanie": "оффер",
-                "trust_arguments": "доверие", "social_proof": "соцдоки", "cta": "CTA"}
-        filled = [_ru.get(k, k) for k, v in (a2e.get("fields") or {}).items()
-                  if isinstance(v, dict) and v.get("data_status") == "ok"]
-        lines.append(f"6. Анализ bio — {'✅ ' + ', '.join(filled) if filled else '⚠️ поля не найдены'}")
-    else:
-        lines.append("6. Анализ bio — ⏭ пропущен")
-
-    # 7. Ссылка из bio
-    a2f = _j(norm / "stage5a2f_link_destination.json")
-    if a2f:
-        dt = (a2f.get("result") or {}).get("destination_type") or "неизвестно"
-        lines.append(f"7. Ссылка из bio — ✅ тип: {dt}")
-    else:
-        lines.append("7. Ссылка из bio — ⏭ пропущен")
-
-    # 8. Анализ лендинга
-    a2g = _j(norm / "stage5a2g_landing_analysis.json")
-    if a2g:
-        fields = a2g.get("fields") or {}
-        n_ok = sum(1 for v in fields.values() if isinstance(v, dict) and v.get("data_status") == "ok")
-        lines.append(f"8. Анализ лендинга — ✅ {n_ok}/{len(fields)} полей заполнено")
-    else:
-        lines.append("8. Анализ лендинга — ⏭ пропущен")
-
-    # 9. Хайлайты
-    hi  = _j(norm / "highlights_index.json")
-    b2s = _j(norm / "stage5b2_highlights_stories_summary.json")
-    if hi:
-        total = len(hi.get("highlights") or [])
-        if b2s:
-            # Check if stage5b2 summary is from a previous pipeline run
-            def _parse_ts(s):
-                if not s:
-                    return None
-                try:
-                    from datetime import datetime
-                    return datetime.fromisoformat(s.replace("Z", "+00:00"))
-                except Exception:
-                    return None
-            hi_ts  = _parse_ts(hi.get("run_timestamp"))
-            b2s_ts = _parse_ts(b2s.get("run_timestamp"))
-            stale_marker = ""
-            if hi_ts and b2s_ts and b2s_ts < hi_ts:
-                stale_marker = " (данные из предыдущего запуска)"
-
-            ok_results  = [r for r in (b2s.get("results") or []) if r.get("status") == "OK"]
-            n_in_table  = len(ok_results)
-            titles      = [r.get("title", "?") for r in ok_results[:5]]
-            table_str   = ", ".join(titles)
-            n_not       = total - n_in_table
-            if n_not > 0:
-                table_str += f" (+{n_not} не вошли)"
-            lines.append(f"9. Хайлайты — ✅ {total} штук{stale_marker}\n   В таблице: {table_str}")
-        else:
-            lines.append(f"9. Хайлайты — ✅ {total} штук, названия и порядок")
-    else:
-        lines.append("9. Хайлайты — ⏭ пропущен")
-
-    # 10. Vision хайлайтов
-    b2v = _j(norm / "stage5b2v_highlights_visual.json")
-    if b2v:
-        analyzed = b2v.get("analyzed_highlights") or []
-        n_ok      = sum(1 for h in analyzed if h.get("fields") and not h.get("skipped"))
-        n_skipped = sum(1 for h in analyzed if h.get("skipped"))
-        if n_ok:
-            lines.append(f"10. Vision хайлайтов — ✅ {n_ok} из {len(analyzed)} проанализировано")
-        elif n_skipped == len(analyzed):
-            lines.append("10. Vision хайлайтов — ⚠️ пропущен, нет данных сторис")
-        else:
-            lines.append(f"10. Vision хайлайтов — ⚠️ {n_ok} OK, {n_skipped} пропущено")
-    else:
-        lines.append("10. Vision хайлайтов — ⏭ пропущен")
-
-    # 11. Сборка данных
-    d1 = _j(out / "stage5d1" / "stage5d1_summary.json")
-    if d1:
-        n_warns = len(d1.get("all_warnings") or [])
-        lines.append(f"11. Сборка данных — ✅ все листы заполнены, {n_warns} предупреждений")
-    else:
-        lines.append("11. Сборка данных — ⏭ пропущен")
-
-    # 12. Запись в таблицу
-    wr = _j(out / "stage5d3_write" / "write_response.json")
-    if wr:
-        if wr.get("ok"):
-            lines.append("12. Запись в таблицу — ✅ данные обновлены")
-        else:
-            lines.append("12. Запись в таблицу — ❌ ошибка записи")
-    else:
-        lines.append("12. Запись в таблицу — ⏭ пропущен")
-
+            lines.append(f"⏳ {s} {name}")
     return "\n".join(lines)
 
 
-def _build_changes_summary(username: str) -> str | None:
-    """Compare current vs previous profile snapshot; return change description or None."""
-    norm = BASE / "data" / username / "normalized"
-
-    def _j(path):
-        try:
-            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-        except Exception:
-            return None
-
-    current  = _j(norm / "profile_summary.json")
-    previous = _j(norm / "previous_profile_snapshot.json")
-
-    if previous is None or current is None:
-        return None
-
-    def _val(d: dict, key: str) -> str:
-        v = (d or {}).get(key)
-        return str(v.get("value", "") if isinstance(v, dict) else (v or "")).strip()
-
-    changes = []
-
-    if _val(current, "bio_text") != _val(previous, "bio_text"):
-        changes.append("bio изменился")
-
-    cur_url  = _val(current,  "external_url")
-    prev_url = _val(previous, "external_url")
-    if cur_url != prev_url:
-        changes.append(f"ссылка в bio: {prev_url or '—'} → {cur_url or '—'}")
-
-    # pinned count
-    cur_pi  = _j(norm / "pinned_posts_index.json")
-    prev_pi = _j(norm / "previous_pinned_snapshot.json")
-    if cur_pi is not None and prev_pi is not None:
-        cur_n  = len(cur_pi.get("pinned_posts") or [])
-        prev_n = len(prev_pi.get("pinned_posts") or [])
-        if cur_n != prev_n:
-            changes.append(f"закрепов: было {prev_n} → стало {cur_n}")
-
-    # highlights count
-    cur_hi  = _j(norm / "highlights_index.json")
-    prev_hi = _j(norm / "previous_highlights_snapshot.json")
-    if cur_hi is not None and prev_hi is not None:
-        cur_n  = len(cur_hi.get("highlights") or [])
-        prev_n = len(prev_hi.get("highlights") or [])
-        if cur_n != prev_n:
-            changes.append(f"хайлайтов: было {prev_n} → стало {cur_n}")
-
-    if not changes:
-        return None
-
-    lines = ["🔄 Изменения с прошлого запуска:"] + [f"- {c}" for c in changes]
-    return "\n".join(lines)
-
-
-def _get_stale_count(username: str) -> int:
-    """Return number of stale highlight IDs recorded for a username."""
-    path = BASE / "data" / username / "normalized" / "stale_highlights.json"
+def _parse_final_stats(log_path: Path) -> str:
+    """Extract key numbers from log for the final report."""
+    if not log_path.exists():
+        return ""
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        return len(data.get("stale_highlight_ids") or [])
+        text = log_path.read_text(encoding="utf-8", errors="ignore")
+        lines = []
+        for line in text.splitlines():
+            if "Reels" in line and "Собрано" in line:
+                lines.append(f"🎬 {line.strip()}")
+            if "Posts Index" in line and "Собрано" in line:
+                lines.append(f"📝 {line.strip()}")
+            if "Проанализировано:" in line:
+                lines.append(f"🤖 {line.strip()}")
+            if "Листов:" in line and "строк:" in line:
+                lines.append(f"📊 {line.strip()}")
+        return "\n".join(lines[:6])
     except Exception:
-        return 0
+        return ""
 
+# ---------------------------------------------------------------------------
+# Pipeline runner
+# ---------------------------------------------------------------------------
 
-def _get_remaining_highlights(username: str) -> tuple[int, int]:
-    """Return (already_processed, remaining) for a username."""
-    norm = BASE / "data" / username / "normalized"
+async def _run_pipeline_task(
+    bot,
+    chat_id: int,
+    username: str,
+    stages: list[str],
+    dry_run: bool,
+    settings: dict,
+    progress_msg_id: int | None,
+):
+    log_path = RESEARCH_DIR / "data" / username / "pipeline.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _j(path):
-        try:
-            return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-        except Exception:
-            return None
+    cmd = [
+        sys.executable, str(RUN_PY),
+        "--account", username,
+        "--stages", ",".join(stages),
+    ]
+    if dry_run:
+        cmd.append("--dry-run")
 
-    hi  = _j(norm / "highlights_index.json")
-    b2s = _j(norm / "stage5b2_highlights_stories_summary.json")
-    if not hi or not b2s:
-        return 0, 0
-    total     = len(hi.get("highlights") or [])
-    processed = b2s.get("highlights_ok", 0)
-    remaining = max(0, total - processed)
-    return processed, remaining
+    env = os.environ.copy()
+    # Pass settings as env vars for future stage reads
+    pt_enabled = [k for k, v in settings["post_types"].items() if v]
+    env["PIPELINE_POST_TYPES"]     = ",".join(pt_enabled)
+    env["PIPELINE_CONTENT_MODE"]   = settings["content_mode"]
+    env["PIPELINE_MONTHS_BACK"]    = str(settings["months_back"])
+    env["PIPELINE_TARGET_COUNT"]   = str(settings["target_count"])
+    env["PIPELINE_CONTENT_FILTER"] = settings["content_filter"]
 
+    start_ts = time.time()
 
-def _highlights_load_keyboard(username: str, remaining: int,
-                               stale_count: int = 0) -> InlineKeyboardMarkup:
-    buttons = []
-    if remaining > 0:
-        cost_5   = round(min(5,  remaining) * 0.03, 2)
-        cost_10  = round(min(10, remaining) * 0.03, 2)
-        cost_all = round(remaining * 0.03, 2)
-        row = []
-        if remaining >= 1:
-            row.append(InlineKeyboardButton(f"+5 (~${cost_5:.2f})",   callback_data=f"hl_more_5:{username}"))
-        if remaining >= 10:
-            row.append(InlineKeyboardButton(f"+10 (~${cost_10:.2f})", callback_data=f"hl_more_10:{username}"))
-        if row:
-            buttons.append(row)
-        buttons.append([InlineKeyboardButton(
-            f"Все оставшиеся (~${cost_all:.2f})", callback_data=f"hl_more_all:{username}"
-        )])
-    if stale_count > 0:
-        cost_stale = round(stale_count * 0.03, 2)
-        buttons.append([InlineKeyboardButton(
-            f"🔄 Обновить протухшие ({stale_count} шт. ~${cost_stale:.2f})",
-            callback_data=f"hl_refresh_stale:{username}",
-        )])
-    return InlineKeyboardMarkup(buttons)
+    async def _update_progress():
+        while current_job["running"]:
+            await asyncio.sleep(30)
+            if not current_job["running"]:
+                break
+            elapsed_min = int((time.time() - start_ts) / 60)
+            progress = _parse_progress(log_path, stages)
+            text = (
+                f"⏳ Анализ @{username} [{elapsed_min} мин]\n\n"
+                f"{progress}"
+            )
+            try:
+                if progress_msg_id:
+                    await bot.edit_message_text(
+                        chat_id=chat_id, message_id=progress_msg_id, text=text
+                    )
+            except Exception:
+                pass
 
+    progress_task = asyncio.create_task(_update_progress())
 
-def _main_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🔍 Новый анализ",    callback_data="new_analysis"),
-            InlineKeyboardButton("⚡ Быстрый анализ", callback_data="quick_analysis"),
-        ],
-        [InlineKeyboardButton("📊 Статус", callback_data="status")],
-    ])
+    try:
+        loop = asyncio.get_running_loop()
+        with open(log_path, "w", encoding="utf-8") as log_file:
+            result = await loop.run_in_executor(
+                None,
+                lambda: subprocess.run(
+                    cmd,
+                    cwd=str(RESEARCH_DIR),
+                    env=env,
+                    stdout=log_file,
+                    stderr=log_file,
+                ),
+            )
+    except Exception as e:
+        logger.exception("Pipeline error for @%s: %s", username, e)
+        result = None
+    finally:
+        progress_task.cancel()
+        current_job["running"]              = False
+        current_job["account"]              = None
+        current_job["started_at"]           = None
+        current_job["chat_id"]              = None
+        current_job["progress_msg_id"]      = None
 
+    elapsed = time.time() - start_ts
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+
+    # Apify cost delta
+    apify_before = current_job.get("apify_balance_before")
+    apify_after  = await _get_apify_balance()
+    if apify_before is not None and apify_after is not None:
+        apify_cost_str = f"Apify ${apify_after - apify_before:.4f}"
+    else:
+        apify_cost_str = "Apify см. console.apify.com"
+
+    ok = result is not None and result.returncode == 0
+    header = f"{'✅' if ok else '⚠️'} Анализ @{username} {'завершён' if ok else 'завершён с ошибками'} за {minutes} мин {seconds} сек"
+
+    stats = _parse_final_stats(log_path)
+    progress_final = _parse_progress(log_path, stages)
+
+    text = (
+        f"{header}\n\n"
+        f"{progress_final}\n\n"
+    )
+    if stats:
+        text += f"📋 Итоги:\n{stats}\n\n"
+    text += f"💰 {apify_cost_str}\n"
+    if dry_run:
+        text += "\n🧪 Это был dry-run — данные не записаны"
+    else:
+        text += f"\n🔗 Таблица: {SPREADSHEET_URL}"
+    if not ok and log_path.exists():
+        text += f"\n📄 Лог: {log_path}"
+
+    try:
+        if progress_msg_id:
+            await bot.edit_message_text(chat_id=chat_id, message_id=progress_msg_id, text=text)
+        else:
+            await bot.send_message(chat_id=chat_id, text=text)
+    except Exception:
+        await bot.send_message(chat_id=chat_id, text=text)
+
+# ---------------------------------------------------------------------------
+# Handlers
+# ---------------------------------------------------------------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
     if not is_allowed(update):
         await update.message.reply_text(
-            f"⛔ У вас нет доступа.\n"
-            f"Ваш chat_id: {chat_id}\n"
-            f"Сообщите его администратору."
+            f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}"
         )
         return
     await update.message.reply_text(
-        "Привет! Я бот для анализа Instagram-конкурентов.\n\n"
-        "🔍 Новый анализ — полный запуск с Apify (сбор + OpenAI)\n"
-        "⚡ Быстрый анализ — только OpenAI по уже собранным данным\n\n"
-        "Или используйте команды:\n"
-        "/analyze username — быстрый анализ\n"
-        "/analyze_full username — полный анализ\n"
-        "/status — текущий статус",
+        "Привет! Я бот для анализа Instagram-конкурентов.",
         reply_markup=_main_keyboard(),
     )
 
@@ -386,300 +560,165 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⛔ Нет доступа.")
         return
 
-    if query.data == "status":
+    data = query.data
+
+    # ── Main menu ──────────────────────────────────────────────────────────
+    if data == "main_menu":
+        await query.edit_message_text(
+            "Выберите действие:",
+            reply_markup=_main_keyboard(),
+        )
+        return
+
+    # ── Account list ──────────────────────────────────────────────────────
+    if data == "show_accounts":
+        await query.edit_message_text(
+            "Выберите аккаунт для анализа:",
+            reply_markup=_accounts_keyboard(),
+        )
+        return
+
+    if data == "acc_new":
+        context.user_data["waiting_for"] = "new_username"
+        await query.edit_message_text(
+            "Введите Instagram username нового аккаунта\n(например: kate.jet):"
+        )
+        return
+
+    if data.startswith("acc:"):
+        username = data[4:]
+        context.user_data["username"] = username
+        if "settings" not in context.user_data:
+            context.user_data["settings"] = _default_settings()
+        s = context.user_data["settings"]
+        await query.edit_message_text(
+            _settings_text(username, s),
+            reply_markup=_settings_keyboard(s),
+        )
+        return
+
+    # ── Settings toggles ──────────────────────────────────────────────────
+    username = context.user_data.get("username", "?")
+    s = _get_settings(context)
+
+    if data.startswith("tbl:"):     # toggle block
+        key = data[4:]
+        if key in s["blocks"]:
+            s["blocks"][key] = not s["blocks"][key]
+
+    elif data.startswith("tpt:"):   # toggle post type
+        key = data[4:]
+        if key in s["post_types"]:
+            s["post_types"][key] = not s["post_types"][key]
+
+    elif data.startswith("tsh:"):   # toggle sheet
+        key = data[4:]
+        if key in s["sheets"]:
+            s["sheets"][key] = not s["sheets"][key]
+
+    elif data.startswith("scm:"):   # set content mode
+        s["content_mode"] = data[4:]
+
+    elif data.startswith("smo:"):   # set months
+        s["months_back"] = int(data[4:])
+
+    elif data.startswith("scf:"):   # set content filter
+        s["content_filter"] = data[4:]
+
+    # ── Actions ──────────────────────────────────────────────────────────
+    elif data == "action:estimate":
+        estimate = _estimate_cost(s)
+        stages   = _build_stages_list(s)
+        estimate += f"\n\nСтейджи: {', '.join(stages)}"
+        await query.edit_message_text(
+            estimate,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Назад к настройкам", callback_data=f"acc:{username}")
+            ]]),
+        )
+        return
+
+    elif data in ("action:dryrun", "action:launch"):
+        dry_run = (data == "action:dryrun")
+
         if current_job["running"]:
-            elapsed = int((time.time() - current_job["started_at"]) / 60)
-            await query.edit_message_text(
-                f"⏳ Выполняется анализ @{current_job['account']}\n"
-                f"Запущен: {elapsed} мин назад",
-                reply_markup=_main_keyboard(),
+            await query.answer(
+                f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.",
+                show_alert=True,
             )
-        else:
-            await query.edit_message_text("✅ Нет активных анализов", reply_markup=_main_keyboard())
-        return
+            return
 
-    if query.data in ("new_analysis", "quick_analysis"):
-        context.user_data["waiting_mode"] = query.data
-        label = "полный (с Apify)" if query.data == "new_analysis" else "быстрый (без Apify)"
-        await query.edit_message_text(
-            f"Режим: {label}\n\n"
-            "Введите username аккаунта Instagram для анализа\n"
-            "(например: kate.jet):"
+        stages = _build_stages_list(s)
+        _ensure_account(username)
+
+        mode_label = "🧪 Dry-run" if dry_run else "🚀 Запускаю"
+        progress_text = (
+            f"⏳ {mode_label} @{username} [0 мин]\n\n"
+            + "\n".join(f"⏳ {st} {_STAGE_NAMES.get(st, st)}" for st in stages)
         )
-        return
+        msg = await query.edit_message_text(progress_text)
 
-    if query.data.startswith("hl_more_"):
-        parts    = query.data.split(":", 1)
-        amount   = parts[0][len("hl_more_"):]   # "5", "10", "all"
-        username = parts[1] if len(parts) > 1 else ""
-
-        if not username:
-            await query.edit_message_text("❌ Ошибка: username не найден в callback")
-            return
-
-        if current_job["running"]:
-            await query.answer(f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.")
-            return
-
-        processed, remaining = _get_remaining_highlights(username)
-
-        if remaining == 0:
-            await query.edit_message_text(f"✅ Все хайлайты @{username} уже загружены")
-            return
-
-        if amount == "all":
-            limit = remaining
-        else:
-            try:
-                limit = int(amount)
-            except ValueError:
-                await query.edit_message_text("❌ Неверный параметр кнопки")
-                return
-
-        await query.edit_message_text(
-            f"⏳ Загружаю ещё {limit} хайлайтов для @{username}...\n"
-            f"   (позиции {processed + 1}–{processed + limit})"
-        )
-
+        current_job["running"]              = True
         current_job["account"]              = username
         current_job["started_at"]           = time.time()
-        current_job["running"]              = True
         current_job["chat_id"]              = update.effective_chat.id
+        current_job["progress_msg_id"]      = msg.message_id
         current_job["apify_balance_before"] = await _get_apify_balance()
 
-        asyncio.create_task(
-            _run_pipeline(update, context, username,
-                          skip_apify=False,
-                          highlights_limit=limit,
-                          highlights_from=processed)
-        )
-        return
-
-    if query.data.startswith("hl_refresh_stale:"):
-        username = query.data[len("hl_refresh_stale:"):]
-
-        if current_job["running"]:
-            await query.answer(f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.")
-            return
-
-        stale_count = _get_stale_count(username)
-        if stale_count == 0:
-            await query.edit_message_text(f"✅ Протухших хайлайтов для @{username} нет")
-            return
-
-        await query.edit_message_text(
-            f"⏳ Обновляю {stale_count} протухших хайлайтов для @{username}..."
-        )
-
-        current_job["account"]              = username
-        current_job["started_at"]           = time.time()
-        current_job["running"]              = True
-        current_job["chat_id"]              = update.effective_chat.id
-        current_job["apify_balance_before"] = await _get_apify_balance()
-
-        asyncio.create_task(
-            _run_pipeline(update, context, username,
-                          skip_apify=False,
-                          refresh_stale=True)
-        )
-
-
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _start_analysis(update, context, skip_apify=True)
-
-
-async def analyze_full(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _start_analysis(update, context, skip_apify=False)
-
-
-async def _start_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE, skip_apify: bool):
-    if not is_allowed(update):
-        await update.message.reply_text(f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}")
-        return
-
-    args = context.args
-    if not args:
-        await update.message.reply_text("❌ Укажите username. Пример: /analyze kate.jet")
-        return
-
-    username = validate_username(args[0])
-    if not username:
-        await update.message.reply_text("❌ Неверный формат username. Только латиница, цифры, точки, подчеркивания.")
-        return
-
-    await _launch(update, context, username, skip_apify)
-
-
-async def _launch(update: Update, context: ContextTypes.DEFAULT_TYPE, username: str, skip_apify: bool):
-    if current_job["running"]:
-        await update.message.reply_text(
-            f"⏳ Уже выполняется анализ @{current_job['account']}.\n"
-            f"Дождитесь завершения."
-        )
-        return
-
-    current_job["account"]             = username
-    current_job["started_at"]          = time.time()
-    current_job["running"]             = True
-    current_job["chat_id"]             = update.effective_chat.id
-    current_job["apify_balance_before"] = await _get_apify_balance()
-
-    mode = "быстрый (без Apify)" if skip_apify else "полный (с Apify)"
-    await update.message.reply_text(
-        f"🚀 Запускаю анализ @{username}...\n"
-        f"Режим: {mode}\n"
-        f"⏱ Обычно занимает 2-5 минут"
-    )
-    logger.info(f"Starting pipeline for @{username}, skip_apify={skip_apify}")
-
-    accounts_path = BASE / "instagram_research_test" / "data" / "accounts.json"
-    try:
-        accounts_data = json.loads(accounts_path.read_text(encoding="utf-8"))
-        existing = [a["username"] for a in accounts_data.get("accounts", [])]
-        if username not in existing:
-            accounts_data["accounts"].append({
-                "username": username,
-                "url": f"https://www.instagram.com/{username}/"
-            })
-            accounts_path.write_text(json.dumps(accounts_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            logger.info(f"Added {username} to accounts.json")
-    except Exception as e:
-        logger.warning(f"Could not update accounts.json: {e}")
-
-    asyncio.create_task(_run_pipeline(update, context, username, skip_apify))
-
-
-async def _run_pipeline(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    username: str,
-    skip_apify: bool,
-    highlights_limit: int = 5,
-    highlights_from: int = 0,
-    refresh_stale: bool = False,
-):
-    start = time.time()
-    log_path = BASE / "instagram_research_test" / "data" / username / "pipeline.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    cmd = [sys.executable, str(BASE / "instagram_research_test" / "run.py"), "--account", username]
-    if skip_apify:
-        cmd += ["--stages", "03,04,05,06,07,10,12,14,15,15b,16"]
-    if refresh_stale:
-        cmd.append("--refresh-stale")
-    else:
-        cmd += ["--highlights-limit", str(highlights_limit)]
-        if highlights_from > 0:
-            cmd += ["--highlights-from", str(highlights_from)]
-
-    try:
-        loop = asyncio.get_running_loop()
-        with open(log_path, "w", encoding="utf-8") as log_file:
-            result = await loop.run_in_executor(
-                None,
-                lambda: __import__("subprocess").run(
-                    cmd,
-                    cwd=str(BASE / "instagram_research_test"),
-                    env=os.environ.copy(),
-                    stdout=log_file,
-                    stderr=log_file,
-                )
-            )
-
-        elapsed = time.time() - start
-        minutes = int(elapsed // 60)
-        seconds = int(elapsed % 60)
-
-        # OpenAI + Apify costs from costs.json (written by collect_costs stage)
-        openai_cost_str = ""
-        apify_cost_str  = ""
-        costs_path = BASE / "output" / username / "costs.json"
-        if costs_path.exists():
-            try:
-                costs_data   = json.loads(costs_path.read_text())
-                totals       = costs_data.get("totals", {})
-                apify_stages = costs_data.get("apify_stages") or {}
-
-                openai_cost_str = (
-                    f"OpenAI ${totals.get('total_cost_usd', 0):.4f}"
-                    f" ({totals.get('total_tokens', 0)} токенов)"
-                )
-
-                apify_total = totals.get("apify_total_usd")
-                if apify_stages:
-                    parts = []
-                    for s, v in apify_stages.items():
-                        label = f"{s} ${v['cost_usd']:.4f}"
-                        if v.get("detail"):
-                            label += f" ({v['detail']})"
-                        parts.append(label)
-                    breakdown = ", ".join(parts)
-                    if apify_total is not None:
-                        apify_cost_str = f"Apify ${apify_total:.4f}: {breakdown}"
-                    else:
-                        apify_cost_str = f"Apify {breakdown}"
-            except Exception:
-                pass
-
-        # Fallback: Apify balance delta if costs.json had no apify data
-        if not apify_cost_str:
-            apify_balance_after  = await _get_apify_balance()
-            apify_balance_before = current_job.get("apify_balance_before")
-            if apify_balance_after is not None and apify_balance_before is not None:
-                apify_delta = round(apify_balance_after - apify_balance_before, 4)
-                apify_cost_str = f"Apify ${apify_delta:.4f}"
-            else:
-                apify_cost_str = "Apify см. console.apify.com"
-
-        # Per-stage summary
-        stages_text   = _build_stages_summary(username)
-        costs_line    = f"13. Затраты — ✅ {openai_cost_str}, {apify_cost_str}"
-        changes_block = _build_changes_summary(username)
-
-        header = "✅ Анализ @{u} завершен!" if result.returncode == 0 else "⚠️ Анализ @{u} завершен с ошибками."
-        header = header.format(u=username)
-
-        text = (
-            f"{header}\n\n"
-            f"⏱ Время: {minutes} мин {seconds} сек\n\n"
-            f"📋 Стадии:\n{stages_text}\n{costs_line}\n\n"
-            + (f"{changes_block}\n\n" if changes_block else "")
-            + f"🔗 Таблица: {SPREADSHEET_URL}"
-        )
-        if result.returncode != 0:
-            text += f"\n📄 Лог: {log_path}"
-
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
-        logger.info(f"Pipeline for @{username} finished, returncode={result.returncode}")
-
-        # If highlights were limited or stale, offer action buttons
-        _, remaining  = _get_remaining_highlights(username)
-        stale_count   = _get_stale_count(username)
-        if remaining > 0 or stale_count > 0:
-            keyboard = _highlights_load_keyboard(username, remaining, stale_count)
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Догрузить ещё хайлайты для @{username}:",
-                reply_markup=keyboard,
-            )
-
-    except Exception as e:
-        logger.exception(f"Pipeline error for @{username}: {e}")
-        await context.bot.send_message(
+        asyncio.create_task(_run_pipeline_task(
+            bot=context.bot,
             chat_id=update.effective_chat.id,
-            text=f"❌ Ошибка при анализе @{username}: {str(e)[:200]}"
-        )
-    finally:
-        current_job["running"]             = False
-        current_job["account"]             = None
-        current_job["started_at"]          = None
-        current_job["chat_id"]             = None
-        current_job["apify_balance_before"] = None
+            username=username,
+            stages=stages,
+            dry_run=dry_run,
+            settings=dict(s),
+            progress_msg_id=msg.message_id,
+        ))
+        return
+
+    # Re-render settings after toggle
+    await query.edit_message_text(
+        _settings_text(username, s),
+        reply_markup=_settings_keyboard(s),
+    )
 
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
-        await update.message.reply_text(f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}")
+        await update.message.reply_text(
+            f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}"
+        )
+        return
+
+    waiting = context.user_data.pop("waiting_for", None)
+
+    if waiting == "new_username":
+        username = validate_username(update.message.text or "")
+        if not username:
+            await update.message.reply_text(
+                "❌ Неверный формат. Только латиница, цифры, точки, подчеркивания.\n"
+                "Попробуйте ещё раз:"
+            )
+            context.user_data["waiting_for"] = "new_username"
+            return
+        context.user_data["username"] = username
+        context.user_data["settings"] = _default_settings()
+        s = context.user_data["settings"]
+        await update.message.reply_text(
+            _settings_text(username, s),
+            reply_markup=_settings_keyboard(s),
+        )
+        return
+
+    await update.message.reply_text(
+        "Используйте кнопку ниже для запуска анализа:",
+        reply_markup=_main_keyboard(),
+    )
+
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update):
+        await update.message.reply_text(f"⛔ Нет доступа.")
         return
     if current_job["running"]:
         elapsed = int((time.time() - current_job["started_at"]) / 60)
@@ -690,30 +729,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("✅ Нет активных анализов")
 
-
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text(f"⛔ Нет доступа. Ваш chat_id: {update.effective_chat.id}")
-        return
-
-    mode = context.user_data.pop("waiting_mode", None)
-    if mode in ("new_analysis", "quick_analysis"):
-        username = validate_username(update.message.text or "")
-        if not username:
-            await update.message.reply_text(
-                "❌ Неверный формат username. Только латиница, цифры, точки, подчеркивания.\n"
-                "Попробуйте ещё раз:"
-            )
-            context.user_data["waiting_mode"] = mode
-            return
-        skip_apify = (mode == "quick_analysis")
-        await _launch(update, context, username, skip_apify)
-    else:
-        await update.message.reply_text(
-            "Используйте /analyze username для запуска",
-            reply_markup=_main_keyboard(),
-        )
-
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -721,19 +739,16 @@ def main():
         logger.error("TELEGRAM_BOT_TOKEN не найден в .env")
         sys.exit(1)
 
-    allowed = get_allowed_ids()
-    if not allowed:
+    if not get_allowed_ids():
         logger.error("TELEGRAM_ALLOWED_IDS не задан в .env")
         sys.exit(1)
 
-    logger.info(f"Бот запускается. Разрешенных пользователей: {len(allowed)}")
+    logger.info("Бот запускается...")
 
     app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler("start",        start))
-    app.add_handler(CommandHandler("help",         start))
-    app.add_handler(CommandHandler("analyze",      analyze))
-    app.add_handler(CommandHandler("analyze_full", analyze_full))
-    app.add_handler(CommandHandler("status",       status))
+    app.add_handler(CommandHandler("start",  start))
+    app.add_handler(CommandHandler("help",   start))
+    app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
