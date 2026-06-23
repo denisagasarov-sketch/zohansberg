@@ -388,23 +388,28 @@ def _account_screen_text(username: str) -> str:
     if table_parts:
         lines.append("\n📊 В таблице: " + " | ".join(table_parts))
 
+    lines.append("\n──────────────")
+    lines.append("🔄 Собрать заново — полный анализ, данные в таблице обновятся")
+    lines.append("➕ Добавить новые посты — только посты которых ещё нет в таблице")
+    lines.append("⚡ Быстрое обновление — пересобрать только устаревшие блоки")
+    lines.append("⚙️ Выбрать что собирать — настроить блоки и период перед запуском")
+
     return "\n".join(lines)
 
 
 def _account_screen_keyboard(username: str, fresh: dict) -> InlineKeyboardMarkup:
-    stale_count = sum(1 for st, _ in fresh.values() if st in ("stale", "none"))
-    refresh_label = (
-        f"🔄 Обновить устаревшее ({stale_count})" if stale_count else "🔄 Обновить устаревшее"
-    )
     rows = [
-        [InlineKeyboardButton(refresh_label, callback_data=f"accrun:stale:{username}")],
+        [InlineKeyboardButton("⚡ Быстрое обновление", callback_data=f"accrun:stale:{username}")],
         [
-            InlineKeyboardButton("♻️ Перезаписать всё", callback_data=f"accrun:all:{username}"),
-            InlineKeyboardButton("➕ Дописать",          callback_data=f"accrun:append:{username}"),
+            InlineKeyboardButton("🔄 Собрать заново",        callback_data=f"accrun:all:{username}"),
+            InlineKeyboardButton("➕ Добавить новые посты",  callback_data=f"accrun:append:{username}"),
         ],
-        [InlineKeyboardButton("⚙️ Настройки и запуск", callback_data=f"acc:{username}")],
+        [InlineKeyboardButton("⚙️ Выбрать что собирать", callback_data=f"acc:{username}")],
         [InlineKeyboardButton("🗑 Удалить", callback_data=f"accdel:{username}")],
-        [InlineKeyboardButton("← Назад", callback_data="show_accounts")],
+        [
+            InlineKeyboardButton("❓ Справка", callback_data=f"help:account:{username}"),
+            InlineKeyboardButton("← Назад",   callback_data="show_accounts"),
+        ],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -657,10 +662,23 @@ def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
 # Main menu / account selection
 # ---------------------------------------------------------------------------
 
+def _main_menu_text() -> str:
+    return (
+        "👋 Привет! Я помогаю анализировать Instagram-конкурентов.\n\n"
+        "Собираю данные профиля, постов, Reels и хайлайтов — "
+        "и записываю всё в таблицу.\n\n"
+        "Выбери конкурента из списка или добавь нового 👇"
+    )
+
+
 def _main_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("🔍 Анализ конкурента", callback_data="show_accounts"),
-    ]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 Мои конкуренты", callback_data="show_accounts"),
+            InlineKeyboardButton("➕ Добавить нового", callback_data="acc_new"),
+        ],
+        [InlineKeyboardButton("❓ Справка", callback_data="help:main")],
+    ])
 
 
 def _accounts_keyboard() -> InlineKeyboardMarkup:
@@ -747,14 +765,19 @@ def _parse_progress(log_path: Path, stages: list[str]) -> str:
     for s in stages:
         name = _STAGE_NAMES.get(s, s)
         if s in failed:
-            lines.append(f"❌ {s} {name}")
+            lines.append(f"❌ {name}")
         elif s in done:
-            lines.append(f"✅ {s} {name}")
+            lines.append(f"✅ {name}")
         elif s == current:
-            lines.append(f"⚙️ {s} {name}...")
+            lines.append(f"⚙️ {name}...")
         else:
-            lines.append(f"⏳ {s} {name}")
+            lines.append(f"⏳ {name}")
     return "\n".join(lines)
+
+
+def _mode_desc(write_mode: str) -> str:
+    """Человекочитаемое описание режима записи для прогресса."""
+    return "полный анализ" if write_mode == "replace" else "добавление новых постов"
 
 
 def _parse_final_stats(log_path: Path) -> str:
@@ -812,6 +835,7 @@ async def _run_pipeline_task(
     env["PIPELINE_CONTENT_FILTER"] = settings["content_filter"]
 
     start_ts = time.time()
+    wm_label = _mode_desc(settings.get("write_mode", "replace"))
 
     async def _update_progress():
         while current_job["running"]:
@@ -821,7 +845,7 @@ async def _run_pipeline_task(
             elapsed_min = int((time.time() - start_ts) / 60)
             progress = _parse_progress(log_path, stages)
             text = (
-                f"⏳ Анализ @{username} [{elapsed_min} мин]\n\n"
+                f"⏳ Анализ @{username} — {wm_label} [{elapsed_min} мин]\n\n"
                 f"{progress}"
             )
             try:
@@ -911,11 +935,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     await update.message.reply_text(
-        "👋 Привет! Я анализирую Instagram-конкурентов.\n\n🔍 Выбери конкурента из списка или добавь нового.",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📋 Мои конкуренты", callback_data="show_accounts"),
-            InlineKeyboardButton("➕ Добавить нового", callback_data="acc_new"),
-        ]]),
+        _main_menu_text(),
+        reply_markup=_main_keyboard(),
     )
 
 
@@ -931,11 +952,11 @@ async def _start_run(query, context, username: str, stages: list[str],
 
     _ensure_account(username)
 
-    mode_label = "🧪 Dry-run" if dry_run else "🚀 Запускаю"
-    wm_label = "" if write_mode == "replace" else f" [{write_mode}]"
+    mode_label = "🧪 Dry-run" if dry_run else "Запускаю"
+    wm_label = _mode_desc(write_mode)
     progress_text = (
-        f"⏳ {mode_label} @{username}{wm_label} [0 мин]\n\n"
-        + "\n".join(f"⏳ {st} {_STAGE_NAMES.get(st, st)}" for st in stages)
+        f"⏳ {mode_label} @{username} — {wm_label} [0 мин]\n\n"
+        + "\n".join(f"⏳ {_STAGE_NAMES.get(st, st)}" for st in stages)
     )
     msg = await query.edit_message_text(progress_text)
 
@@ -1012,7 +1033,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Main menu ──────────────────────────────────────────────────────────
     if data == "main_menu":
         await query.edit_message_text(
-            "Выберите действие:",
+            _main_menu_text(),
             reply_markup=_main_keyboard(),
         )
         return
