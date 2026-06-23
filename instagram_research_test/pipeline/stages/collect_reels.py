@@ -79,7 +79,7 @@ def collect(username: str, limit: int = 10, dry_run: bool = False) -> dict:
     raw_items = run_actor(
         actor_id=ACTOR_ID,
         input_data={
-            "directUrls": [url],
+            "username": [username],
             "resultsLimit": limit,
             "includeTranscript": False,
             "proxy": {"useApifyProxy": True},
