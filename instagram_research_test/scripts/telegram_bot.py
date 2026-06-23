@@ -5,9 +5,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -156,23 +158,12 @@ _SHEET_DISPLAY_ORDER = [
 ]
 
 
-def _get_account_summary(username: str) -> str:
-    data_dir = RESEARCH_DIR / "data" / username / "normalized"
-
-    # meta.json — даты блоков
-    meta = {}
-    try:
-        p = data_dir / "meta.json"
-        if p.exists():
-            meta = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-
-    # profile_summary.json — имя и подписчики
+def _read_profile_brief(username: str) -> tuple[str, str]:
+    """Возвращает (full_name, followers_str) из profile_summary.json."""
     full_name = ""
     followers_str = ""
     try:
-        p = data_dir / "profile_summary.json"
+        p = RESEARCH_DIR / "data" / username / "normalized" / "profile_summary.json"
         if p.exists():
             ps = json.loads(p.read_text(encoding="utf-8"))
             fn = ps.get("full_name", {})
@@ -182,17 +173,27 @@ def _get_account_summary(username: str) -> str:
             followers_str = _format_followers(fc_val)
     except Exception:
         pass
+    return full_name, followers_str
 
-    # sheets_payload.json — количество строк по листам
-    sheet_counts: dict = {}
+
+def _read_sheet_counts(username: str) -> dict:
+    """Возвращает {имя_листа: число_строк} из sheets_payload.json."""
+    counts: dict = {}
     try:
-        p = data_dir / "sheets_payload.json"
+        p = RESEARCH_DIR / "data" / username / "normalized" / "sheets_payload.json"
         if p.exists():
             sp = json.loads(p.read_text(encoding="utf-8"))
             for sheet_name, sheet_data in sp.get("sheets", {}).items():
-                sheet_counts[sheet_name] = len(sheet_data.get("rows", []))
+                counts[sheet_name] = len(sheet_data.get("rows", []))
     except Exception:
         pass
+    return counts
+
+
+def _get_account_summary(username: str) -> str:
+    meta = _read_meta(username)
+    full_name, followers_str = _read_profile_brief(username)
+    sheet_counts = _read_sheet_counts(username)
 
     lines = [f"📋 @{username}"]
     profile_parts = []
@@ -273,6 +274,190 @@ def _accounts_list_text() -> str:
             lines.append("  " + " | ".join(sheet_parts))
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Account screen: freshness of data blocks (mirror of pipeline/core/meta.py)
+# ---------------------------------------------------------------------------
+
+# TTL в днях, синхронизировано с pipeline/core/meta.py BLOCK_TTL_DAYS
+_BLOCK_TTL_DAYS = {
+    "profile": 30, "pinned": 30, "bio": 30, "landing": 30,
+    "highlights": 14, "reels": 7, "posts": 7,
+}
+
+# Порядок и подписи 7 блоков на экране аккаунта
+_BLOCK_ORDER = [
+    ("profile",    "Профиль"),
+    ("pinned",     "Закрепы"),
+    ("bio",        "Bio"),
+    ("landing",    "Лендинг"),
+    ("highlights", "Хайлайты"),
+    ("reels",      "Reels"),
+    ("posts",      "Посты"),
+]
+
+# Блок → стейджи (инверсия STAGE_TO_BLOCK из meta.py)
+_BLOCK_TO_STAGES = {
+    "profile":    ["01"],
+    "pinned":     ["02", "03", "04"],
+    "bio":        ["05"],
+    "landing":    ["06", "07"],
+    "highlights": ["08", "09", "10"],
+    "reels":      ["11", "12"],
+    "posts":      ["13", "14"],
+}
+
+# Канонический порядок стейджей для сортировки выборки
+_ALL_STAGES_ORDER = [
+    "01", "02", "03", "04", "05", "06", "07", "08", "09", "10",
+    "11", "12", "13", "14", "15", "15b", "16",
+]
+
+
+def _read_meta(username: str) -> dict:
+    try:
+        p = RESEARCH_DIR / "data" / username / "normalized" / "meta.json"
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _block_freshness(username: str) -> dict:
+    """block -> (state, date_str): state ∈ {'fresh', 'stale', 'none'}."""
+    meta = _read_meta(username)
+    result = {}
+    for block, ttl in _BLOCK_TTL_DAYS.items():
+        last = meta.get(block)
+        if not last:
+            result[block] = ("none", None)
+            continue
+        try:
+            dt = datetime.strptime(last, "%d.%m.%Y %H:%M")
+            days = (datetime.now() - dt).days
+            result[block] = ("stale" if days >= ttl else "fresh", last.split(" ")[0])
+        except Exception:
+            result[block] = ("stale", last)
+    return result
+
+
+def _stages_for_blocks(blocks: list[str]) -> list[str]:
+    """Стейджи для набора блоков + обязательные 15/15b/16, в каноническом порядке."""
+    wanted = set()
+    for b in blocks:
+        wanted.update(_BLOCK_TO_STAGES.get(b, []))
+    wanted.update(["15", "15b", "16"])
+    return [s for s in _ALL_STAGES_ORDER if s in wanted]
+
+
+def _account_screen_text(username: str) -> str:
+    full_name, followers_str = _read_profile_brief(username)
+    fresh = _block_freshness(username)
+    sheet_counts = _read_sheet_counts(username)
+
+    lines = [f"📋 @{username}"]
+    head = []
+    if full_name:
+        head.append(f"👤 {full_name}")
+    if followers_str:
+        head.append(f"{followers_str} подписчиков")
+    if head:
+        lines.append(" | ".join(head))
+
+    lines.append("\n🗂 Свежесть данных:")
+    for block, label in _BLOCK_ORDER:
+        state, date_str = fresh.get(block, ("none", None))
+        if state == "fresh":
+            lines.append(f"✅ {label} — {date_str}")
+        elif state == "stale":
+            lines.append(f"⚠️ {label} — устарело ({date_str})")
+        else:
+            lines.append(f"⚪ {label} — нет данных")
+
+    table_parts = []
+    for sheet_key, short in _SHEET_DISPLAY_ORDER:
+        c = sheet_counts.get(sheet_key)
+        if c is not None:
+            table_parts.append(f"{short}: {c}")
+    if table_parts:
+        lines.append("\n📊 В таблице: " + " | ".join(table_parts))
+
+    return "\n".join(lines)
+
+
+def _account_screen_keyboard(username: str, fresh: dict) -> InlineKeyboardMarkup:
+    stale_count = sum(1 for st, _ in fresh.values() if st in ("stale", "none"))
+    refresh_label = (
+        f"🔄 Обновить устаревшее ({stale_count})" if stale_count else "🔄 Обновить устаревшее"
+    )
+    rows = [
+        [InlineKeyboardButton(refresh_label, callback_data=f"accrun:stale:{username}")],
+        [
+            InlineKeyboardButton("♻️ Перезаписать всё", callback_data=f"accrun:all:{username}"),
+            InlineKeyboardButton("➕ Дописать",          callback_data=f"accrun:append:{username}"),
+        ],
+        [InlineKeyboardButton("⚙️ Настройки и запуск", callback_data=f"acc:{username}")],
+        [InlineKeyboardButton("🗑 Удалить", callback_data=f"accdel:{username}")],
+        [InlineKeyboardButton("← Назад", callback_data="show_accounts")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+# ---------------------------------------------------------------------------
+# Account deletion (path-traversal safe)
+# ---------------------------------------------------------------------------
+
+def _safe_account_dir(username: str) -> Path | None:
+    """Возвращает data/<username>/ только если имя валидно и путь внутри data/."""
+    if not re.match(r'^[a-zA-Z0-9._]{1,30}$', username):
+        return None
+    data_root = (RESEARCH_DIR / "data").resolve()
+    target = (data_root / username).resolve()
+    if target == data_root or data_root not in target.parents:
+        return None
+    return target
+
+
+def _remove_account_from_json(username: str) -> bool:
+    try:
+        data = json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8"))
+        before = data.get("accounts", [])
+        after = [a for a in before if a.get("username") != username]
+        if len(after) == len(before):
+            return False
+        data["accounts"] = after
+        ACCOUNTS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.warning("Could not remove %s from accounts.json: %s", username, e)
+        return False
+
+
+async def _delete_account_from_sheets(username: str) -> tuple[bool, int, str]:
+    url            = os.environ.get("GOOGLE_SHEETS_WEBAPP_URL", "")
+    secret         = os.environ.get("GOOGLE_SHEETS_SYNC_SECRET", "")
+    spreadsheet_id = os.environ.get(
+        "GOOGLE_SHEETS_SPREADSHEET_ID", "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
+    )
+    if not url:
+        return (False, 0, "GOOGLE_SHEETS_WEBAPP_URL не задан в .env")
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(url, json={
+                "secret": secret,
+                "mode": "delete_account",
+                "spreadsheet_id": spreadsheet_id,
+                "account_label": username,
+            })
+            data = r.json()
+            ok = bool(data.get("ok"))
+            deleted = int(data.get("deleted_rows_total", 0) or 0)
+            err = "; ".join(data.get("errors", []) or [])
+            return (ok, deleted, err)
+    except Exception as e:
+        return (False, 0, str(e))
 
 
 # Apify cost estimates per block (USD)
@@ -479,7 +664,7 @@ def _accounts_keyboard() -> InlineKeyboardMarkup:
     rows = []
     for acc in accounts[:10]:
         uname = acc.get("username", "")
-        rows.append([InlineKeyboardButton(f"@{uname}", callback_data=f"acc:{uname}")])
+        rows.append([InlineKeyboardButton(f"@{uname}", callback_data=f"accview:{uname}")])
     rows.append([InlineKeyboardButton("➕ Добавить новый", callback_data="acc_new")])
     rows.append([InlineKeyboardButton("← Назад", callback_data="main_menu")])
     return InlineKeyboardMarkup(rows)
@@ -730,6 +915,86 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def _start_run(query, context, username: str, stages: list[str],
+                     dry_run: bool, write_mode: str, settings: dict):
+    """Запускает пайплайн с заданным набором стейджей и режимом записи."""
+    if current_job["running"]:
+        await query.answer(
+            f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.",
+            show_alert=True,
+        )
+        return
+
+    _ensure_account(username)
+
+    mode_label = "🧪 Dry-run" if dry_run else "🚀 Запускаю"
+    wm_label = "" if write_mode == "replace" else f" [{write_mode}]"
+    progress_text = (
+        f"⏳ {mode_label} @{username}{wm_label} [0 мин]\n\n"
+        + "\n".join(f"⏳ {st} {_STAGE_NAMES.get(st, st)}" for st in stages)
+    )
+    msg = await query.edit_message_text(progress_text)
+
+    run_settings = dict(settings)
+    run_settings["write_mode"] = write_mode
+
+    current_job["running"]              = True
+    current_job["account"]              = username
+    current_job["started_at"]           = time.time()
+    current_job["chat_id"]              = query.message.chat_id
+    current_job["progress_msg_id"]      = msg.message_id
+    current_job["apify_balance_before"] = await _get_apify_balance()
+
+    asyncio.create_task(_run_pipeline_task(
+        bot=context.bot,
+        chat_id=query.message.chat_id,
+        username=username,
+        stages=stages,
+        dry_run=dry_run,
+        settings=run_settings,
+        progress_msg_id=msg.message_id,
+    ))
+
+
+async def _perform_delete(query, username: str):
+    """Удаляет аккаунт: accounts.json + папку data/<username>/ + строки из таблицы."""
+    await query.edit_message_text(f"🗑 Удаляю @{username}…")
+    lines = []
+
+    # 1. accounts.json
+    if _remove_account_from_json(username):
+        lines.append("✅ Удалён из списка аккаунтов")
+    else:
+        lines.append("⚠️ В списке аккаунтов не найден")
+
+    # 2. Папка data/<username>/ (с защитой от path traversal)
+    target = _safe_account_dir(username)
+    if target is None:
+        lines.append("⚠️ Недопустимое имя — папка не тронута")
+    elif target.exists():
+        try:
+            shutil.rmtree(target)
+            lines.append(f"✅ Папка data/{username}/ удалена")
+        except Exception as e:
+            lines.append(f"⚠️ Папка: {e}")
+    else:
+        lines.append("ℹ️ Папки с данными не было")
+
+    # 3. Строки из Google-таблицы
+    ok, deleted, err = await _delete_account_from_sheets(username)
+    if ok:
+        lines.append(f"✅ Из таблицы удалено строк: {deleted}")
+    else:
+        lines.append(f"⚠️ Таблица: {err or 'не удалось удалить'}")
+
+    await query.edit_message_text(
+        f"🗑 @{username} удалён\n\n" + "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("← К списку", callback_data="show_accounts")
+        ]]),
+    )
+
+
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -763,15 +1028,69 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Account view screen (свежесть данных + действия) ──────────────────
+    if data.startswith("accview:"):
+        username = data[len("accview:"):]
+        context.user_data["username"] = username
+        if "settings" not in context.user_data:
+            context.user_data["settings"] = _default_settings()
+        fresh = _block_freshness(username)
+        await query.edit_message_text(
+            _account_screen_text(username),
+            reply_markup=_account_screen_keyboard(username, fresh),
+        )
+        return
+
+    # ── Account run actions (Обновить устаревшее / Перезаписать / Дописать) ─
+    if data.startswith("accrun:"):
+        _, action_kind, username = data.split(":", 2)
+        context.user_data["username"] = username
+        s = _get_settings(context)
+        if action_kind == "stale":
+            fresh = _block_freshness(username)
+            blocks = [b for b, (st, _) in fresh.items() if st in ("stale", "none")]
+            stages = _stages_for_blocks(blocks)
+            write_mode = "replace"
+        elif action_kind == "append":
+            stages = list(_ALL_STAGES_ORDER)
+            write_mode = "append"
+        else:  # "all"
+            stages = list(_ALL_STAGES_ORDER)
+            write_mode = "replace"
+        await _start_run(query, context, username, stages, dry_run=False,
+                         write_mode=write_mode, settings=s)
+        return
+
+    # ── Account delete (confirm + perform) ────────────────────────────────
+    if data.startswith("accdelyes:"):
+        username = data[len("accdelyes:"):]
+        await _perform_delete(query, username)
+        return
+
+    if data.startswith("accdel:"):
+        username = data[len("accdel:"):]
+        await query.edit_message_text(
+            f"🗑 Удалить @{username}?\n\n"
+            f"Будут удалены:\n"
+            f"• запись из списка аккаунтов\n"
+            f"• папка data/{username}/ (все собранные данные)\n"
+            f"• строки аккаунта из Google-таблицы\n\n"
+            f"Действие необратимо.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🗑 Да, удалить", callback_data=f"accdelyes:{username}")],
+                [InlineKeyboardButton("← Отмена",       callback_data=f"accview:{username}")],
+            ]),
+        )
+        return
+
     if data.startswith("acc:"):
         username = data[4:]
         context.user_data["username"] = username
         if "settings" not in context.user_data:
             context.user_data["settings"] = _default_settings()
         s = context.user_data["settings"]
-        summary = _get_account_summary(username)
         await query.edit_message_text(
-            f"{summary}\n\n{_settings_text(username, s)}",
+            _settings_text(username, s),
             reply_markup=_settings_keyboard(s),
         )
         return
@@ -819,40 +1138,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data in ("action:dryrun", "action:launch"):
         dry_run = (data == "action:dryrun")
-
-        if current_job["running"]:
-            await query.answer(
-                f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.",
-                show_alert=True,
-            )
-            return
-
         stages = _build_stages_list(s)
-        _ensure_account(username)
-
-        mode_label = "🧪 Dry-run" if dry_run else "🚀 Запускаю"
-        progress_text = (
-            f"⏳ {mode_label} @{username} [0 мин]\n\n"
-            + "\n".join(f"⏳ {st} {_STAGE_NAMES.get(st, st)}" for st in stages)
-        )
-        msg = await query.edit_message_text(progress_text)
-
-        current_job["running"]              = True
-        current_job["account"]              = username
-        current_job["started_at"]           = time.time()
-        current_job["chat_id"]              = update.effective_chat.id
-        current_job["progress_msg_id"]      = msg.message_id
-        current_job["apify_balance_before"] = await _get_apify_balance()
-
-        asyncio.create_task(_run_pipeline_task(
-            bot=context.bot,
-            chat_id=update.effective_chat.id,
-            username=username,
-            stages=stages,
-            dry_run=dry_run,
-            settings=dict(s),
-            progress_msg_id=msg.message_id,
-        ))
+        await _start_run(query, context, username, stages, dry_run=dry_run,
+                         write_mode=s.get("write_mode", "replace"), settings=s)
         return
 
     # Re-render settings after toggle
