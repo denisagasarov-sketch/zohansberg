@@ -78,6 +78,10 @@ def _load_accounts() -> list[dict]:
 
 
 def _ensure_account(username: str) -> None:
+    # Защита от мусорных записей вида "?" — только валидные username.
+    if not re.match(r'^[a-zA-Z0-9._]{1,30}$', username or ""):
+        logger.warning("Skip _ensure_account: invalid username %r", username)
+        return
     try:
         data = json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8"))
         existing = [a["username"] for a in data.get("accounts", [])]

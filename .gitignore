@@ -1,3 +1,39 @@
+# ── Node / OS ──────────────────────────────────────────────────────────────
 node_modules/
 dist/
 .DS_Store
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Secrets (но .env.example отслеживается) ────────────────────────────────
+.env
+
+# ── Логи ───────────────────────────────────────────────────────────────────
+*.log
+
+# ── Чужие вложенные репозитории ────────────────────────────────────────────
+/nutri-ai/
+/nutri-ai-public/
+/nutri-ai-v2/
+
+# ── Локальные служебные файлы и бэкапы ─────────────────────────────────────
+/.claude/
+/_local_backup/
+/test_folder/
+/cleanup_v2.sh
+/cleanup_dead_stages.sh
+
+# ── Данные пайплайна (отслеживаем только реестры) ──────────────────────────
+# Используем data/* (не data/), чтобы re-include через ! работал:
+# git не даёт re-include файл, если исключена сама директория.
+instagram_research_test/data/*
+!instagram_research_test/data/accounts.json
+!instagram_research_test/data/actor_payloads.json
+
+# ── Отчёты пайплайна (папка нужна на диске после клона) ─────────────────────
+instagram_research_test/report/*
+!instagram_research_test/report/.gitkeep
