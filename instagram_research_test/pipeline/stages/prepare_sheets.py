@@ -23,7 +23,7 @@ _CDN_MARKERS = ("cdninstagram.com", "scontent", "fbcdn.net", "lookaside.fbsbx.co
 # ---------------------------------------------------------------------------
 
 PROFILE_HEADERS = [
-    "Конкурент", "Ниша", "Описание bio", "Для кого",
+    "Дата записи", "Конкурент", "Ниша", "Описание bio", "Для кого",
     "Обещание результата", "Позиционирование",
     "Соцдоказательства", "Аргументы доверия",
     "Главный CTA", "Куда ведет CTA",
@@ -31,13 +31,13 @@ PROFILE_HEADERS = [
 ]
 
 PINNED_HEADERS = [
-    "Конкурент", "Ссылка на пост", "Позиция закрепа", "Тема поста",
+    "Дата записи", "Конкурент", "Ссылка на пост", "Позиция закрепа", "Тема поста",
     "Почему закреплен", "Хук / первый экран", "Что в тексте поста",
     "Ключевые смыслы", "Какой CTA", "Куда ведет CTA", "Роль в воронке",
 ]
 
 FUNNEL_HEADERS = [
-    "Конкурент", "Полный путь пользователя", "Точка входа", "Первый шаг",
+    "Дата записи", "Конкурент", "Полный путь пользователя", "Точка входа", "Первый шаг",
     "Что обещают за переход", "Куда ведет", "Что происходит дальше",
     "Где собирают контакт", "Какой контакт собирают",
     "Через сколько появляется продажа", "Как устроен прогрев",
@@ -47,7 +47,7 @@ FUNNEL_HEADERS = [
 ]
 
 LANDING_HEADERS = [
-    "Конкурент", "Ссылка на сайт",
+    "Дата записи", "Конкурент", "Ссылка на сайт",
     "Главный заголовок", "Подзаголовок", "Визуальный образ", "Главный CTA",
     "Есть дедлайн", "Как себя называют", "Для кого", "Core Job", "Big Job",
     "Уникальность", "Цифры", "Формат отзывов", "Кейсы", "СМИ", "Сертификаты",
@@ -58,14 +58,14 @@ LANDING_HEADERS = [
 ]
 
 HIGHLIGHTS_HEADERS = [
-    "Конкурент", "Название highlight", "Порядок",
+    "Дата записи", "Конкурент", "Название highlight", "Порядок",
     "Тема highlight", "Задача highlight", "Что внутри",
     "Механика подачи", "Хук обложки",
     "CTA финальных кадров", "Количество кадров", "Куда ведет CTA",
 ]
 
 REELS_HEADERS = [
-    "Конкурент", "Ссылка", "Тема", "Хук визуальный", "Формат подачи",
+    "Дата записи", "Конкурент", "Ссылка", "Тема", "Хук визуальный", "Формат подачи",
     "Просмотры", "Лайки", "Комментарии", "CTA", "Роль в воронке", "Боль", "Решение",
     "Крючок", "Структура", "Тип хука",
     "Вовлечённость", "Виральность",
@@ -73,7 +73,7 @@ REELS_HEADERS = [
 ]
 
 POSTS_HEADERS = [
-    "Дата выгрузки", "Конкурент", "Ссылка на пост", "Заголовок поста",
+    "Дата записи", "Конкурент", "Ссылка на пост", "Заголовок поста",
     "Тема поста", "Рубрика", "Механика подачи", "Кратко о чем пост",
     "Тип хука", "Хук / первый абзац", "Структура поста",
     "Продающая вставка", "Какой CTA", "Куда ведет CTA",
@@ -382,6 +382,7 @@ def _build_profile(sources: dict, username: str) -> tuple[list, list]:
         cta_dest = _redact_url(url) if url else ""
 
     row = {
+        "Дата записи":         datetime.now().strftime("%d.%m.%Y"),
         "Конкурент":           _competitor,
         "Ниша":                _sem_or_bio("niche"),
         "Описание bio":        _nf(bio_text),
@@ -418,6 +419,7 @@ def _build_pinned(sources: dict, username: str) -> tuple[list, list]:
         caption = _fval_str(item, "caption_preview", "caption", "text")
         position = item.get("position")
         row = {
+            "Дата записи":         datetime.now().strftime("%d.%m.%Y"),
             "Конкурент":           _competitor,
             "Ссылка на пост":      _redact_url(str(url)) if url else "",
             "Позиция закрепа":     str(position) if position is not None else "",
@@ -454,6 +456,7 @@ def _build_funnel(sources: dict, username: str) -> tuple[list, list]:
     first_step = cta_text if cta_text else "Переход по ссылке в bio"
 
     row = {h: "" for h in FUNNEL_HEADERS}
+    row["Дата записи"]               = datetime.now().strftime("%d.%m.%Y")
     row["Конкурент"]                 = _account_label(sources, username)
     row["Точка входа"]               = "Instagram-профиль"
     row["Первый шаг"]                = first_step
@@ -492,6 +495,7 @@ def _build_landing(sources: dict, username: str) -> tuple[list, list]:
         return value
 
     row = {
+        "Дата записи":    datetime.now().strftime("%d.%m.%Y"),
         "Конкурент":      _competitor,
         "Ссылка на сайт": _redact_url(url),
     }
@@ -530,6 +534,7 @@ def _build_highlights(sources: dict, username: str) -> tuple[list, list]:
         if cta_final.lower() in ("not_found", "не найдено", "нет cta", "cta не найден", ""):
             cta_final = "CTA не найден"
         row = {
+            "Дата записи":          datetime.now().strftime("%d.%m.%Y"),
             "Конкурент":            _competitor,
             "Название highlight":   h.get("title", ""),
             "Порядок":              str(h.get("position", "")),
@@ -595,6 +600,7 @@ def _build_reels(sources: dict, username: str) -> tuple[list, list]:
         duration_raw = _c1.get("video_duration")  if _c1 else None
 
         row = {
+            "Дата записи":    datetime.now().strftime("%d.%m.%Y"),
             "Конкурент":      _competitor,
             "Ссылка":         _redact_url(url) if url else "",
             "Тема":           _field_ok(r.get("tema"))          or "не найдено",
@@ -648,7 +654,7 @@ def _build_posts(sources: dict, username: str) -> tuple[list, list]:
         if post_type not in allowed_types:
             skipped += 1
             continue
-        rows.append(_make_row(POSTS_HEADERS, r))
+        rows.append(_make_row(POSTS_HEADERS, {"Дата записи": datetime.now().strftime("%d.%m.%Y"), **r}))
 
     if skipped:
         warnings.append(
