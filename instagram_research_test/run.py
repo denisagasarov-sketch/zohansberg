@@ -29,6 +29,7 @@ from pipeline.stages.analyze_landing import analyze as analyze_landing
 from pipeline.stages.analyze_highlights import analyze as analyze_highlights
 from pipeline.stages.prepare_sheets import prepare as prepare_sheets
 from pipeline.stages.write_sheets import write as write_sheets
+from pipeline.core.meta import update_meta, STAGE_TO_BLOCK
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -196,6 +197,10 @@ def run_pipeline(username: str, selected: list[Stage], dry_run: bool = False) ->
             "status": "dry_run" if dry_run else "ok",
             "result": result,
         })
+        if not dry_run:
+            block = STAGE_TO_BLOCK.get(stage.number)
+            if block:
+                update_meta(username, block)
 
     print("\n=== Pipeline Summary ===")
     print(f"Аккаунт: @{username}")
