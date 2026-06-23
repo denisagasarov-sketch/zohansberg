@@ -43,9 +43,17 @@ _DOWNLOAD_HEADERS = {
 }
 
 FILTER_SYSTEM_PROMPT = """\
-Ты фильтруешь посты Instagram. Отвечай только JSON: {"is_relevant": true/false, "reason": "одно слово"}
-Мусор = поздравления с праздниками, личные путешествия без экспертной ценности, бытовой контент.
-Не мусор = экспертный контент, кейсы, продажи, обучение, провокация, соцдоки, тренды."""
+Ты фильтруешь посты Instagram. Отвечай только валидным JSON без текста до или после:
+{"is_relevant": true/false, "content_type": "professional|personal|mixed", "reason": "одно слово"}
+
+Правила:
+- is_relevant=false: поздравления с праздниками, чистый быт, личные путешествия без экспертной ценности
+- is_relevant=true: всё остальное
+
+content_type:
+- professional = экспертный контент, кейсы, обучение, продажи, соцдоки, тренды, провокация, разборы
+- personal = путешествия, праздники, быт, личные события без экспертного вывода
+- mixed = личная история с экспертным выводом или уроком"""
 
 SYSTEM_PROMPT = """\
 Ты аналитик контента Instagram. Анализируешь посты конкурентов.
@@ -128,22 +136,29 @@ def _parse_json(raw_text: str) -> tuple[dict, str | None]:
         return {}, str(e)
 
 
-def _is_relevant(caption: str) -> tuple[bool, str]:
-    """GPT-4o-mini фильтр мусорных постов. Возвращает (is_relevant, reason)."""
+def _is_relevant(caption: str) -> tuple[bool, str, str]:
+    """GPT-4o-mini фильтр мусорных постов.
+
+    Возвращает (is_relevant, content_type, reason).
+    content_type: "professional" | "personal" | "mixed"
+    """
     snippet = caption[:300]
     messages = [
         {"role": "system", "content": FILTER_SYSTEM_PROMPT},
         {"role": "user", "content": snippet or "(нет caption)"},
     ]
     try:
-        raw_text = chat(messages, model=FILTER_MODEL, max_tokens=50)
+        raw_text = chat(messages, model=FILTER_MODEL, max_tokens=80)
         parsed, err = _parse_json(raw_text)
         if err:
-            return True, ""
-        return bool(parsed.get("is_relevant", True)), str(parsed.get("reason", ""))
+            return True, "professional", ""
+        is_rel      = bool(parsed.get("is_relevant", True))
+        content_type = str(parsed.get("content_type", "professional"))
+        reason       = str(parsed.get("reason", ""))
+        return is_rel, content_type, reason
     except Exception as e:
         logger.warning("Фильтр: ошибка %s — пост не фильтруется", e)
-        return True, ""
+        return True, "professional", ""
 
 
 def _load_posts_index(username: str) -> tuple[list, dict]:
@@ -483,8 +498,14 @@ def _build_filtered_row(username: str, m: dict, reason: str) -> dict:
     }
 
 
-def analyze(username: str, dry_run: bool = False) -> dict:
-    """Анализирует посты через GPT-4o, сохраняет stage5e1_posts_analysis.json."""
+def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -> dict:
+    """Анализирует посты через GPT-4o, сохраняет stage5e1_posts_analysis.json.
+
+    content_filter:
+      "all"          — пропускать всё что is_relevant=true
+      "professional" — пропускать только professional и mixed
+      "personal"     — пропускать только personal
+    """
     get_account(username)
     posts, _url_to_raw = _load_posts_index(username)
 
@@ -516,12 +537,26 @@ def analyze(username: str, dry_run: bool = False) -> dict:
         pos = i + 1
         logger.info("[%d/%d] %s | %s", pos, len(posts), m["post_type"], m["url"])
 
-        # Правка 1: фильтрация мусора через gpt-4o-mini
-        relevant, reason = _is_relevant(m["caption"])
+        # фильтрация мусора через gpt-4o-mini
+        relevant, content_type, reason = _is_relevant(m["caption"])
+
+        # фильтр по is_relevant
         if not relevant:
-            logger.info("  FILTERED: %s", reason)
+            logger.info("  FILTERED (мусор): %s", reason)
             filtered_count += 1
-            rows.append(_build_filtered_row(username, m, reason))
+            rows.append(_build_filtered_row(username, m, "мусор"))
+            continue
+
+        # фильтр по content_filter
+        type_allowed = (
+            content_filter == "all"
+            or (content_filter == "professional" and content_type in ("professional", "mixed"))
+            or (content_filter == "personal"     and content_type == "personal")
+        )
+        if not type_allowed:
+            logger.info("  FILTERED (не тот тип): content_type=%s filter=%s", content_type, content_filter)
+            filtered_count += 1
+            rows.append(_build_filtered_row(username, m, "не тот тип контента"))
             continue
 
         post_id = post.get("id") or post.get("shortCode") or f"post_{i}"
@@ -561,6 +596,7 @@ def analyze(username: str, dry_run: bool = False) -> dict:
         "stage": "stage5e1",
         "model": MODEL,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "content_filter_applied": content_filter,
         "posts_analyzed": len(posts),
         "posts_ok": ok_count,
         "posts_failed": fail_count,
