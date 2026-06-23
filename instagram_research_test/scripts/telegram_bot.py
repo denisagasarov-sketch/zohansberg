@@ -553,46 +553,23 @@ def _ck(val: bool) -> str:
 
 
 def _settings_text(username: str, settings: dict) -> str:
-    s = settings
-    pt = s["post_types"]
-    cm = "За период" if s["content_mode"] == "period" else "Кол-во штук"
-    mo = s["months_back"]
-    tc = s["target_count"]
-    cf_labels = {"all": "Все", "professional": "Проф", "personal": "Личный"}
-    cf = cf_labels.get(s["content_filter"], s["content_filter"])
-
-    block_lines = "\n".join(
-        f"{_ck(s['blocks'][k])} {label}"
-        for k, label in _BLOCK_LABELS.items()
-    )
-    sheet_lines = "\n".join(
-        f"{_ck(s['sheets'][k])} {label}"
-        for k, label in _SHEET_LABELS.items()
-    )
-
     return (
-        f"=== Настройки анализа @{username} ===\n\n"
-        f"БЛОКИ:\n{block_lines}\n\n"
-        f"ПОСТЫ — фильтры:\n"
-        f"{_ck(pt['photo'])} Фото  {_ck(pt['carousel'])} Карусель  {_ck(pt['video'])} Видео\n"
-        f"Режим: {cm}   Период: {mo}м   Кол-во: {tc}\n"
-        f"Контент: {cf}\n\n"
-        f"ЗАПИСЬ В ТАБЛИЦУ:\n{sheet_lines}"
+        f"⚙️ Настройки — @{username}\n\n"
+        f"Выбери что собирать и за какой период.\n"
+        f"По умолчанию — всё за 6 месяцев."
     )
 
 
 def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
     s = settings
     pt = s["post_types"]
-    cf = s["content_filter"]
     mo = s["months_back"]
-    cm = s["content_mode"]
 
     def tb(key):
         return _ck(s["blocks"][key])
 
     rows = [
-        # Blocks row 1-2
+        # Блоки — что собирать
         [
             InlineKeyboardButton(f"{tb('01-04')} Профиль/закрепы", callback_data="tbl:01-04"),
             InlineKeyboardButton(f"{tb('05')} Bio",                callback_data="tbl:05"),
@@ -605,50 +582,20 @@ def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
             InlineKeyboardButton(f"{tb('11-12')} Reels",          callback_data="tbl:11-12"),
             InlineKeyboardButton(f"{tb('13-14')} Посты",          callback_data="tbl:13-14"),
         ],
-        # Post types
-        [
-            InlineKeyboardButton(f"{_ck(pt['photo'])} Фото",      callback_data="tpt:photo"),
-            InlineKeyboardButton(f"{_ck(pt['carousel'])} Кар.",   callback_data="tpt:carousel"),
-            InlineKeyboardButton(f"{_ck(pt['video'])} Видео",     callback_data="tpt:video"),
-        ],
-        # Content mode
-        [
-            InlineKeyboardButton(
-                f"{'▶' if cm=='period' else '·'} За период",
-                callback_data="scm:period",
-            ),
-            InlineKeyboardButton(
-                f"{'▶' if cm=='count' else '·'} Кол-во штук",
-                callback_data="scm:count",
-            ),
-        ],
-        # Months
+        # Период
         [
             InlineKeyboardButton(f"{'[' if mo==1  else ''}1м{']'  if mo==1  else ''}", callback_data="smo:1"),
             InlineKeyboardButton(f"{'[' if mo==3  else ''}3м{']'  if mo==3  else ''}", callback_data="smo:3"),
             InlineKeyboardButton(f"{'[' if mo==6  else ''}6м{']'  if mo==6  else ''}", callback_data="smo:6"),
             InlineKeyboardButton(f"{'[' if mo==12 else ''}12м{']' if mo==12 else ''}", callback_data="smo:12"),
         ],
-        # Content filter
+        # Типы постов
         [
-            InlineKeyboardButton(f"{'▶' if cf=='all'          else '·'} Все",     callback_data="scf:all"),
-            InlineKeyboardButton(f"{'▶' if cf=='professional' else '·'} Проф",   callback_data="scf:professional"),
-            InlineKeyboardButton(f"{'▶' if cf=='personal'     else '·'} Личный", callback_data="scf:personal"),
+            InlineKeyboardButton(f"{_ck(pt['photo'])} Фото",        callback_data="tpt:photo"),
+            InlineKeyboardButton(f"{_ck(pt['carousel'])} Карусель", callback_data="tpt:carousel"),
+            InlineKeyboardButton(f"{_ck(pt['video'])} Видео",       callback_data="tpt:video"),
         ],
-        # Sheets row 1
-        [
-            InlineKeyboardButton(f"{_ck(s['sheets']['prof'])} Профиль", callback_data="tsh:prof"),
-            InlineKeyboardButton(f"{_ck(s['sheets']['pins'])} Закрепы", callback_data="tsh:pins"),
-            InlineKeyboardButton(f"{_ck(s['sheets']['hi'])} Хайлайты", callback_data="tsh:hi"),
-        ],
-        # Sheets row 2
-        [
-            InlineKeyboardButton(f"{_ck(s['sheets']['re'])} Reels",   callback_data="tsh:re"),
-            InlineKeyboardButton(f"{_ck(s['sheets']['po'])} Посты",   callback_data="tsh:po"),
-            InlineKeyboardButton(f"{_ck(s['sheets']['fu'])} Воронка", callback_data="tsh:fu"),
-            InlineKeyboardButton(f"{_ck(s['sheets']['la'])} Лендинг", callback_data="tsh:la"),
-        ],
-        # Actions
+        # Действия
         [
             InlineKeyboardButton("💰 Смета",   callback_data="action:estimate"),
             InlineKeyboardButton("🧪 Dry-run", callback_data="action:dryrun"),
@@ -1134,19 +1081,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key in s["post_types"]:
             s["post_types"][key] = not s["post_types"][key]
 
-    elif data.startswith("tsh:"):   # toggle sheet
-        key = data[4:]
-        if key in s["sheets"]:
-            s["sheets"][key] = not s["sheets"][key]
-
-    elif data.startswith("scm:"):   # set content mode
-        s["content_mode"] = data[4:]
-
     elif data.startswith("smo:"):   # set months
         s["months_back"] = int(data[4:])
-
-    elif data.startswith("scf:"):   # set content filter
-        s["content_filter"] = data[4:]
 
     # ── Actions ──────────────────────────────────────────────────────────
     elif data == "action:estimate":
