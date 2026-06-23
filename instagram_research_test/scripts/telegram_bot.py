@@ -78,8 +78,8 @@ async def _get_apify_balance() -> float | None:
 
 def _build_stages_summary(username: str) -> str:
     """Read normalized/output files and build a numbered per-stage summary string."""
-    norm = BASE / "data" / username / "normalized"
-    out  = BASE / "output" / username
+    norm = BASE / "instagram_research_test" / "data" / username / "normalized"
+    out  = BASE / "instagram_research_test" / "data" / username / "normalized"
     lines = []
 
     def _j(path):
@@ -532,6 +532,20 @@ async def _launch(update: Update, context: ContextTypes.DEFAULT_TYPE, username: 
     )
     logger.info(f"Starting pipeline for @{username}, skip_apify={skip_apify}")
 
+    accounts_path = BASE / "instagram_research_test" / "data" / "accounts.json"
+    try:
+        accounts_data = json.loads(accounts_path.read_text(encoding="utf-8"))
+        existing = [a["username"] for a in accounts_data.get("accounts", [])]
+        if username not in existing:
+            accounts_data["accounts"].append({
+                "username": username,
+                "url": f"https://www.instagram.com/{username}/"
+            })
+            accounts_path.write_text(json.dumps(accounts_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info(f"Added {username} to accounts.json")
+    except Exception as e:
+        logger.warning(f"Could not update accounts.json: {e}")
+
     asyncio.create_task(_run_pipeline(update, context, username, skip_apify))
 
 
@@ -545,12 +559,12 @@ async def _run_pipeline(
     refresh_stale: bool = False,
 ):
     start = time.time()
-    log_path = BASE / "output" / username / "pipeline.log"
+    log_path = BASE / "instagram_research_test" / "data" / username / "pipeline.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [sys.executable, str(SCRIPTS_DIR / "run_pipeline.py"), "--account", username]
+    cmd = [sys.executable, str(BASE / "instagram_research_test" / "run.py"), "--account", username]
     if skip_apify:
-        cmd.append("--skip-apify")
+        cmd += ["--stages", "03,04,05,06,07,10,12,14,15,15b,16"]
     if refresh_stale:
         cmd.append("--refresh-stale")
     else:
@@ -565,7 +579,7 @@ async def _run_pipeline(
                 None,
                 lambda: __import__("subprocess").run(
                     cmd,
-                    cwd=str(BASE),
+                    cwd=str(BASE / "instagram_research_test"),
                     env=os.environ.copy(),
                     stdout=log_file,
                     stderr=log_file,
