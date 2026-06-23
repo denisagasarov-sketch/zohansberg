@@ -1078,7 +1078,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # ── Account run actions (Обновить устаревшее / Перезаписать / Дописать) ─
+    # ── Account run actions (Быстрое обновление / Собрать заново / Добавить новые посты) ─
     if data.startswith("accrun:"):
         _, action_kind, username = data.split(":", 2)
         context.user_data["username"] = username
