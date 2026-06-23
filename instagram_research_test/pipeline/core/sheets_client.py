@@ -27,9 +27,19 @@ def write_payload(payload: dict, dry_run: bool = True) -> dict:
         return {"dry_run": True, "sheets": list(sheets.keys())}
 
     url = get_webhook_url()
+    secret = os.getenv("GOOGLE_SHEETS_SYNC_SECRET", "")
+    spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ")
     resp = requests.post(
         url,
-        json={"action": "write", **payload},
+        json={
+            "secret": secret,
+            "mode": "write",
+            "spreadsheet_id": spreadsheet_id,
+            "start_row": 3,
+            "account_label": payload.get("account", ""),
+            "rename_headers": True,
+            "sheets": payload.get("sheets", {}),
+        },
         timeout=60,
     )
     resp.raise_for_status()
