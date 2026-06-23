@@ -603,7 +603,7 @@ def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("❓ Справка", callback_data=f"help:settings:{username}"),
-            InlineKeyboardButton("← Назад",   callback_data="main_menu"),
+            InlineKeyboardButton("← Назад",   callback_data=f"accview:{username}"),
         ],
     ]
     return InlineKeyboardMarkup(rows)
