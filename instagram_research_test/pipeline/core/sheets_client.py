@@ -7,9 +7,9 @@ from pipeline.core.config import load_env
 
 def get_webhook_url() -> str:
     load_env()
-    url = os.getenv("GOOGLE_SHEETS_WEBHOOK_URL")
+    url = os.getenv("GOOGLE_SHEETS_WEBAPP_URL")
     if not url:
-        raise EnvironmentError("GOOGLE_SHEETS_WEBHOOK_URL не найден в .env")
+        raise EnvironmentError("GOOGLE_SHEETS_WEBAPP_URL не найден в .env")
     return url
 
 

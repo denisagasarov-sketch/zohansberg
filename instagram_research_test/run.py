@@ -27,6 +27,7 @@ from pipeline.stages.analyze_pinned_visuals import analyze as analyze_pinned_vis
 from pipeline.stages.classify_profile_link import classify as classify_profile_link
 from pipeline.stages.analyze_landing import analyze as analyze_landing
 from pipeline.stages.analyze_highlights import analyze as analyze_highlights
+from pipeline.stages.prepare_sheets import prepare as prepare_sheets
 from pipeline.stages.write_sheets import write as write_sheets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -104,6 +105,10 @@ def _build_payload(username: str, dry_run: bool) -> dict:
     return build_payload(username=username, dry_run=dry_run)
 
 
+def _prepare_sheets(username: str, dry_run: bool) -> dict:
+    return prepare_sheets(username=username, dry_run=dry_run)
+
+
 def _write_sheets(username: str, dry_run: bool) -> dict:
     return write_sheets(username=username, dry_run=dry_run)
 
@@ -124,6 +129,7 @@ STAGES = (
     Stage("13", "collect_posts", _posts),
     Stage("14", "analyze_posts", _analyze_posts),
     Stage("15", "build_payload", _build_payload),
+    Stage("15b", "prepare_sheets", _prepare_sheets),
     Stage("16", "write_sheets", _write_sheets),
 )
 STAGES_BY_NUMBER = {stage.number: stage for stage in STAGES}
@@ -131,9 +137,13 @@ STAGES_BY_NUMBER = {stage.number: stage for stage in STAGES}
 
 def _normalize_stage_number(value: str) -> str:
     stripped = value.strip()
-    if not stripped.isdigit():
-        raise ValueError(f"Некорректный номер стейджа: {value!r}")
-    return f"{int(stripped):02d}"
+    if stripped.isdigit():
+        return f"{int(stripped):02d}"
+    # Буквенно-цифровые номера вида "15b" — возвращаем как есть
+    import re as _re
+    if _re.match(r"^\d+[a-z]+$", stripped):
+        return stripped
+    raise ValueError(f"Некорректный номер стейджа: {value!r}")
 
 
 def select_stages(stages: str | None, from_stage: str | None) -> list[Stage]:

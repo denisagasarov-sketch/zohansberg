@@ -21,9 +21,9 @@ def write(username: str, dry_run: bool = False) -> dict:
         logger.info("[DRY RUN] Файлы не отправляются")
         return {"dry_run": True, "rows_written": 0}
 
-    payload_path = normalized(username, "payload.json")
+    payload_path = normalized(username, "sheets_payload.json")
     if not payload_path.exists():
-        raise FileNotFoundError(f"payload.json не найден: {payload_path}")
+        raise FileNotFoundError(f"sheets_payload.json не найден: {payload_path}")
 
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
 

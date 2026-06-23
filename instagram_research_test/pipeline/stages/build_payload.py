@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_sources(username: str) -> dict:
-    norm_dir = normalized(username, "").parent
+    norm_dir = normalized(username, "placeholder").parent
     sources = {}
     if not norm_dir.exists():
         return sources
