@@ -1,7 +1,7 @@
 {
   "account": "kate.jet",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-17T14:12:58.202330+00:00",
+  "run_timestamp": "2026-06-23T08:53:30.080928+00:00",
   "detection_method": "actor_field",
   "source_ref": "posts.resultsType=posts.isPinned",
   "posts_checked": 30,
@@ -11,58 +11,6 @@
   "pinned_posts": [
     {
       "position": 1,
-      "url": {
-        "value": "https://www.instagram.com/p/DVYs6lJEu3o/",
-        "data_status": "ok",
-        "source_ref": "posts_actor.url",
-        "confidence": "high",
-        "notes": ""
-      },
-      "content_id": {
-        "value": "3844019821617540584",
-        "data_status": "ok",
-        "source_ref": "posts_actor.id",
-        "confidence": "high",
-        "notes": ""
-      },
-      "shortcode": {
-        "value": "DVYs6lJEu3o",
-        "data_status": "ok",
-        "source_ref": "posts_actor.shortCode",
-        "confidence": "high",
-        "notes": ""
-      },
-      "caption_preview": {
-        "value": "Что мне помогло сделать выручку $1 МЛН с SMM 😎\n\nВ первую неделю запуска соцсетей Refocus, у нас было всего 50 подписчиков, но это не помешало сделать продажу с высоким чеком в $1000. В следующий месяц мы сделали выручку $13 000 ⚡\n\nЗа год выручка с SMM была $1 000 000 с ROMI > 6000%. SMM приводил сам",
-        "data_status": "ok",
-        "source_ref": "posts_actor.caption",
-        "confidence": "high",
-        "notes": ""
-      },
-      "is_pinned": {
-        "value": true,
-        "data_status": "ok",
-        "source_ref": "posts_actor.isPinned",
-        "confidence": "high",
-        "notes": ""
-      },
-      "timestamp": {
-        "value": "2026-03-02T14:48:13.000Z",
-        "data_status": "ok",
-        "source_ref": "posts_actor.timestamp",
-        "confidence": "high",
-        "notes": ""
-      },
-      "type": {
-        "value": "Sidecar",
-        "data_status": "ok",
-        "source_ref": "posts_actor.type",
-        "confidence": "high",
-        "notes": ""
-      }
-    },
-    {
-      "position": 2,
       "url": {
         "value": "https://www.instagram.com/p/DRhjE6mEk_o/",
         "data_status": "ok",
@@ -112,7 +60,59 @@
         "confidence": "high",
         "notes": ""
       }
+    },
+    {
+      "position": 2,
+      "url": {
+        "value": "https://www.instagram.com/p/DVYs6lJEu3o/",
+        "data_status": "ok",
+        "source_ref": "posts_actor.url",
+        "confidence": "high",
+        "notes": ""
+      },
+      "content_id": {
+        "value": "3844019821617540584",
+        "data_status": "ok",
+        "source_ref": "posts_actor.id",
+        "confidence": "high",
+        "notes": ""
+      },
+      "shortcode": {
+        "value": "DVYs6lJEu3o",
+        "data_status": "ok",
+        "source_ref": "posts_actor.shortCode",
+        "confidence": "high",
+        "notes": ""
+      },
+      "caption_preview": {
+        "value": "Что мне помогло сделать выручку $1 МЛН с SMM 😎\n\nВ первую неделю запуска соцсетей Refocus, у нас было всего 50 подписчиков, но это не помешало сделать продажу с высоким чеком в $1000. В следующий месяц мы сделали выручку $13 000 ⚡\n\nЗа год выручка с SMM была $1 000 000 с ROMI > 6000%. SMM приводил сам",
+        "data_status": "ok",
+        "source_ref": "posts_actor.caption",
+        "confidence": "high",
+        "notes": ""
+      },
+      "is_pinned": {
+        "value": true,
+        "data_status": "ok",
+        "source_ref": "posts_actor.isPinned",
+        "confidence": "high",
+        "notes": ""
+      },
+      "timestamp": {
+        "value": "2026-03-02T14:48:13.000Z",
+        "data_status": "ok",
+        "source_ref": "posts_actor.timestamp",
+        "confidence": "high",
+        "notes": ""
+      },
+      "type": {
+        "value": "Sidecar",
+        "data_status": "ok",
+        "source_ref": "posts_actor.type",
+        "confidence": "high",
+        "notes": ""
+      }
     }
   ],
-  "raw_source": "data/raw/stage5a1_posts_for_pinned_raw.json"
+  "raw_source": "data/kate.jet/raw/stage5a1_posts_for_pinned_raw.json"
 }

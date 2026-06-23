@@ -2,59 +2,60 @@
   "account": "kate.jet",
   "stage": "stage5a2e",
   "prompt_version": "v6",
-  "model": "gpt-4o-mini",
-  "generated_at": "2026-05-17T14:14:21.785378+00:00",
+  "model": "gpt-4o",
+  "generated_at": "2026-06-23T09:02:41.848591+00:00",
   "bio_text": "💵 Ex-Head of SMM Refocus: сделала выручку $1 млн\n📰 US Forbes писали о моей стратегии в SMM\n⚡ Систематизируй SMM с помощью курса | занять место 👇🏽",
   "openai_status": "ok",
-  "tokens_used": 2165,
+  "tokens_used": null,
   "fields": {
     "niche": {
-      "value": "SMM",
+      "value": "Обучение систематизации SMM",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Тематика деятельности связана с SMM."
+      "notes": "Основная тема деятельности указана в описании использования курса для систематизации SMM."
     },
     "target_audience": {
-      "value": "не определено",
-      "data_status": "not_found",
+      "value": "вероятно: специалисты и предприниматели в области SMM",
+      "data_status": "inferred",
       "source": "bio_text",
-      "notes": "Целевая аудитория не указана в тексте."
+      "notes": "Упоминание курса по SMM может заинтересовать специалистов в этой сфере.",
+      "confidence": "low"
     },
     "result_promise": {
-      "value": "научиться систематизировать SMM с помощью курса",
+      "value": "Систематизация SMM",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Обещание результата связано с обучением систематизации SMM."
+      "notes": "Конкретно упоминается результат - систематизация SMM с помощью курса."
     },
     "positioning": {
-      "value": "Ex-Head of SMM Refocus",
+      "value": "Экс-руководитель SMM в Refocus с опытом успешных стратегий",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Первая строка bio описывает позиционирование."
+      "notes": "Автор был Ex-Head of SMM и имеет опыт создания стратегии с доходом $1 млн."
     },
     "trust_arguments": {
       "value": "Ex-Head of SMM Refocus",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Указана должность, что является аргументом доверия."
+      "notes": "Должность экс-руководителя SMM в компании Refocus упоминается в качестве аргумента."
     },
     "social_proof": {
-      "value": "$1 млн выручки; US Forbes писали",
+      "value": "$1 млн выручки, публикация в US Forbes",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Упомянуты результаты и упоминание в СМИ."
+      "notes": "Показатели успеха включают выручку в $1 млн и публикацию в известном издании."
     },
     "cta_text": {
-      "value": "Систематизируй SMM с помощью курса | занять место",
+      "value": "занять место",
       "data_status": "ok",
       "source": "bio_text",
-      "notes": "Призыв к действию четко сформулирован."
+      "notes": "Явный призыв к действию для участия в курсе."
     },
     "cta_destination": {
-      "value": "",
-      "data_status": "not_found",
+      "value": "https://t.me/SMMworkshopBot",
+      "data_status": "ok",
       "source": "bio_text",
-      "notes": "Ссылка для CTA не указана."
+      "notes": "Внешняя ссылка на Telegram-бот для записи на курс."
     }
   }
 }

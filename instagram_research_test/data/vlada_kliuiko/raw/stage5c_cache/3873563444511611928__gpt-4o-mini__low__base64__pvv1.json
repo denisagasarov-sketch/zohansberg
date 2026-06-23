@@ -1,0 +1,38 @@
+{
+  "story_id": "3873563444511611928",
+  "highlight_id": "18110898391654002",
+  "canonical_title": "GEO",
+  "position_in_highlight": 3,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:13:44.015850+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 133059,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "community_social_proof",
+    "commercial_role": "education",
+    "has_visible_text": true,
+    "extracted_text": "если вы работаете на запад, для вас GEO вообще мастхев! \n\nПотому что там уже очень большой объем трафика идет через нейронки, и с каждым месяцем этот объем только увеличивается\n\nесли у вас оффлайн бизнес, это вам более чем надо! Тк раньше люди искали локально услуги/товары часто через карты в Гугл, Яндекс, сейчас это ищут через AI",
+    "has_cta": false,
+    "cta_text": null,
+    "main_subject": "обсуждение влияния нейронных сетей на бизнес",
+    "visual_style": "минималистичный, светлые тона",
+    "sentiment": "positive",
+    "tags": [
+      "нейронные сети",
+      "трафик",
+      "бизнес",
+      "диалоги",
+      "AI"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3378,
+  "from_cache": false
+}

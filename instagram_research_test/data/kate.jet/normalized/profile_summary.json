@@ -1,13 +1,10 @@
 {
   "account": "kate.jet",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-17T14:12:58.202330+00:00",
+  "run_timestamp": "2026-06-23T08:53:30.080928+00:00",
   "planned_apify_calls": 2,
   "actual_apify_calls": 2,
-  "apify_run_ids": [
-    "bG5uTqedt7lafE7X6",
-    "Q6OZkZ01RYcevbaan"
-  ],
+  "apify_run_ids": [],
   "profile_url": {
     "value": "https://www.instagram.com/kate.jet/",
     "data_status": "ok",
@@ -51,14 +48,14 @@
     "notes": ""
   },
   "followers_count": {
-    "value": 2523,
+    "value": 2496,
     "data_status": "ok",
     "source_ref": "details_actor.apify/instagram-scraper",
     "confidence": "high",
     "notes": ""
   },
   "following_count": {
-    "value": 1421,
+    "value": 1438,
     "data_status": "ok",
     "source_ref": "details_actor.apify/instagram-scraper",
     "confidence": "high",
@@ -71,5 +68,5 @@
     "confidence": "high",
     "notes": ""
   },
-  "raw_source": "data/raw/stage5a1_profile_details_raw.json"
+  "raw_source": "data/kate.jet/raw/stage5a1_profile_details_raw.json"
 }

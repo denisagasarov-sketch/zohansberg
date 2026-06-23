@@ -172,20 +172,29 @@ def select_stages(stages: str | None, from_stage: str | None) -> list[Stage]:
     return list(STAGES)
 
 
-def run_pipeline(username: str, selected: list[Stage], dry_run: bool = False) -> list[dict]:
+def run_pipeline(
+    username: str,
+    selected: list[Stage],
+    dry_run: bool = False,
+    write_mode: str = "replace",
+) -> list[dict]:
     get_account(username)
     results = []
 
     logger.info(
-        "Pipeline | @%s | stages=%s | dry_run=%s",
+        "Pipeline | @%s | stages=%s | dry_run=%s | write_mode=%s",
         username,
         ",".join(stage.number for stage in selected),
         dry_run,
+        write_mode,
     )
     for index, stage in enumerate(selected, start=1):
         logger.info("[%d/%d] %s %s", index, len(selected), stage.number, stage.name)
         try:
-            result = stage.runner(username, dry_run)
+            if stage.number == "16":
+                result = write_sheets(username=username, dry_run=dry_run, write_mode=write_mode)
+            else:
+                result = stage.runner(username, dry_run)
         except Exception as error:
             logger.error("Stage %s %s failed: %s", stage.number, stage.name, error)
             raise RuntimeError(
@@ -216,11 +225,15 @@ def main() -> None:
     selection.add_argument("--stages", help="Номера через запятую, например 01,05,08")
     selection.add_argument("--from-stage", help="Запустить с указанного номера")
     parser.add_argument("--dry-run", action="store_true", help="Не вызывать внешние API")
+    parser.add_argument(
+        "--write-mode", default="replace", choices=["replace", "append"],
+        help="Режим записи в таблицу: replace (перезаписать) или append (дописать)",
+    )
     args = parser.parse_args()
 
     try:
         selected = select_stages(args.stages, args.from_stage)
-        run_pipeline(args.account, selected, args.dry_run)
+        run_pipeline(args.account, selected, args.dry_run, write_mode=args.write_mode)
     except (ValueError, FileNotFoundError, EnvironmentError, RuntimeError) as error:
         parser.error(str(error))
 

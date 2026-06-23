@@ -1,0 +1,38 @@
+{
+  "story_id": "3870592862048297892",
+  "highlight_id": "17874797856565339",
+  "canonical_title": "отзывы курс",
+  "position_in_highlight": 4,
+  "mediaType": "Video",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:13:21.839744+00:00",
+  "url_used_field": "thumbnailUrl",
+  "fetch_bytes": 49517,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "student_review",
+    "commercial_role": "trust",
+    "has_visible_text": true,
+    "extracted_text": "Без нейронок я бы год собирала эту информацию для аналитики",
+    "has_cta": false,
+    "cta_text": null,
+    "main_subject": "студентка делится опытом",
+    "visual_style": "темный фон, минималистичный текст",
+    "sentiment": "positive",
+    "tags": [
+      "отзывы",
+      "анализ",
+      "опыт",
+      "курс",
+      "бизнес"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3289,
+  "from_cache": false
+}

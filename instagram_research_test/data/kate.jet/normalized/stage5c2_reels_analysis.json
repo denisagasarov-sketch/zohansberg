@@ -3,24 +3,23 @@
   "stage": "stage5c2",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T14:18:47.123324+00:00",
+  "generated_at": "2026-06-23T09:14:29.912171+00:00",
   "reels_analyzed": 10,
   "reels_ok": 10,
   "reels_skipped": 0,
-  "total_tokens": 17886,
   "reels": [
     {
       "position": 1,
-      "reel_id": "3774456417253256519",
-      "url": "https://www.instagram.com/p/DRhkB0Sku1H/",
-      "view_count": 4222,
-      "likes_count": 153,
+      "reel_id": "3177176790116446711",
+      "url": "https://www.instagram.com/p/CwXmXULgbH3/",
+      "view_count": 74314,
+      "likes_count": 444,
       "is_pinned": true,
-      "published_at": "2025-11-26T15:19:58.000Z",
-      "engagement_rate": "3.62%",
+      "published_at": "2023-08-25T13:14:50.000Z",
+      "engagement_rate": "0.60%",
       "vision_status": "ok",
       "hook": {
-        "value": "яркое сочетание золотых ботфортов и красных шорт — необычный стиль привлекает внимание",
+        "value": "селфи девушки в зеркале с текстом — вызывает любопытство",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -28,9 +27,9 @@
         "data_status": "ok"
       },
       "text_status": "ok",
-      "text_source": "transcript",
+      "text_source": "caption",
       "tema": {
-        "value": "Перезапуск курса по SMM с обновлениями",
+        "value": "Маркетинг и контент в сфере бизнеса и консалтинга",
         "data_status": "ok"
       },
       "bol": {
@@ -38,101 +37,42 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Запись в список early birds для получения спецусловий и скидки",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "cta": {
-        "value": "сделайте репост поста",
+        "value": "Подписывайся!",
         "data_status": "ok"
       },
       "rol_v_voronke": {
-        "value": "продажа",
+        "value": "знакомство",
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "Средняя оценка моего предыдущего курса 9,3 из 10",
+        "value": "Буду рассказывать то, чем не поделилась даже с Forbes",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "анонс → предложение → призыв",
+        "value": "обещание → CTA",
         "data_status": "ok"
       },
       "hook_type": {
-        "value": "факт",
+        "value": "обещание",
         "data_status": "ok"
-      },
-      "tokens_vision": 608,
-      "tokens_text": 1234,
-      "tokens_total": 1842
+      }
     },
     {
       "position": 2,
-      "reel_id": "3177176790116446711",
-      "url": "https://www.instagram.com/p/CwXmXULgbH3/",
-      "view_count": 74312,
-      "likes_count": 443,
-      "is_pinned": true,
-      "published_at": "2023-08-25T13:14:50.000Z",
-      "engagement_rate": "0.60%",
-      "vision_status": "ok",
-      "hook": {
-        "value": "девушка с телефоном в руке крупным планом — эмоциональный контакт",
-        "data_status": "ok"
-      },
-      "vizual_format": {
-        "value": "текст на экране",
-        "data_status": "ok"
-      },
-      "text_status": "ok",
-      "text_source": "transcript",
-      "tema": {
-        "value": "История успеха в СММ и личной жизни",
-        "data_status": "ok"
-      },
-      "bol": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "reshenie": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "cta": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "rol_v_voronke": {
-        "value": "доверие",
-        "data_status": "ok"
-      },
-      "kryuchok": {
-        "value": "История о начале с нуля после развода и потери бизнеса",
-        "data_status": "ok"
-      },
-      "struktura": {
-        "value": "история → достижения → вывод",
-        "data_status": "ok"
-      },
-      "hook_type": {
-        "value": "история",
-        "data_status": "ok"
-      },
-      "tokens_vision": 597,
-      "tokens_text": 1214,
-      "tokens_total": 1811
-    },
-    {
-      "position": 3,
       "reel_id": "3178581700955474968",
       "url": "https://www.instagram.com/p/CwclzdXAgwY/",
-      "view_count": 21770,
+      "view_count": 21774,
       "likes_count": 198,
       "is_pinned": true,
       "published_at": "2023-08-27T11:45:48.000Z",
       "engagement_rate": "0.91%",
       "vision_status": "ok",
       "hook": {
-        "value": "крупный белый текст на фоне кафе — перечень книг вызывает интерес",
+        "value": "лицо с удивлением и текст поверх — эмоциональный контакт",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -140,9 +80,9 @@
         "data_status": "ok"
       },
       "text_status": "ok",
-      "text_source": "transcript",
+      "text_source": "caption",
       "tema": {
-        "value": "Лучшие книги для контент-маркетинга",
+        "value": "Советы по контент-маркетингу",
         "data_status": "ok"
       },
       "bol": {
@@ -150,45 +90,42 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Книги, которые помогут прокачаться в контент-маркетинге",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "cta": {
-        "value": "Подписывайся на меня, и я научу тебя продавать через контент.",
+        "value": "Подписывайся и не стесняйся писать в личку, если нужен совет по контент-маркетингу🤜🏽🤛🏽",
         "data_status": "ok"
       },
       "rol_v_voronke": {
-        "value": "доверие",
+        "value": "лидогенерация",
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "Ильяхов курит в сторонке.",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "struktura": {
-        "value": "представление → список книг → призыв подписаться",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "hook_type": {
-        "value": "провокация",
-        "data_status": "ok"
-      },
-      "tokens_vision": 601,
-      "tokens_text": 1252,
-      "tokens_total": 1853
+        "value": "не найдено",
+        "data_status": "not_found"
+      }
     },
     {
-      "position": 4,
-      "reel_id": "3843230595707754618",
-      "url": "https://www.instagram.com/p/DVV5d1PEth6/",
-      "view_count": 4690,
-      "likes_count": -1,
-      "is_pinned": false,
-      "published_at": "2026-03-01T12:41:44.000Z",
-      "engagement_rate": "-0.02%",
+      "position": 3,
+      "reel_id": "3774456417253256519",
+      "url": "https://www.instagram.com/p/DRhkB0Sku1H/",
+      "view_count": 4230,
+      "likes_count": 152,
+      "is_pinned": true,
+      "published_at": "2025-11-26T15:19:58.000Z",
+      "engagement_rate": "3.59%",
       "vision_status": "ok",
       "hook": {
-        "value": "женщина в золотых сапогах на фоне бамбука — необычный стиль привлекает внимание",
+        "value": "женщина в яркой одежде и золотых сапогах на беговой дорожке — необычный стиль привлекает внимание",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -196,21 +133,21 @@
         "data_status": "ok"
       },
       "text_status": "ok",
-      "text_source": "transcript",
+      "text_source": "caption",
       "tema": {
-        "value": "Системный подход к SMM для управления результатами",
+        "value": "Обучение и развитие в системном SMM",
         "data_status": "ok"
       },
       "bol": {
-        "value": "Контент выходит, а заявки то есть, то нет, и это выматывает",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Система, связывающая контент и цифры, для понимания, что работает",
+        "value": "Участие в курсе 'Системный SMM' с прикладными материалами",
         "data_status": "ok"
       },
       "cta": {
-        "value": "Регистрируйся по ссылке в био моего профиля",
+        "value": "Пост с программой и запись в early birds — по ссылке в шапке профиля.",
         "data_status": "ok"
       },
       "rol_v_voronke": {
@@ -218,20 +155,70 @@
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "Если ты делаешь SMM по чуйке, то ты не управляешь результатом",
+        "value": "Я так люблю свое дело, что однажды просто убила себя работой.",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "проблема → решение → призыв зарегистрироваться",
+        "value": "история → вывод → предложение",
         "data_status": "ok"
       },
       "hook_type": {
-        "value": "провокация",
+        "value": "история",
+        "data_status": "ok"
+      }
+    },
+    {
+      "position": 4,
+      "reel_id": "3843230595707754618",
+      "url": "https://www.instagram.com/p/DVV5d1PEth6/",
+      "view_count": 4694,
+      "likes_count": -1,
+      "is_pinned": false,
+      "published_at": "2026-03-01T12:41:44.000Z",
+      "engagement_rate": "-0.02%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "женщина в золотых ботфортах с микрофоном — необычный наряд привлекает внимание",
         "data_status": "ok"
       },
-      "tokens_vision": 608,
-      "tokens_text": 1313,
-      "tokens_total": 1921
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "caption",
+      "tema": {
+        "value": "Связь контента и аналитики для увеличения дохода",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "Непонимание, почему контент работает и как его масштабировать",
+        "data_status": "ok"
+      },
+      "reshenie": {
+        "value": "Воркшоп для создания системы анализа контента",
+        "data_status": "ok"
+      },
+      "cta": {
+        "value": "Ссылка на регистрацию в био профиля",
+        "data_status": "ok"
+      },
+      "rol_v_voronke": {
+        "value": "лидогенерация",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "Как связать контент и аналитику в систему, которая приводит к деньгам",
+        "data_status": "ok"
+      },
+      "struktura": {
+        "value": "вопрос → боли → решение → CTA",
+        "data_status": "ok"
+      },
+      "hook_type": {
+        "value": "вопрос",
+        "data_status": "ok"
+      }
     },
     {
       "position": 5,
@@ -244,7 +231,7 @@
       "engagement_rate": "4.13%",
       "vision_status": "ok",
       "hook": {
-        "value": "человек держит двух кошек на фоне простой стены — вызывает интерес и умиление",
+        "value": "женщина с двумя кошками на руках — привлекает внимание любителей животных",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -254,63 +241,7 @@
       "text_status": "ok",
       "text_source": "caption",
       "tema": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "bol": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "reshenie": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "cta": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "rol_v_voronke": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "kryuchok": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "struktura": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "hook_type": {
-        "value": "не найдено",
-        "data_status": "not_found"
-      },
-      "tokens_vision": 598,
-      "tokens_text": 1017,
-      "tokens_total": 1615
-    },
-    {
-      "position": 6,
-      "reel_id": "3767838273910771270",
-      "url": "https://www.instagram.com/p/DRKDPJ_ko5G/",
-      "view_count": 1840,
-      "likes_count": 105,
-      "is_pinned": false,
-      "published_at": "2025-11-17T12:12:27.000Z",
-      "engagement_rate": "5.71%",
-      "vision_status": "ok",
-      "hook": {
-        "value": "лицо с необычным украшением на зубах крупным планом — необычный образ привлекает внимание",
-        "data_status": "ok"
-      },
-      "vizual_format": {
-        "value": "говорящая голова",
-        "data_status": "ok"
-      },
-      "text_status": "ok",
-      "text_source": "transcript",
-      "tema": {
-        "value": "Музыка и самовыражение",
+        "value": "популярность рила",
         "data_status": "ok"
       },
       "bol": {
@@ -330,20 +261,70 @@
         "data_status": "ok"
       },
       "kryuchok": {
-        "value": "Pack it up, pack it in, let me begin",
+        "value": "надежда на то, что рилс не станет популярным",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "вступление → рифмы и вызов",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "hook_type": {
-        "value": "обещание",
+        "value": "не найдено",
+        "data_status": "not_found"
+      }
+    },
+    {
+      "position": 6,
+      "reel_id": "3767838273910771270",
+      "url": "https://www.instagram.com/p/DRKDPJ_ko5G/",
+      "view_count": 1841,
+      "likes_count": 105,
+      "is_pinned": false,
+      "published_at": "2025-11-17T12:12:27.000Z",
+      "engagement_rate": "5.70%",
+      "vision_status": "ok",
+      "hook": {
+        "value": "лицо с экстравагантным украшением на зубах крупным планом — привлекает внимание",
         "data_status": "ok"
       },
-      "tokens_vision": 602,
-      "tokens_text": 1186,
-      "tokens_total": 1788
+      "vizual_format": {
+        "value": "говорящая голова",
+        "data_status": "ok"
+      },
+      "text_status": "ok",
+      "text_source": "caption",
+      "tema": {
+        "value": "Подготовка к золотому балу",
+        "data_status": "ok"
+      },
+      "bol": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "reshenie": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "cta": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "rol_v_voronke": {
+        "value": "знакомство",
+        "data_status": "ok"
+      },
+      "kryuchok": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "struktura": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      },
+      "hook_type": {
+        "value": "не найдено",
+        "data_status": "not_found"
+      }
     },
     {
       "position": 7,
@@ -356,7 +337,7 @@
       "engagement_rate": "2.49%",
       "vision_status": "ok",
       "hook": {
-        "value": "человек сидит на дереве с видом на море — необычное место привлекает внимание",
+        "value": "девушка на фоне моря сидит на дереве — необычное место привлекает внимание",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -364,14 +345,14 @@
         "data_status": "ok"
       },
       "text_status": "ok",
-      "text_source": "transcript",
+      "text_source": "caption",
       "tema": {
-        "value": "Личная тревога и стресс из-за финансовых обязательств",
+        "value": "Как успокоиться",
         "data_status": "ok"
       },
       "bol": {
-        "value": "Накопились напряжение и тревога из-за необходимости заработать деньги для помощи близким",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "reshenie": {
         "value": "не найдено",
@@ -382,37 +363,34 @@
         "data_status": "not_found"
       },
       "rol_v_voronke": {
-        "value": "знакомство",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "kryuchok": {
-        "value": "Ребят, знаете, у меня что-то так поплохело в последнее время",
+        "value": "Как успокоиться то?",
         "data_status": "ok"
       },
       "struktura": {
-        "value": "личный опыт → выражение тревоги",
+        "value": "вопрос",
         "data_status": "ok"
       },
       "hook_type": {
-        "value": "история",
+        "value": "вопрос",
         "data_status": "ok"
-      },
-      "tokens_vision": 600,
-      "tokens_text": 1398,
-      "tokens_total": 1998
+      }
     },
     {
       "position": 8,
       "reel_id": "3781455125274617151",
       "url": "https://www.instagram.com/p/DR6bWbEEuU_/",
-      "view_count": 1547,
+      "view_count": 1562,
       "likes_count": 76,
       "is_pinned": false,
       "published_at": "2025-12-06T07:06:03.000Z",
-      "engagement_rate": "4.91%",
+      "engagement_rate": "4.87%",
       "vision_status": "ok",
       "hook": {
-        "value": "человек в спортивной одежде с микрофоном — вызывает интерес",
+        "value": "лицо с серьезным выражением крупным планом — привлекает внимание",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -420,9 +398,9 @@
         "data_status": "ok"
       },
       "text_status": "ok",
-      "text_source": "transcript",
+      "text_source": "caption",
       "tema": {
-        "value": "Перезапуск программы",
+        "value": "Запуск курса по SMM",
         "data_status": "ok"
       },
       "bol": {
@@ -430,15 +408,15 @@
         "data_status": "not_found"
       },
       "reshenie": {
-        "value": "Крутые обновления в программе",
+        "value": "Запуск курса по SMM",
         "data_status": "ok"
       },
       "cta": {
-        "value": "не найдено",
-        "data_status": "not_found"
+        "value": "вся инфа в профиле",
+        "data_status": "ok"
       },
       "rol_v_voronke": {
-        "value": "прогрев",
+        "value": "лидогенерация",
         "data_status": "ok"
       },
       "kryuchok": {
@@ -446,30 +424,27 @@
         "data_status": "not_found"
       },
       "struktura": {
-        "value": "вступление → анонс обновлений",
+        "value": "анонс курса → CTA",
         "data_status": "ok"
       },
       "hook_type": {
         "value": "не найдено",
         "data_status": "not_found"
-      },
-      "tokens_vision": 594,
-      "tokens_text": 1273,
-      "tokens_total": 1867
+      }
     },
     {
       "position": 9,
       "reel_id": "3822049483476352283",
       "url": "https://www.instagram.com/p/DUKpcFQkr0b/",
-      "view_count": 1012,
+      "view_count": 1018,
       "likes_count": 66,
       "is_pinned": false,
       "published_at": "2026-01-31T07:19:01.000Z",
-      "engagement_rate": "6.52%",
+      "engagement_rate": "6.48%",
       "vision_status": "ok",
       "hook": {
-        "value": "дорога с красочным закатом на заднем плане — притягивает взгляд",
-        "data_status": "ok"
+        "value": "",
+        "data_status": "not_found"
       },
       "vizual_format": {
         "value": "b-roll",
@@ -508,23 +483,20 @@
       "hook_type": {
         "value": "не найдено",
         "data_status": "not_found"
-      },
-      "tokens_vision": 593,
-      "tokens_text": 1003,
-      "tokens_total": 1596
+      }
     },
     {
       "position": 10,
       "reel_id": "3804079009789723915",
       "url": "https://www.instagram.com/p/DTKzbRcCUUL/",
-      "view_count": 567,
+      "view_count": 570,
       "likes_count": 24,
       "is_pinned": false,
       "published_at": "2026-01-06T12:15:09.000Z",
-      "engagement_rate": "4.23%",
+      "engagement_rate": "4.21%",
       "vision_status": "ok",
       "hook": {
-        "value": "человек на мотоцикле на изгибающейся дороге — вызывает интерес и волнение",
+        "value": "наездник на мотоцикле на извилистой дороге — ощущение движения и скорости",
         "data_status": "ok"
       },
       "vizual_format": {
@@ -558,16 +530,13 @@
         "data_status": "not_found"
       },
       "struktura": {
-        "value": "описание поездки",
-        "data_status": "ok"
+        "value": "не найдено",
+        "data_status": "not_found"
       },
       "hook_type": {
         "value": "не найдено",
         "data_status": "not_found"
-      },
-      "tokens_vision": 596,
-      "tokens_text": 999,
-      "tokens_total": 1595
+      }
     }
   ]
 }

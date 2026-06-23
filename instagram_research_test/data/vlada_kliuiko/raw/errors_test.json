@@ -1,0 +1,16 @@
+[
+  {
+    "step": "highlights_index",
+    "actor_id": "scrapio/instagram-highlights-scraper",
+    "error": "You must rent a paid Actor in order to run it after its free trial has expired. To rent this Actor, go to https://console.apify.com/actors/hZihPOyiPyET6bbrc",
+    "timestamp": "2026-05-11T11:13:20.898884+00:00",
+    "input_used_without_secrets": {
+      "proxyConfiguration": {
+        "useApifyProxy": true
+      },
+      "startUrls": [
+        "https://www.instagram.com/vlada_kliuiko/"
+      ]
+    }
+  }
+]

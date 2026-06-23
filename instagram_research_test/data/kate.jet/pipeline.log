@@ -1,0 +1,24 @@
+2026-06-23 17:54:15,375 INFO Pipeline | @kate.jet | stages=11,12,15,15b,16 | dry_run=True
+2026-06-23 17:54:15,375 INFO [1/5] 11 collect_reels
+2026-06-23 17:54:15,375 INFO [11] collect_reels | @kate.jet | limit=10 | dry_run=True
+2026-06-23 17:54:15,375 INFO [DRY RUN] Apify не вызывается
+2026-06-23 17:54:15,375 INFO [2/5] 12 analyze_reels
+2026-06-23 17:54:15,375 INFO [12] analyze_reels | @kate.jet | reels=10 | dry_run=True
+2026-06-23 17:54:15,375 INFO [DRY RUN] OpenAI не вызывается, файлы не записываются
+2026-06-23 17:54:15,375 INFO [3/5] 15 build_payload
+2026-06-23 17:54:15,376 INFO [15] build_payload | @kate.jet | dry_run=True
+2026-06-23 17:54:15,376 INFO [DRY RUN] Файлы не записываются
+2026-06-23 17:54:15,376 INFO [4/5] 15b prepare_sheets
+2026-06-23 17:54:15,376 INFO [15b] prepare_sheets | @kate.jet | dry_run=True
+2026-06-23 17:54:15,376 INFO [DRY RUN] Файлы не записываются
+2026-06-23 17:54:15,376 INFO [5/5] 16 write_sheets
+2026-06-23 17:54:15,376 INFO [16] write_sheets | @kate.jet | dry_run=True
+2026-06-23 17:54:15,376 INFO [DRY RUN] Файлы не отправляются
+
+=== Pipeline Summary ===
+Аккаунт: @kate.jet
+11 collect_reels: dry_run
+12 analyze_reels: dry_run
+15 build_payload: dry_run
+15b prepare_sheets: dry_run
+16 write_sheets: dry_run

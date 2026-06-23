@@ -1,7 +1,7 @@
 {
   "account": "kate.jet",
   "stage": "stage5a1",
-  "run_timestamp": "2026-05-17T14:12:58.202330+00:00",
+  "run_timestamp": "2026-06-23T08:53:30.080928+00:00",
   "analysis_method": "rule_based",
   "source_ref": "profile_summary.bio_text",
   "niche": {

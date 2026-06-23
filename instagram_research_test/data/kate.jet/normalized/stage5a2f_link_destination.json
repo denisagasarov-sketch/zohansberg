@@ -13,11 +13,11 @@
   "server_hint": "nginx",
   "classification_method": "heuristic",
   "tokens_used": null,
-  "generated_at": "2026-05-17T14:14:23.245015+00:00",
+  "generated_at": "2026-06-23T09:02:43.543497+00:00",
   "result": {
     "destination_type": "бот",
     "confidence": "high",
-    "reasoning": "Domain matched heuristic rule for бот",
+    "reasoning": "Домен соответствует правилу бот",
     "data_status": "ok"
   }
 }

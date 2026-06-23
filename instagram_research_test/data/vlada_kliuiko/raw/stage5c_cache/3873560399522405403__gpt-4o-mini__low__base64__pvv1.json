@@ -1,0 +1,38 @@
+{
+  "story_id": "3873560399522405403",
+  "highlight_id": "18110898391654002",
+  "canonical_title": "GEO",
+  "position_in_highlight": 1,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:13:27.335215+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 199664,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "educational",
+    "commercial_role": "education",
+    "has_visible_text": true,
+    "extracted_text": "Представьте, что вы супер стилист для принцев\n\nМы можем решить все ваши самые горящие вопросы, но должны напомнить вам об одном. Татьяна Короткая действительно понимает, что такое вешать свои ценности на пустое проявление.\n\nОкей, давай я расскажу. Разберем, без воды!\n\n• корень - «стиль»\n• тяжесть - «самостоятельность»\n\nТВОЙ ИДЕАЛЬНЫЙ КОНДИЦИОНЕР\n\n• Лучший вариант (прям попадание в цель)\n\nЧто тебе нужно знать:\n\n• корень «степенчатость»\n• выход в топ выдачи от нейросети называется GEO продвижением",
+    "has_cta": true,
+    "cta_text": "выход в топ выдачи от нейросети",
+    "main_subject": "необходимость использования нейросети в продвижении",
+    "visual_style": "минималистичный, светлые тона, структурированный",
+    "sentiment": "positive",
+    "tags": [
+      "GEO",
+      "продвижение",
+      "нейросеть",
+      "стилист",
+      "образование"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3462,
+  "from_cache": false
+}

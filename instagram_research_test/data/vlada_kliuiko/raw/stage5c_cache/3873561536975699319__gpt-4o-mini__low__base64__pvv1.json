@@ -1,0 +1,38 @@
+{
+  "story_id": "3873561536975699319",
+  "highlight_id": "18110898391654002",
+  "canonical_title": "GEO",
+  "position_in_highlight": 2,
+  "mediaType": "Image",
+  "model": "gpt-4o-mini",
+  "detail": "low",
+  "image_input_mode": "base64",
+  "prompt_version": "v1",
+  "analysis_timestamp": "2026-05-12T13:13:37.572312+00:00",
+  "url_used_field": "imageUrl",
+  "fetch_bytes": 194919,
+  "fetch_content_type": "image/jpeg",
+  "status": "analyzed",
+  "analysis": {
+    "content_type": "other",
+    "commercial_role": "none",
+    "has_visible_text": true,
+    "extracted_text": "тыкните на любую реакцию, если логика понятна💖\nтак я пойму, интересна ли вам тема, и точно ли я все подробно описала",
+    "has_cta": true,
+    "cta_text": "тыкните на любую реакцию",
+    "main_subject": "человек с улыбкой",
+    "visual_style": "непринужденный, мягкие тона, простой фон",
+    "sentiment": "positive",
+    "tags": [
+      "реакция",
+      "тематика",
+      "обсуждение",
+      "отзыв",
+      "взаимодействие"
+    ],
+    "confidence": "high",
+    "notes": null
+  },
+  "tokens_used": 3323,
+  "from_cache": false
+}

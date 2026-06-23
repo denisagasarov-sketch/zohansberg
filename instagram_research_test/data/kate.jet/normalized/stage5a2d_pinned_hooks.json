@@ -3,37 +3,39 @@
   "stage": "stage5a2d",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T14:14:10.041840+00:00",
+  "generated_at": "2026-06-23T09:02:36.501377+00:00",
   "posts": [
     {
       "position": 1,
       "post_type": "Sidecar",
-      "carousel_narrative": "Кейс о создании системы, увеличивающей доход через SMM и аналитику.",
-      "carousel_cta": "не найдено",
+      "carousel_narrative": "Описание модулей программы курса по управлению и тестированию в SMM.",
+      "carousel_cta": "узнать в шапке профиля",
       "image_source": "carousel",
-      "displayUrl_used": "https://scontent-lga3-3.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-lga3-3.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gERlH10g3bSLHp3izngd--sRGYewRJnbBIpTnQnCj-gK_kUVCA5w80ULyV-j1VsxDw&_nc_ohc=Uq7FxGdoZVAQ7kNvwEZr4pX&_nc_gid=oAt97fPEI6quj2fZKVAD0g&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af79uDMXL6cVXotf2BdNPq4JkyZnQOA4yHWxxu377BLfZQ&oe=6A0FABE5&_nc_sid=10d13b",
+      "displayUrl_used": "https://scontent-dfw6-1.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-dfw6-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gF5D9bd-iACuQEGJPX8DvekRWRyLQ_jN5dmzNtYoweCM27KJnBKrb02E8LPNQOXsHg&_nc_ohc=tHSEVLndYb4Q7kNvwG0i1fI&_nc_gid=u4frs8dsHI0t7CtJvbuGDw&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af81sd7dWY-h83rjt3dNMIl597grx6X0VI6dKnvVuvVpfg&oe=6A402576&_nc_sid=10d13b",
       "skipped": false,
       "hook": {
-        "value": "Как выстроить SMM на $1 млн → Успешный кейс.",
+        "value": "Программа курса → внимание к обучению SMM с возможностью управления процессами",
         "data_status": "ok",
-        "notes": "На обложке изображение девушки в очках и текст о SMM кейсе."
+        "notes": "На первом слайде изображена женщина, стоящая перед морем, и заголовок о программе курса 'Системный SMM'."
       },
-      "tokens_used": 1000
+      "images_analyzed": 5,
+      "download_warnings": []
     },
     {
       "position": 2,
       "post_type": "Sidecar",
-      "carousel_narrative": "Карусель описывает блоки курса и их содержание, включая инструменты и материалы.",
-      "carousel_cta": "Хочешь вырасти как спец, ощутить контроль над ситуацией в SMM?",
+      "carousel_narrative": "Описание системы аналитики и контента, завершающееся анонсом воркшопа и результатами студентов.",
+      "carousel_cta": "поделюсь шаблонами",
       "image_source": "carousel",
-      "displayUrl_used": "https://scontent-atl3-2.cdninstagram.com/v/t51.82787-15/586911036_18545477062036910_4197282936902800217_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-atl3-2.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gF2Rj8jUr4c6CwB2W6ZFoBqGvqtjooN5RGz9AKU6-8jIsgKaqZlrkRnRwgmF5iOSCA&_nc_ohc=lvW8ZjBltncQ7kNvwGDvUR1&_nc_gid=l3e5Cu68lEo05DMHWNMKTQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af6CszrmEdKAzWgeX1mr9kw8wptSuqxfKH2Vu3WBRmYOvg&oe=6A0F9636&_nc_sid=10d13b",
+      "displayUrl_used": "https://scontent-atl3-2.cdninstagram.com/v/t51.82787-15/642550280_18569917048036910_6056550292763533873_n.jpg?stp=dst-jpg_e15_fr_p1080x1080_tt6&_nc_ht=scontent-atl3-2.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gHIBg3p_SwkqCilJBop8KqIi2T5ZHoRl_j6xG8ct3WSSZrzLjNWEiUYHeaiK444NaQ&_nc_ohc=OL_y0HVlbS0Q7kNvwFS7Ff2&_nc_gid=2Qn7vFQ540QLTWrWJBtG-w&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af-xHygGruEZAA-eKlIq1_wjRxDOugjlA_F4Z7RudPc1PA&oe=6A4002E5&_nc_sid=10d13b",
       "skipped": false,
       "hook": {
-        "value": "Программа курса «Системный SMM» → Изучай SMM с профессионалами",
+        "value": "как выстроить SMM на $1 млн",
         "data_status": "ok",
-        "notes": "На обложке изображение женщины на пляже и текст о курсе."
+        "notes": "женщина в солнечных очках с текстом 'Мой кейс' и 'Как выстроить SMM на $1 млн'"
       },
-      "tokens_used": 1016
+      "images_analyzed": 5,
+      "download_warnings": []
     }
   ]
 }

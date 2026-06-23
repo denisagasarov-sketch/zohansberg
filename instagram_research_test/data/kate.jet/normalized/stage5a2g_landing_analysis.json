@@ -2,28 +2,29 @@
   "account": "kate.jet",
   "stage": "stage5a2g",
   "prompt_version": "v3",
-  "generated_at": "2026-05-17T14:14:27.095952+00:00",
+  "generated_at": "2026-06-23T09:02:43.545500+00:00",
   "url": "https://t.me/SMMworkshopBot",
   "destination_type": "бот",
   "fetch_success": true,
   "text_length": 0,
   "is_spa": false,
   "screenshots_taken": 0,
+  "screenshots_dir": "",
   "pass_statuses": {
-    "g1": "skipped_bot",
-    "g2": "skipped_bot",
-    "g3": "skipped_bot",
-    "g4": "skipped_bot",
-    "g5": "skipped_bot",
-    "g6": "skipped_bot",
-    "g7": "skipped_bot"
+    "g1_vision": "skipped_bot",
+    "g2_text_positioning": "skipped_bot",
+    "g3_text_trust": "skipped_bot",
+    "g4_text_pains": "skipped_bot",
+    "g5_text_product": "skipped_bot",
+    "g6_text_sales": "skipped_bot",
+    "g7_text_creative": "skipped_bot"
   },
-  "tokens_used": 0,
+  "tokens_used": null,
   "fields_new": {
     "glavnyy_zagolovok": {
-      "value": "Воркшоп по SMM от Кейт Семёновой",
-      "data_status": "ok",
-      "confidence": "high"
+      "value": "",
+      "data_status": "not_applicable",
+      "confidence": "low"
     },
     "podzagolovok": {
       "value": "",
@@ -111,9 +112,9 @@
       "confidence": "low"
     },
     "nazvanie_produkta": {
-      "value": "⚡️ Систематизируй SMM с помощью курса |https://clck.ru/3SX9aE | Старт 1 июня \t⚡️ По вопросам писать @kate_jet",
-      "data_status": "ok",
-      "confidence": "high"
+      "value": "",
+      "data_status": "not_applicable",
+      "confidence": "low"
     },
     "format": {
       "value": "",
@@ -173,16 +174,16 @@
   },
   "fields": {
     "chto_prodayut": {
-      "value": "⚡️ Систематизируй SMM с помощью курса |https://clck.ru/3SX9aE | Старт 1 июня \t⚡️ По вопросам писать @kate_jet",
-      "data_status": "ok"
+      "value": "",
+      "data_status": "not_applicable"
     },
     "pervye_3_ekrana": {
       "value": "",
       "data_status": "not_applicable"
     },
     "glavnyy_zagolovok": {
-      "value": "Воркшоп по SMM от Кейт Семёновой",
-      "data_status": "ok"
+      "value": "",
+      "data_status": "not_applicable"
     },
     "podzagolovok": {
       "value": "",

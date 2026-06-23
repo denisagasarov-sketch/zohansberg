@@ -119,6 +119,162 @@ _SHEET_LABELS = {
     "la":   "Лендинг",
 }
 
+# ---------------------------------------------------------------------------
+# Account summary helpers
+# ---------------------------------------------------------------------------
+
+def _format_followers(n) -> str:
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return str(n) if n else "—"
+    if n >= 1_000_000:
+        val = f"{n / 1_000_000:.1f}".rstrip("0").rstrip(".")
+        return f"{val}M"
+    if n >= 1_000:
+        val = f"{n / 1_000:.1f}".rstrip("0").rstrip(".")
+        return f"{val}K"
+    return str(n)
+
+
+# Группы блоков для сводки: (ключи meta.json, отображаемое название)
+_SUMMARY_BLOCKS = [
+    (["profile", "bio"], "Профиль и bio"),
+    (["pinned"],         "Закрепы"),
+    (["highlights"],     "Хайлайты"),
+    (["reels"],          "Reels"),
+    (["posts"],          "Посты"),
+    (["landing"],        "Лендинг"),
+]
+
+# Листы таблицы в порядке важности для короткой строки
+_SHEET_DISPLAY_ORDER = [
+    ("Посты",              "Посты"),
+    ("Reels",              "Reels"),
+    ("Закрепленные посты", "Закрепы"),
+    ("Описание профиля",   "Профиль"),
+]
+
+
+def _get_account_summary(username: str) -> str:
+    data_dir = RESEARCH_DIR / "data" / username / "normalized"
+
+    # meta.json — даты блоков
+    meta = {}
+    try:
+        p = data_dir / "meta.json"
+        if p.exists():
+            meta = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+
+    # profile_summary.json — имя и подписчики
+    full_name = ""
+    followers_str = ""
+    try:
+        p = data_dir / "profile_summary.json"
+        if p.exists():
+            ps = json.loads(p.read_text(encoding="utf-8"))
+            fn = ps.get("full_name", {})
+            full_name = fn.get("value", "") if isinstance(fn, dict) else str(fn)
+            fc = ps.get("followers_count", {})
+            fc_val = fc.get("value") if isinstance(fc, dict) else fc
+            followers_str = _format_followers(fc_val)
+    except Exception:
+        pass
+
+    # sheets_payload.json — количество строк по листам
+    sheet_counts: dict = {}
+    try:
+        p = data_dir / "sheets_payload.json"
+        if p.exists():
+            sp = json.loads(p.read_text(encoding="utf-8"))
+            for sheet_name, sheet_data in sp.get("sheets", {}).items():
+                sheet_counts[sheet_name] = len(sheet_data.get("rows", []))
+    except Exception:
+        pass
+
+    lines = [f"📋 @{username}"]
+    profile_parts = []
+    if full_name:
+        profile_parts.append(f"👤 {full_name}")
+    if followers_str:
+        profile_parts.append(f"{followers_str} подписчиков")
+    if profile_parts:
+        lines.append(" | ".join(profile_parts))
+
+    lines.append("\n📅 Последние обновления:")
+    for block_keys, label in _SUMMARY_BLOCKS:
+        dates = [meta[k] for k in block_keys if k in meta]
+        if dates:
+            latest = max(dates)
+            date_display = latest.split(" ")[0] if " " in latest else latest
+            lines.append(f"✅ {label} — {date_display}")
+        else:
+            lines.append(f"⚠️ {label} — нет данных")
+
+    table_parts = []
+    for sheet_key, short_name in _SHEET_DISPLAY_ORDER:
+        count = sheet_counts.get(sheet_key)
+        if count is not None:
+            table_parts.append(f"{short_name}: {count}")
+    if table_parts:
+        lines.append("\n📊 В таблице:")
+        lines.append("  " + " | ".join(table_parts))
+
+    return "\n".join(lines)
+
+
+def _accounts_list_text() -> str:
+    accounts = _load_accounts()
+    if not accounts:
+        return "Нет аккаунтов. Добавьте первый:"
+
+    lines = ["Выберите аккаунт для анализа:\n"]
+    for acc in accounts[:10]:
+        uname = acc.get("username", "")
+        data_dir = RESEARCH_DIR / "data" / uname / "normalized"
+
+        has_data = False
+        latest_date = ""
+        try:
+            p = data_dir / "meta.json"
+            if p.exists():
+                meta = json.loads(p.read_text(encoding="utf-8"))
+                if meta:
+                    has_data = True
+                    latest = max(meta.values())
+                    parts = latest.split(".")
+                    if len(parts) >= 2:
+                        latest_date = f"{parts[0]}.{parts[1]}"
+        except Exception:
+            pass
+
+        sheet_parts = []
+        try:
+            p = data_dir / "sheets_payload.json"
+            if p.exists():
+                sp = json.loads(p.read_text(encoding="utf-8"))
+                sheets = sp.get("sheets", {})
+                for sheet_key, short_name in _SHEET_DISPLAY_ORDER[:3]:
+                    sd = sheets.get(sheet_key, {})
+                    n = len(sd.get("rows", [])) if isinstance(sd, dict) else 0
+                    if n:
+                        sheet_parts.append(f"{short_name} {n}")
+        except Exception:
+            pass
+
+        status = "✅" if has_data else "⚪"
+        header = f"@{uname} {status}"
+        if latest_date:
+            header += f" — {latest_date}"
+        lines.append(header)
+        if sheet_parts:
+            lines.append("  " + " | ".join(sheet_parts))
+
+    return "\n".join(lines)
+
+
 # Apify cost estimates per block (USD)
 _APIFY_COSTS = {"01-04": 0.05, "08-10": 0.10, "11-12": 0.05, "13-14": 0.10}
 # OpenAI cost estimates per block (USD)
@@ -133,6 +289,7 @@ def _default_settings() -> dict:
         "months_back":    6,
         "target_count":   30,
         "content_filter": "all",
+        "write_mode":     "replace",
         "sheets":         {k: True for k in _SHEET_LABELS},
     }
 
@@ -351,15 +508,23 @@ async def _get_apify_balance() -> float | None:
 # ---------------------------------------------------------------------------
 
 _STAGE_NAMES = {
-    "01": "collect_profile",    "02": "collect_pinned_details",
-    "03": "analyze_pinned_posts", "04": "analyze_pinned_visuals",
-    "05": "analyze_bio",        "06": "classify_profile_link",
-    "07": "analyze_landing",    "08": "collect_highlights",
-    "09": "collect_stories",    "10": "analyze_highlights",
-    "11": "collect_reels",      "12": "analyze_reels",
-    "13": "collect_posts",      "14": "analyze_posts",
-    "15": "build_payload",      "15b": "prepare_sheets",
-    "16": "write_sheets",
+    "01":  "Профиль и закрепы",
+    "02":  "Детали закрепов",
+    "03":  "Анализ текста закрепов",
+    "04":  "Визуал закрепов",
+    "05":  "Анализ bio",
+    "06":  "Классификация ссылки",
+    "07":  "Анализ лендинга",
+    "08":  "Сбор хайлайтов",
+    "09":  "Сбор сторис",
+    "10":  "Анализ хайлайтов",
+    "11":  "Сбор Reels",
+    "12":  "Анализ Reels",
+    "13":  "Сбор постов",
+    "14":  "Анализ постов",
+    "15":  "Сборка данных",
+    "15b": "Подготовка таблицы",
+    "16":  "Запись в таблицу",
 }
 
 
@@ -436,6 +601,7 @@ async def _run_pipeline_task(
         sys.executable, str(RUN_PY),
         "--account", username,
         "--stages", ",".join(stages),
+        "--write-mode", settings.get("write_mode", "replace"),
     ]
     if dry_run:
         cmd.append("--dry-run")
@@ -525,6 +691,8 @@ async def _run_pipeline_task(
         text += "\n🧪 Это был dry-run — данные не записаны"
     else:
         text += f"\n🔗 Таблица: {SPREADSHEET_URL}"
+        account_summary = _get_account_summary(username)
+        text += f"\n\n{account_summary}"
     if not ok and log_path.exists():
         text += f"\n📄 Лог: {log_path}"
 
@@ -547,8 +715,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     await update.message.reply_text(
-        "Привет! Я бот для анализа Instagram-конкурентов.",
-        reply_markup=_main_keyboard(),
+        "👋 Привет! Я анализирую Instagram-конкурентов.\n\n🔍 Выбери конкурента из списка или добавь нового.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("📋 Мои конкуренты", callback_data="show_accounts"),
+            InlineKeyboardButton("➕ Добавить нового", callback_data="acc_new"),
+        ]]),
     )
 
 
@@ -573,7 +744,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Account list ──────────────────────────────────────────────────────
     if data == "show_accounts":
         await query.edit_message_text(
-            "Выберите аккаунт для анализа:",
+            _accounts_list_text(),
             reply_markup=_accounts_keyboard(),
         )
         return
@@ -591,8 +762,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "settings" not in context.user_data:
             context.user_data["settings"] = _default_settings()
         s = context.user_data["settings"]
+        summary = _get_account_summary(username)
         await query.edit_message_text(
-            _settings_text(username, s),
+            f"{summary}\n\n{_settings_text(username, s)}",
             reply_markup=_settings_keyboard(s),
         )
         return

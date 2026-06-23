@@ -30,6 +30,6 @@
 - 11 collect_reels.py          — готов
 - 12 analyze_reels.py          — готов
 - 13 collect_posts.py          — готов
-- 14 analyze_posts.py          — НЕ НАПИСАН
-- 15 build_payload.py          — НЕ НАПИСАН
-- 16 write_sheets.py           — НЕ НАПИСАН
+- 14 analyze_posts.py          — готов
+- 15 build_payload.py          — готов
+- 16 write_sheets.py           — готов

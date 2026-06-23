@@ -3,264 +3,57 @@
   "stage": "stage5b2v",
   "prompt_version": "v2",
   "model": "gpt-4o",
-  "generated_at": "2026-05-17T14:16:59.640226+00:00",
+  "generated_at": "2026-06-23T09:05:03.608912+00:00",
   "analyzed_highlights": [
     {
       "highlight_id": "18048529088454532",
       "title": "Отзывы",
       "position": 1,
-      "stories_total": 13,
-      "stories_selected": 5,
-      "imageUrls_used": [
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/591152522_18547595119036910_220401137742389952_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=108&ig_cache_key=Mzc4MzE0MTExNzE3ODAyNDEyMA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=aE2QuHVfybwQ7kNvwH1HlDb&_nc_oc=AdqnvS056scn6k_y5j_4-Gqa-3ewTnuYhAqt9-vyt7W2eiMEfg1AF4bWGChNPJDn6mw&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=HayPxbpCWTvcOp_qy2iiBg&_nc_ss=7a22e&oh=00_Af6AkIQ10sy3SfRIre6qp8LfRNI2p128YyoDs-TLMbWp5Q&oe=6A0DA131",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/588237528_18547595143036910_8338020607328116184_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=103&ig_cache_key=Mzc4MzE0MTIzMTE1NDA3MDY4MQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=Un0Q7PrG5fYQ7kNvwFksv7y&_nc_oc=AdqTR1KiAvN67TmbLbXUVZbsMoJZ5mLJpYLsjYbg1A4CXCgXQbmXOQby8qabEm3mloE&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=HayPxbpCWTvcOp_qy2iiBg&_nc_ss=7a22e&oh=00_Af77SZ2rLiHJfHbz5yoQhoZs9ZN2rmovaTNJwvUQa5P0ow&oe=6A0DA956",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/588750625_18547595173036910_6051995082198769851_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=100&ig_cache_key=Mzc4MzE0MTM1ODQ1OTU5MTQyNQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=h0C3JOjhvT8Q7kNvwG6xtl3&_nc_oc=Adp348tSU9fA9Jre7FJOxC7ty4rN6b_1Bi4T0OV_oNLYy0Rb9svREr9F19lHigGkgUs&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=HayPxbpCWTvcOp_qy2iiBg&_nc_ss=7a22e&oh=00_Af6mfcT1Xn0fSEulW97RPuTBkoqHcM6Z_-fUX6jZHtvqhw&oe=6A0DA66A",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/574200308_18547595227036910_2588330123572172737_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=109&ig_cache_key=Mzc4MzE0MTYzNTg2MjQ1MzM1MA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=i5owX4wWTjEQ7kNvwEF5hmM&_nc_oc=AdrQ05ieq8LK_SWRppYLB87ms-MwB_Z5HHigWuJdqqeOHZUAB4BD1x7SJV0J4FnDPEQ&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=HayPxbpCWTvcOp_qy2iiBg&_nc_ss=7a22e&oh=00_Af6DP1yTMkAfCA1vhxX0m2itODhIFttdNisXhxkoGoxVHw&oe=6A0DD558",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/590912004_18547595332036910_6511189485254309053_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=107&ig_cache_key=Mzc4MzE0MTc1NDU5NDgyODQwNw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=5zLeABb2bKUQ7kNvwEBQKIh&_nc_oc=Adr8SmL1Ay8lyBskiqAU4VaQlEwGaaFk1OM0j7VGg4U-BA9KhySh2H7fD0TIJyPgFnY&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=HayPxbpCWTvcOp_qy2iiBg&_nc_ss=7a22e&oh=00_Af4wuvIhXFE4aKY0PMK8VYNeG4aBbqQs9kIC-BWhj8tLtQ&oe=6A0DB607"
-      ],
-      "skipped": false,
-      "fields": {
-        "tema": {
-          "value": "отзывы",
-          "data_status": "ok",
-          "notes": "Кадры содержат отзывы студентов о курсе."
-        },
-        "zadacha": {
-          "value": "социальное доказательство",
-          "data_status": "ok",
-          "notes": "Отзывы студентов создают доверие к курсу."
-        },
-        "chto_vnutri": {
-          "value": "Студенты делятся своими впечатлениями и результатами после прохождения курса.",
-          "data_status": "ok",
-          "notes": "Каждый кадр содержит отзыв студента о курсе."
-        },
-        "mekhanika": {
-          "value": "отзыв",
-          "data_status": "ok",
-          "notes": "Контент представлен в виде текстовых отзывов студентов."
-        },
-        "cta": {
-          "value": "курс",
-          "data_status": "ok",
-          "notes": "Призыв к действию предлагает оставить заявку на курс."
-        }
-      },
-      "tokens_used": 1810,
-      "cover_hook": {
-        "status": "ok",
-        "text": "На обложке хайлайта хуком может быть заголовок \"СТУДЕНТЫ О КУРСЕ\". Он привлекает внимание и сразу дает понять, о чем будет информация."
-      },
-      "cta_targeted": {
-        "status": "ok",
-        "text": "оставь заявку на курс",
-        "frames_used": 2
-      }
+      "stories_total": 0,
+      "stories_selected": 0,
+      "imageUrls_used": [],
+      "skipped": true,
+      "skip_reason": "no_image_urls"
     },
     {
       "highlight_id": "18136644298466967",
       "title": "Публикации",
       "position": 2,
-      "stories_total": 11,
-      "stories_selected": 5,
-      "imageUrls_used": [
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/588067238_18544980691036910_7905004962963105498_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=Mzc3MjIyNjI0NTQwMTY5NzAyMA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=FWwEWrCV38oQ7kNvwHwz-Z5&_nc_oc=AdqgwHXHUHitO6rp249yMDQfmS8O9_SG-g3dfoonVtx6rLOZ8mOK3MsxetMsqV4onBE&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=5mPKyOfrMJq3mIIAHg8p4g&_nc_ss=7a22e&oh=00_Af4OOFgK6kdZDvNNTxKKIQ0Gr4KRRasNB_y9tPL8vBoDtg&oe=6A0DAF3A",
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/589035593_18544980856036910_4331799238013736451_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=Mzc3MjIyNjg4ODc5OTQ5NjM1OA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=_Uf65qefWsUQ7kNvwHQbjk8&_nc_oc=Adppp3t2BfoWox77O34snwKJoZh-qKfTmLAxVKqAvMSIriZ_SQ1OEtiZDPKi8m2O078&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=5mPKyOfrMJq3mIIAHg8p4g&_nc_ss=7a22e&oh=00_Af5-jlAzgMOZ-_85q5NJBaHl6ZpRnvO5D7uSwDNmIO6Ubg&oe=6A0DA970",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/588416438_18544980976036910_6323427083939356882_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=102&ig_cache_key=Mzc3MjIyNzI3OTg2ODA1MTU4Nw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=J7ySURB8xEcQ7kNvwEbl0Ga&_nc_oc=Adqpk_dY7lubCwt2kOEANUXRn8zRUIe_SpmlwEXUAHG1SrOJMp-gq7p2uWTEmaTfzb4&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=5mPKyOfrMJq3mIIAHg8p4g&_nc_ss=7a22e&oh=00_Af4m88HEP8S856A7iXnh4CtTmZE7bwKfNXt1PFsWFahbow&oe=6A0D9FD8",
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/584454520_18544981051036910_376815301943675518_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=106&ig_cache_key=Mzc3MjIyNzU2MDI0MDQ1MTAwOQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=34yWC9PxPigQ7kNvwEHp578&_nc_oc=AdqWgpiBUUQE0Q4xp7p1Gq0YRyHp0ai1kW18RBqZtfAEBQ7ZXu35X7CpaPNDgXSnlFs&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=5mPKyOfrMJq3mIIAHg8p4g&_nc_ss=7a22e&oh=00_Af7PlXb48Lt3yS8xmKGVAjhvNQa2E1ySgAadquYuDglpxw&oe=6A0DCD10",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/585859668_18544981117036910_6127118138337504362_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=102&ig_cache_key=Mzc3MjIyNzg3NDMwOTk5NDIzNg%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExNzkuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=nu58rh4UylQQ7kNvwE1fBxi&_nc_oc=Adp2J42_1-IRcB48UTqwKlmVGXHdBHvpuZXFWRf7QpbTw6bx5C1-fNQK6TlzKNt0W6M&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=5mPKyOfrMJq3mIIAHg8p4g&_nc_ss=7a22e&oh=00_Af5IhoVbLjboQTS7AShuI2WFS5mydpOScOUywsJPbNH9Eg&oe=6A0DC05A"
-      ],
-      "skipped": false,
-      "fields": {
-        "tema": {
-          "value": "обучение",
-          "data_status": "ok",
-          "notes": "Кадры содержат образовательный контент о SMM и бизнесе."
-        },
-        "zadacha": {
-          "value": "обучение",
-          "data_status": "ok",
-          "notes": "Цель — обучить аудиторию через статьи и подкасты."
-        },
-        "chto_vnutri": {
-          "value": "Показывают статьи и подкасты о SMM и бизнес-стратегиях.",
-          "data_status": "ok",
-          "notes": "Кадры содержат ссылки на образовательные материалы."
-        },
-        "mekhanika": {
-          "value": "репост сторис",
-          "data_status": "ok",
-          "notes": "Контент представлен в виде репостов статей и подкастов."
-        },
-        "cta": {
-          "value": "сайт",
-          "data_status": "ok",
-          "notes": "Призывы к действию ведут на внешние сайты и платформы."
-        }
-      },
-      "tokens_used": 1849,
-      "cover_hook": {
-        "status": "ok",
-        "text": "На обложке хайлайта хуком является заголовок: \"Как аналитика превращает SMM в полноценный канал продаж\". Он привлекает внимание, так как обещает раскрыть полезную информацию о том, как использовать аналитику для улучшения продаж через социальные медиа."
-      },
-      "cta_targeted": {
-        "status": "ok",
-        "text": "слушать",
-        "frames_used": 2
-      }
+      "stories_total": 0,
+      "stories_selected": 0,
+      "imageUrls_used": [],
+      "skipped": true,
+      "skip_reason": "no_image_urls"
     },
     {
       "highlight_id": "18145835785306063",
       "title": "Мой путь",
       "position": 3,
-      "stories_total": 77,
-      "stories_selected": 2,
-      "imageUrls_used": [
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/554841959_17970655043795518_2909540514062908143_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=MzIyMTgyMjgyMDcyNzYzMDUzNw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=QkAiPwDK8ZcQ7kNvwEq1RJh&_nc_oc=Adp_hz9wj_v0TQAInrI4vOxm_7syi5FrgyA2SI0TAwh02yJOmPOJhqi2at-fP-NKsZI&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=gnf6Vsp4ynFWitePPbeW-w&_nc_ss=7a22e&oh=00_Af4MM6EwuN109II9EGSxaRKpO1tC6T_y2NdYgyOHbKS0Vg&oe=6A0DBE20",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/566275229_18060377618188618_7300913113894201839_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=MzIyMTgyMjg1MTM2MjcyODA5Nw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=Gm4XhBPJwfcQ7kNvwGhGwpg&_nc_oc=Adqv_uDZja31q5TXD0bTfqUPh4qDkst2qd4UbCSbUXQci4ab1eY3OIxtAC0XMZVSJ0M&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=gnf6Vsp4ynFWitePPbeW-w&_nc_ss=7a22e&oh=00_Af67jLq61dN1YvqR9ma0AcFagRmR-Z7BJYdtX5z2bm48eA&oe=6A0DC9C2"
-      ],
-      "skipped": false,
-      "fields": {
-        "tema": {
-          "value": "знакомство",
-          "data_status": "ok",
-          "notes": "Название 'Мой путь' и содержание указывают на личную историю."
-        },
-        "zadacha": {
-          "value": "доверие",
-          "data_status": "ok",
-          "notes": "Личная история помогает установить доверие с аудиторией."
-        },
-        "chto_vnutri": {
-          "value": "Автор делится личной историей и важными событиями своей жизни.",
-          "data_status": "ok",
-          "notes": "Упоминание о частях и событиях указывает на личный рассказ."
-        },
-        "mekhanika": {
-          "value": "видео",
-          "data_status": "ok",
-          "notes": "Кадры выглядят как часть видеорассказа."
-        },
-        "cta": {
-          "value": "",
-          "data_status": "not_found",
-          "notes": "Призыв к действию не виден на кадрах."
-        }
-      },
-      "tokens_used": 1481,
-      "cover_hook": {
-        "status": "ok",
-        "text": "На обложке хайлайта хуком является визуал и заголовок. Яркий красный топ и поза модели привлекают внимание, а крупный текст на фоне сразу бросается в глаза."
-      },
-      "cta_targeted": {
-        "status": "ok",
-        "text": "not_found",
-        "frames_used": 1
-      }
+      "stories_total": 0,
+      "stories_selected": 0,
+      "imageUrls_used": [],
+      "skipped": true,
+      "skip_reason": "no_image_urls"
     },
     {
       "highlight_id": "18036274999576186",
       "title": "Обо мне",
       "position": 4,
-      "stories_total": 14,
-      "stories_selected": 5,
-      "imageUrls_used": [
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/561812306_18090768460857973_3435224233980914659_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=MzIxNzYwNjk4OTg1NjQwOTA1MA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=ujgPALf8-VoQ7kNvwFXJJkp&_nc_oc=Adq3vvR5n4YTRrVUJKv6icwfcXhV2ZUMlHdXN1joeDoIzkatrpwTtvSyfpS3RleNcjE&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=I9PpnLDhlkxENQTwpE1ksA&_nc_ss=7a22e&oh=00_Af59Pa46jiha-jWYU4DHlSaYQAOf2kHwwnF9PV-Rpy0SpA&oe=6A0DD60D",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/569037369_18055704656285278_4734585999783907407_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=103&ig_cache_key=MzIxNzYwNjk5MjQ5MDQyMTE4Nw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=9fLpew_KujYQ7kNvwHz6Io0&_nc_oc=AdqRFbURJO2GMNx1aXQ-bjKlwGHcgScMOI7JTHcsgtvmHSOSQrkyoyvzPc9ZOnE8K1M&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=I9PpnLDhlkxENQTwpE1ksA&_nc_ss=7a22e&oh=00_Af5NEvBY47LyPpPsgzGo0WiWgU9PfK5pnv0gaip2HpKnlA&oe=6A0DCB64",
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/567201642_18058470734213954_7581985230428607915_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=MzIxNzYwNjk4NDQ5NjIzNDAzOQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=nHreFEMfke8Q7kNvwH-o_Yx&_nc_oc=AdpIrbZMt6C4QrkD2ORDFvUD_rdrkeGhTBedta5DP88h9MWG6DUFKBzJWkzq6nSkzuo&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=I9PpnLDhlkxENQTwpE1ksA&_nc_ss=7a22e&oh=00_Af7KPDoE0lpvrEsxsMyVGq-yZM-Hi3Uq8ZqOKlZYkqJivA&oe=6A0DCFC0",
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/574401589_18158920390394101_6160422189687127106_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=111&ig_cache_key=MzIxNzYwNjk5MTkwMzMyOTg1NQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=Wggs2c4jWlcQ7kNvwF53Eah&_nc_oc=AdogFL3ClU5_7Px2UL-Gk36GFL32VwQcr7R1qcARr5jrc8W_FQfDyWRr_KGqZFEivek&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=I9PpnLDhlkxENQTwpE1ksA&_nc_ss=7a22e&oh=00_Af6PLElz-3EDrrRMtM-zWblfH9v2sQ6C2MFsiILpYOJNbA&oe=6A0DC3D8",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/558511309_18058734644552716_1024859870438048093_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=100&ig_cache_key=MzIxNzYwNjk5MzYzMTQxMjM3OQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=ghgt8hoEPq4Q7kNvwGVavXJ&_nc_oc=AdqBbLpmaNO6YEMhCHwi2ai5jzDaZki3GhGrEMXTNRDK1NL3dF7RxWNFZwqTDI2w0lk&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=I9PpnLDhlkxENQTwpE1ksA&_nc_ss=7a22e&oh=00_Af4toi4g1-K8s0CIjFlZgp1rKNbbsWmZ7p6HwATpN4_Tcw&oe=6A0DBB60"
-      ],
-      "skipped": false,
-      "fields": {
-        "tema": {
-          "value": "знакомство",
-          "data_status": "ok",
-          "notes": "Кадры рассказывают о личных достижениях и интересах автора."
-        },
-        "zadacha": {
-          "value": "доверие",
-          "data_status": "ok",
-          "notes": "Автор делится своими достижениями и личными фактами для создания доверия."
-        },
-        "chto_vnutri": {
-          "value": "Автор рассказывает о своих профессиональных достижениях и личных интересах.",
-          "data_status": "ok",
-          "notes": "Кадры содержат информацию о карьере и личных увлечениях."
-        },
-        "mekhanika": {
-          "value": "кейс",
-          "data_status": "ok",
-          "notes": "Контент представлен в виде кейсов и личных историй."
-        },
-        "cta": {
-          "value": "",
-          "data_status": "not_found",
-          "notes": "Явного призыва к действию на кадрах не видно."
-        }
-      },
-      "tokens_used": 1825,
-      "cover_hook": {
-        "status": "ok",
-        "text": "Хуком на этой обложке является заголовок \"ПРИГЛАСИЛИ НА TED\". Он выделен крупным шрифтом и привлекает внимание в первую очередь."
-      },
-      "cta_targeted": {
-        "status": "ok",
-        "text": "not_found",
-        "frames_used": 2
-      }
+      "stories_total": 0,
+      "stories_selected": 0,
+      "imageUrls_used": [],
+      "skipped": true,
+      "skip_reason": "no_image_urls"
     },
     {
       "highlight_id": "17919926188005828",
       "title": "КНИГИ",
       "position": 5,
-      "stories_total": 34,
-      "stories_selected": 5,
-      "imageUrls_used": [
-        "https://scontent-ord5-2.cdninstagram.com/v/t51.82787-15/561198754_18077530949105677_8347168180716724722_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=MjgzOTYzNzk3NDcwNzg2NTQ0MQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=BHZ2CKtruu0Q7kNvwER4OVx&_nc_oc=Adr1qTN4iWm6S66fO0sbnLURCwF5GYP84bzYyJCK7ByjGtvDbBr1Fut0342jSPywQK4&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-2.cdninstagram.com&_nc_gid=rz6J5dTav5_IcpqAkVvkXA&_nc_ss=7a22e&oh=00_Af4UCL1Yzgarfi66yd-BGPaSFj4OoqNFwuhPEZe0HNftrw&oe=6A0DB7AA",
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/564501119_18133420753457094_6136401649852434554_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=MjkwNTg5MzY3OTA2NDc3ODc2NA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=_QDp2KhlSjIQ7kNvwG75qta&_nc_oc=Adp9JTzgG14ZTPx-plklgASIbuyZU1XAMYNCBjcomwL_WtGhECl8LXZGgLe9OsMpVE4&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=rz6J5dTav5_IcpqAkVvkXA&_nc_ss=7a22e&oh=00_Af5FXKLAz25LJaLe51db_lzAhaOMGYTNgHHezNX_Q_9gOA&oe=6A0DC45B",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/567972017_18075524449915907_4579860179429121902_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=110&ig_cache_key=Mjk3Mjc4OTM1MTg4NjI1OTgwMw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=yG14OqB5GY8Q7kNvwH1AJ17&_nc_oc=AdrFb5xo12BI-OghAycis0dwiwjC_HVFQ9RNA_b9A0zZj6MEBPNJ3zoYgoOKWITleqA&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=rz6J5dTav5_IcpqAkVvkXA&_nc_ss=7a22e&oh=00_Af4JuqYvUqa9N_wN9aJ5otrCqvbLSmCCWuKqdAmyE-0YUw&oe=6A0DC225",
-        "https://scontent-ord5-1.cdninstagram.com/v/t51.82787-15/563618303_18103065844619448_3574714108739302054_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=Mjk3Mjc4OTg5OTE1OTA5NzU5Ng%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=Z2ITvHC2mlIQ7kNvwFoafoG&_nc_oc=AdqldckGhJqQFbTJ0otmcrDdS3T4xzZdG4htzXOmfOsyRc0eK-ePskxz5pSaFgCXGX4&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-1.cdninstagram.com&_nc_gid=rz6J5dTav5_IcpqAkVvkXA&_nc_ss=7a22e&oh=00_Af7VdIb87yKnuB_tbFEn_Nv97ytChE2Rnj2JNzTu6LCqjg&oe=6A0DCFBA",
-        "https://scontent-ord5-3.cdninstagram.com/v/t51.82787-15/562702114_18079668782081734_708264075710118458_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=107&ig_cache_key=Mjk3Mjc5MDg0ODQ4MTA4ODc3Mw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IlNUT1JZLnhwaWRzLjExMjUuc2RyLnJlZ3VsYXJfcGhvdG8uQzMifQ%3D%3D&_nc_ohc=eteXFttxBFkQ7kNvwEWT8a_&_nc_oc=Adr0KB3L_Az1-7ZKiwIt9fWypbWpsnen4kSPmrl6OsNVMpHc2kj6MhccDZYp0HU3JrE&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ord5-3.cdninstagram.com&_nc_gid=rz6J5dTav5_IcpqAkVvkXA&_nc_ss=7a22e&oh=00_Af7TbwYoEPvkjPw_tHBURzjsAH6KfzvruwIPd06WPfoP4g&oe=6A0DACA4"
-      ],
-      "skipped": false,
-      "fields": {
-        "tema": {
-          "value": "книги",
-          "data_status": "ok",
-          "notes": "Кадры посвящены обзору различных книг."
-        },
-        "zadacha": {
-          "value": "рекомендации",
-          "data_status": "ok",
-          "notes": "Кадры содержат личные рекомендации по книгам."
-        },
-        "chto_vnutri": {
-          "value": "Автор делится впечатлениями и рекомендациями о прочитанных книгах.",
-          "data_status": "ok",
-          "notes": "Каждый кадр содержит отзыв о конкретной книге."
-        },
-        "mekhanika": {
-          "value": "скрин",
-          "data_status": "ok",
-          "notes": "Книги представлены в виде изображений обложек с текстовыми комментариями."
-        },
-        "cta": {
-          "value": "",
-          "data_status": "not_found",
-          "notes": "Призыв к действию на кадрах отсутствует."
-        }
-      },
-      "tokens_used": 1819,
-      "cover_hook": {
-        "status": "ok",
-        "text": "Хуком в этой обложке хайлайта является заголовок: \"10 лет назад прочла эту книгу и сразу забрала в работу и жизнь эти техники.\" Этот текст сразу привлекает внимание и вызывает интерес к содержанию."
-      },
-      "cta_targeted": {
-        "status": "ok",
-        "text": "not_found",
-        "frames_used": 2
-      }
+      "stories_total": 0,
+      "stories_selected": 0,
+      "imageUrls_used": [],
+      "skipped": true,
+      "skip_reason": "no_image_urls"
     }
   ]
 }
