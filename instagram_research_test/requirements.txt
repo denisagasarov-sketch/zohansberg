@@ -4,3 +4,5 @@ openai
 apify-client
 opencv-python
 pillow
+python-telegram-bot>=21.0
+httpx
