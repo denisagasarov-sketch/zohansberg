@@ -560,7 +560,7 @@ def _settings_text(username: str, settings: dict) -> str:
     )
 
 
-def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
+def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
     s = settings
     pt = s["post_types"]
     mo = s["months_back"]
@@ -601,7 +601,10 @@ def _settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🧪 Dry-run", callback_data="action:dryrun"),
             InlineKeyboardButton("🚀 Запустить", callback_data="action:launch"),
         ],
-        [InlineKeyboardButton("← Назад", callback_data="main_menu")],
+        [
+            InlineKeyboardButton("❓ Справка", callback_data=f"help:settings:{username}"),
+            InlineKeyboardButton("← Назад",   callback_data="main_menu"),
+        ],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -637,6 +640,38 @@ def _accounts_keyboard() -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton("➕ Добавить новый", callback_data="acc_new")])
     rows.append([InlineKeyboardButton("← Назад", callback_data="main_menu")])
     return InlineKeyboardMarkup(rows)
+
+# ---------------------------------------------------------------------------
+# Help screen texts
+# ---------------------------------------------------------------------------
+
+_HELP_MAIN = (
+    "❓ Как это работает\n\n"
+    "Бот собирает данные из Instagram и записывает их в Google Таблицу.\n\n"
+    "1. Добавь конкурента по username (например kate.jet)\n"
+    "2. Нажми «Собрать заново»\n"
+    "3. Через 3–10 минут данные появятся в таблице\n\n"
+    "Стоимость одного анализа — $0.5–2 в зависимости от количества постов."
+)
+
+_HELP_ACCOUNT = (
+    "❓ Что означают значки\n\n"
+    "✅ — данные свежие\n"
+    "⚠️ — данные устарели, лучше обновить\n"
+    "⚪ — данных нет, ещё не собирались\n\n"
+    "🔄 Собрать заново — удалит старые данные и соберёт всё с нуля\n"
+    "➕ Добавить новые посты — оставит старые, добавит только новые\n"
+    "⚡ Быстрое обновление — пересоберёт только устаревшее"
+)
+
+_HELP_SETTINGS = (
+    "❓ Что выбирать\n\n"
+    "Блоки — части профиля которые нужно собрать.\n"
+    "Если нужен только анализ постов — оставь галочку только на «Посты».\n\n"
+    "Период — за сколько месяцев собирать посты.\n"
+    "Чем меньше период — тем быстрее и дешевле.\n\n"
+    "Типы постов — обычно достаточно Фото + Карусель."
+)
 
 # ---------------------------------------------------------------------------
 # Apify balance
@@ -985,6 +1020,36 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Help screens (возврат на тот же экран) ────────────────────────────
+    if data == "help:main":
+        await query.edit_message_text(
+            _HELP_MAIN,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Назад", callback_data="main_menu")
+            ]]),
+        )
+        return
+
+    if data.startswith("help:account:"):
+        username = data[len("help:account:"):]
+        await query.edit_message_text(
+            _HELP_ACCOUNT,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Назад", callback_data=f"accview:{username}")
+            ]]),
+        )
+        return
+
+    if data.startswith("help:settings:"):
+        username = data[len("help:settings:"):]
+        await query.edit_message_text(
+            _HELP_SETTINGS,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Назад", callback_data=f"acc:{username}")
+            ]]),
+        )
+        return
+
     # ── Account list ──────────────────────────────────────────────────────
     if data == "show_accounts":
         await query.edit_message_text(
@@ -1063,7 +1128,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         s = context.user_data["settings"]
         await query.edit_message_text(
             _settings_text(username, s),
-            reply_markup=_settings_keyboard(s),
+            reply_markup=_settings_keyboard(username, s),
         )
         return
 
@@ -1107,7 +1172,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Re-render settings after toggle
     await query.edit_message_text(
         _settings_text(username, s),
-        reply_markup=_settings_keyboard(s),
+        reply_markup=_settings_keyboard(username, s),
     )
 
 
@@ -1134,7 +1199,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         s = context.user_data["settings"]
         await update.message.reply_text(
             _settings_text(username, s),
-            reply_markup=_settings_keyboard(s),
+            reply_markup=_settings_keyboard(username, s),
         )
         return
 
