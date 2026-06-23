@@ -356,13 +356,16 @@ function _handleDeleteAccount(body, response, spreadsheetId) {
       var perSheet  = { deleted_rows: 0, deleted_at_rows: [] };
 
       if (lastRow >= REQUIRED_START_ROW) {
-        // Read column A from row 3 down
-        var colA = sheet.getRange(REQUIRED_START_ROW, 1, lastRow - REQUIRED_START_ROW + 1, 1)
-                        .getValues();
+        // Read the "Конкурент" column (matched by header), NOT a hardcoded
+        // column A: column A is "Дата записи" and never holds the username.
+        var competitorCol = _findColumnByHeader(sheet, "Конкурент");
+        if (competitorCol === -1) competitorCol = 1;  // fallback to A if header missing
+        var colCompetitor = sheet.getRange(REQUIRED_START_ROW, competitorCol, lastRow - REQUIRED_START_ROW + 1, 1)
+                                 .getValues();
         // Collect matching absolute row numbers
         var matchRows = [];
-        for (var ri = 0; ri < colA.length; ri++) {
-          var cellVal = String(colA[ri][0] || "").trim();
+        for (var ri = 0; ri < colCompetitor.length; ri++) {
+          var cellVal = String(colCompetitor[ri][0] || "").trim();
           if (cellVal !== "" && cellVal.indexOf(accountLabel) !== -1) {
             matchRows.push(REQUIRED_START_ROW + ri);
           }
@@ -488,6 +491,18 @@ function _resolveColumn(sheet, column, lastCol) {
       idx = idx * 26 + (up.charCodeAt(k) - 64);
     }
     if (idx >= 1 && idx <= lastCol) return idx;
+  }
+  return -1;
+}
+
+
+// Возвращает 1-based номер колонки по точному заголовку в строке 1, иначе -1.
+function _findColumnByHeader(sheet, headerName) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return -1;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim() === headerName) return i + 1;
   }
   return -1;
 }
@@ -698,14 +713,18 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
   var lastColLetter = _colLetter(headers.length);
 
   if (accountLabel && accountLabel.trim() !== "" && lastRow >= REQUIRED_START_ROW) {
-    // Scan column A from row 3 to lastRow — find rows matching accountLabel
-    var colARange  = sheet.getRange(REQUIRED_START_ROW, 1, lastRow - REQUIRED_START_ROW + 1, 1);
-    var colAValues = colARange.getValues();
+    // Find account rows by the "Конкурент" column (matched by header), NOT a
+    // hardcoded column A: in the current layout column A is "Дата записи" and
+    // never contains the username, so the old scan never matched.
+    var competitorCol = _findColumnByHeader(sheet, "Конкурент");
+    if (competitorCol === -1) competitorCol = 1;  // fallback to A if header missing
+    var numRows       = lastRow - REQUIRED_START_ROW + 1;
+    var colCompetitor = sheet.getRange(REQUIRED_START_ROW, competitorCol, numRows, 1).getValues();
     var firstMatchRow = -1;
     var lastMatchRow  = -1;
 
-    for (var ri = 0; ri < colAValues.length; ri++) {
-      var cellVal = String(colAValues[ri][0] || "").trim();
+    for (var ri = 0; ri < colCompetitor.length; ri++) {
+      var cellVal = String(colCompetitor[ri][0] || "").trim();
       // Use indexOf so we match regardless of historical format:
       // "kate.jet", "https://www.instagram.com/kate.jet/", "@kate.jet https://..."
       if (cellVal !== "" && cellVal.indexOf(accountLabel.trim()) !== -1) {
