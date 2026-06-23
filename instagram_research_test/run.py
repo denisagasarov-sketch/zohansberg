@@ -8,6 +8,8 @@
 
 import argparse
 import logging
+import os
+import sys
 from dataclasses import dataclass
 from typing import Callable
 
@@ -90,16 +92,37 @@ def _analyze_reels(username: str, dry_run: bool) -> dict:
     return analyze_reels(username=username, dry_run=dry_run)
 
 
+def _env_int(name: str, default: int) -> int:
+    """Читает целочисленную env-переменную, при пустом/некорректном значении — default."""
+    raw = os.environ.get(name, "")
+    try:
+        return int(raw) if raw.strip() else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _posts(username: str, dry_run: bool) -> dict:
+    # Настройки из бота (PIPELINE_*); дефолты совпадают с прежним поведением:
+    # period / 6 мес / все типы / 30 шт.
+    content_mode = os.environ.get("PIPELINE_CONTENT_MODE", "period") or "period"
+    months_back = _env_int("PIPELINE_MONTHS_BACK", 6)
+    target_count = _env_int("PIPELINE_TARGET_COUNT", 30)
+    post_types_raw = os.environ.get("PIPELINE_POST_TYPES", "")
+    post_types = [p.strip() for p in post_types_raw.split(",") if p.strip()] or None
     return collect_posts(
         username=username,
         limit=200,
+        months_back=months_back,
         dry_run=dry_run,
+        post_types=post_types,
+        content_mode=content_mode,
+        target_count=target_count,
     )
 
 
 def _analyze_posts(username: str, dry_run: bool) -> dict:
-    return analyze_posts(username=username, dry_run=dry_run)
+    content_filter = os.environ.get("PIPELINE_CONTENT_FILTER", "all") or "all"
+    return analyze_posts(username=username, dry_run=dry_run, content_filter=content_filter)
 
 
 def _build_payload(username: str, dry_run: bool) -> dict:
@@ -196,25 +219,41 @@ def run_pipeline(
             else:
                 result = stage.runner(username, dry_run)
         except Exception as error:
-            logger.error("Stage %s %s failed: %s", stage.number, stage.name, error)
-            raise RuntimeError(
-                f"Стейдж {stage.number} ({stage.name}) завершился с ошибкой"
-            ) from error
+            # Устойчивость: ошибка одного стейджа не роняет весь прогон.
+            # У реального конкурента часто пуст какой-то блок (нет закрепов,
+            # хайлайтов, ссылки, протухла кука) — продолжаем со следующего.
+            logger.exception("Stage %s %s failed: %s", stage.number, stage.name, error)
+            results.append({
+                "number": stage.number,
+                "name": stage.name,
+                "status": "failed",
+                "error": str(error).splitlines()[0] if str(error).strip() else repr(error),
+                "result": None,
+            })
+            continue
         results.append({
             "number": stage.number,
             "name": stage.name,
             "status": "dry_run" if dry_run else "ok",
             "result": result,
         })
+        # update_meta — только для успешно завершённых стейджей
         if not dry_run:
             block = STAGE_TO_BLOCK.get(stage.number)
             if block:
                 update_meta(username, block)
 
+    failures = [item for item in results if item["status"] == "failed"]
+
     print("\n=== Pipeline Summary ===")
     print(f"Аккаунт: @{username}")
     for item in results:
-        print(f"{item['number']} {item['name']}: {item['status']}")
+        line = f"{item['number']} {item['name']}: {item['status']}"
+        if item["status"] == "failed":
+            line += f" — {item.get('error', '')}"
+        print(line)
+    if failures:
+        print(f"\n⚠️ Стейджей с ошибкой: {len(failures)} из {len(results)}")
     return results
 
 
@@ -233,9 +272,15 @@ def main() -> None:
 
     try:
         selected = select_stages(args.stages, args.from_stage)
-        run_pipeline(args.account, selected, args.dry_run, write_mode=args.write_mode)
+        results = run_pipeline(args.account, selected, args.dry_run, write_mode=args.write_mode)
     except (ValueError, FileNotFoundError, EnvironmentError, RuntimeError) as error:
         parser.error(str(error))
+        return
+
+    # Ненулевой код выхода, если хотя бы один стейдж упал —
+    # чтобы бот показал предупреждение «завершён с ошибками».
+    if any(item["status"] == "failed" for item in results):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

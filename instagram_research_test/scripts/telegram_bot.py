@@ -530,6 +530,7 @@ _STAGE_NAMES = {
 
 def _parse_progress(log_path: Path, stages: list[str]) -> str:
     done: set[str] = set()
+    failed: set[str] = set()
     current: str | None = None
 
     if log_path.exists():
@@ -540,10 +541,14 @@ def _parse_progress(log_path: Path, stages: list[str]) -> str:
                 m = re.search(r'\[(\d+)/\d+\] (\w+) (\w+)', line)
                 if m:
                     current = m.group(2)
-                # "01 collect_profile: ok" — stage done
-                m2 = re.search(r'^(\w+) \w+: (ok|dry_run)$', line.strip())
+                # "01 collect_profile: ok" / ": dry_run" / ": failed — ..." — итог стейджа
+                m2 = re.search(r'^(\w+) \w+: (ok|dry_run|failed)\b', line.strip())
                 if m2:
-                    done.add(m2.group(1))
+                    status = m2.group(2)
+                    if status == "failed":
+                        failed.add(m2.group(1))
+                    else:
+                        done.add(m2.group(1))
                     if current == m2.group(1):
                         current = None
         except Exception:
@@ -552,7 +557,9 @@ def _parse_progress(log_path: Path, stages: list[str]) -> str:
     lines = []
     for s in stages:
         name = _STAGE_NAMES.get(s, s)
-        if s in done:
+        if s in failed:
+            lines.append(f"❌ {s} {name}")
+        elif s in done:
             lines.append(f"✅ {s} {name}")
         elif s == current:
             lines.append(f"⚙️ {s} {name}...")
