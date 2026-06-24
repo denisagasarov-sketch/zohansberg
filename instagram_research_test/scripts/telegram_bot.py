@@ -403,6 +403,57 @@ def _stages_for_blocks(blocks: list[str]) -> list[str]:
     return [s for s in _ALL_STAGES_ORDER if s in wanted]
 
 
+# ---------------------------------------------------------------------------
+# Группы листов для выбора сбора (5 штук): подпись + стейджи + блоки meta.
+# ---------------------------------------------------------------------------
+_GROUPS = [
+    ("profile",    "👤 Профиль и закрепы", ["01", "02", "03", "04", "05"], ["profile", "pinned", "bio"]),
+    ("landing",    "🔗 Лендинг и воронка", ["06", "07"],                   ["landing"]),
+    ("highlights", "✨ Хайлайты",          ["08", "09", "10"],             ["highlights"]),
+    ("reels",      "🎬 Reels",             ["11", "12"],                   ["reels"]),
+    ("posts",      "📝 Посты",             ["13", "14"],                   ["posts"]),
+]
+_GROUP_KEYS   = [g[0] for g in _GROUPS]
+_GROUP_LABEL  = {g[0]: g[1] for g in _GROUPS}
+_GROUP_STAGES = {g[0]: g[2] for g in _GROUPS}
+_GROUP_BLOCKS = {g[0]: g[3] for g in _GROUPS}
+# Apify-стоимость на группу (OpenAI считается по стейджам из _OPENAI_COSTS)
+_GROUP_APIFY  = {"profile": 0.05, "landing": 0.0, "highlights": 0.10, "reels": 0.05, "posts": 0.10}
+
+
+def _selected_groups(settings: dict) -> list[str]:
+    groups = settings.get("groups") or {}
+    return [k for k in _GROUP_KEYS if groups.get(k)]
+
+
+def _stages_for_groups(group_keys: list[str]) -> list[str]:
+    """Стейджи для выбранных групп + обязательные 15/15b/16, в каноническом порядке.
+
+    Группа «Лендинг» (06/07) требует profile_summary.json (стейдж 01): если
+    выбрана landing, но не profile — тихо подтягиваем 01, чтобы 06 не упал.
+    """
+    wanted = set()
+    for gk in group_keys:
+        wanted.update(_GROUP_STAGES.get(gk, []))
+    if "landing" in group_keys and "profile" not in group_keys:
+        wanted.add("01")
+    wanted.update(["15", "15b", "16"])
+    return [s for s in _ALL_STAGES_ORDER if s in wanted]
+
+
+def _ddmmyyyy_key(dstr: str):
+    try:
+        return datetime.strptime(dstr, "%d.%m.%Y")
+    except Exception:
+        return datetime.min
+
+
+def _short_date(dstr: str) -> str:
+    """'24.06.2026' -> '24.06' для компактной свежести по группам."""
+    parts = (dstr or "").split(".")
+    return ".".join(parts[:2]) if len(parts) >= 2 else dstr
+
+
 def _account_screen_text(username: str, sheet_counts: dict) -> str:
     full_name, followers_str = _read_profile_brief(username)
     fresh = _block_freshness(username)
@@ -417,14 +468,19 @@ def _account_screen_text(username: str, sheet_counts: dict) -> str:
         lines.append(" | ".join(head))
 
     lines.append("\n🗂 Свежесть данных:")
-    for block, label in _BLOCK_ORDER:
-        state, date_str = fresh.get(block, ("none", None))
-        if state == "fresh":
-            lines.append(f"✅ {label} — {date_str}")
-        elif state == "stale":
-            lines.append(f"⚠️ {label} — устарело ({date_str})")
+    for gk in _GROUP_KEYS:
+        # самая свежая дата среди блоков группы; ⚠️ если хоть один блок устарел
+        dated = []
+        for b in _GROUP_BLOCKS[gk]:
+            st, ds = fresh.get(b, ("none", None))
+            if ds:
+                dated.append((st, ds))
+        if dated:
+            latest = max((ds for _, ds in dated), key=_ddmmyyyy_key)
+            stale  = any(st == "stale" for st, _ in dated)
+            lines.append(f"{_GROUP_LABEL[gk]} — {_short_date(latest)}" + (" ⚠️" if stale else ""))
         else:
-            lines.append(f"⚪ {label} — нет данных")
+            lines.append(f"{_GROUP_LABEL[gk]} — нет данных")
 
     table_parts = []
     for sheet_key, short in _SHEET_DISPLAY_ORDER:
@@ -436,7 +492,7 @@ def _account_screen_text(username: str, sheet_counts: dict) -> str:
     lines.append("🔄 Собрать заново — полный анализ, данные в таблице обновятся")
     lines.append("➕ Добавить новые посты — только посты которых ещё нет в таблице")
     lines.append("⚡ Быстрое обновление — пересобрать только устаревшие блоки")
-    lines.append("⚙️ Выбрать что собирать — настроить блоки и период перед запуском")
+    lines.append("⚙️ Выбрать что собирать — группы листов и режим записи")
 
     return "\n".join(lines)
 
@@ -521,37 +577,27 @@ _OPENAI_COSTS = {"03": 0.05, "04": 0.03, "05": 0.02, "07": 0.05, "10": 0.08, "12
 
 def _default_settings() -> dict:
     return {
-        "blocks":         {k: True  for k in _BLOCK_LABELS},
+        "groups":         {k: True for k in _GROUP_KEYS},
         "post_types":     {"photo": True, "carousel": True, "video": False},
         "content_mode":   "period",
         "months_back":    6,
         "target_count":   30,
         "content_filter": "all",
         "write_mode":     "replace",
-        "sheets":         {k: True for k in _SHEET_LABELS},
     }
 
 
 def _get_settings(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    if "settings" not in context.user_data:
-        context.user_data["settings"] = _default_settings()
-    return context.user_data["settings"]
+    s = context.user_data.get("settings")
+    # Миграция старого стейта (blocks/period/types) → новая схема групп.
+    if not isinstance(s, dict) or "groups" not in s:
+        s = _default_settings()
+        context.user_data["settings"] = s
+    return s
 
 
 def _build_stages_list(settings: dict) -> list[str]:
-    stages = []
-    for block_key, enabled in settings["blocks"].items():
-        if enabled:
-            stages.extend(_BLOCK_STAGES[block_key])
-    stages += ["15", "15b", "16"]
-    # deduplicate preserving order
-    seen = set()
-    result = []
-    for s in stages:
-        if s not in seen:
-            seen.add(s)
-            result.append(s)
-    return result
+    return _stages_for_groups(_selected_groups(settings))
 
 # ---------------------------------------------------------------------------
 # Cost estimate
@@ -563,18 +609,16 @@ def _estimate_cost(settings: dict) -> str:
     apify_parts  = []
     openai_parts = []
 
-    for block_key, enabled in settings["blocks"].items():
-        if not enabled:
-            continue
-        a = _APIFY_COSTS.get(block_key, 0)
+    for gk in _selected_groups(settings):
+        a = _GROUP_APIFY.get(gk, 0.0)
         if a:
             apify_total += a
-            apify_parts.append(f"{_BLOCK_LABELS[block_key].split('(')[0].strip()} ${a:.2f}")
-        for stage in _BLOCK_STAGES[block_key]:
+            apify_parts.append(f"{_GROUP_LABEL[gk]} ${a:.2f}")
+        for stage in _GROUP_STAGES[gk]:
             o = _OPENAI_COSTS.get(stage, 0)
             if o:
                 openai_total += o
-                openai_parts.append(f"stage {stage} ${o:.2f}")
+                openai_parts.append(f"{_GROUP_LABEL[gk]} · stage {stage} ${o:.2f}")
 
     lines = ["💰 Смета:"]
     if apify_parts:
@@ -597,59 +641,39 @@ def _ck(val: bool) -> str:
 
 
 def _settings_text(username: str, settings: dict) -> str:
+    wm = settings.get("write_mode", "replace")
+    mode_line = ("Перезаписать — заменить строки аккаунта"
+                 if wm == "replace" else "Дополнить — дописать без удаления")
     return (
-        f"⚙️ Настройки — @{username}\n\n"
-        f"Выбери что собирать и за какой период.\n"
-        f"По умолчанию — всё за 6 месяцев."
+        f"⚙️ Что собрать — @{username}\n\n"
+        f"Отмечены группы листов для обновления (по умолчанию — все).\n"
+        f"Сними галочку с того, что обновлять не нужно.\n\n"
+        f"Режим: {mode_line}."
     )
 
 
 def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
-    s = settings
-    pt = s["post_types"]
-    mo = s["months_back"]
+    groups = settings.get("groups") or {}
+    wm     = settings.get("write_mode", "replace")
 
-    def tb(key):
-        return _ck(s["blocks"][key])
-
+    # 5 групп — чекбоксы (по умолчанию все включены)
     rows = [
-        # Блоки — что собирать
-        [
-            InlineKeyboardButton(f"{tb('01-04')} Профиль/закрепы", callback_data="tbl:01-04"),
-            InlineKeyboardButton(f"{tb('05')} Bio",                callback_data="tbl:05"),
-        ],
-        [
-            InlineKeyboardButton(f"{tb('06-07')} Ссылка/лендинг", callback_data="tbl:06-07"),
-            InlineKeyboardButton(f"{tb('08-10')} Хайлайты",       callback_data="tbl:08-10"),
-        ],
-        [
-            InlineKeyboardButton(f"{tb('11-12')} Reels",          callback_data="tbl:11-12"),
-            InlineKeyboardButton(f"{tb('13-14')} Посты",          callback_data="tbl:13-14"),
-        ],
-        # Период
-        [
-            InlineKeyboardButton(f"{'[' if mo==1  else ''}1м{']'  if mo==1  else ''}", callback_data="smo:1"),
-            InlineKeyboardButton(f"{'[' if mo==3  else ''}3м{']'  if mo==3  else ''}", callback_data="smo:3"),
-            InlineKeyboardButton(f"{'[' if mo==6  else ''}6м{']'  if mo==6  else ''}", callback_data="smo:6"),
-            InlineKeyboardButton(f"{'[' if mo==12 else ''}12м{']' if mo==12 else ''}", callback_data="smo:12"),
-        ],
-        # Типы постов
-        [
-            InlineKeyboardButton(f"{_ck(pt['photo'])} Фото",        callback_data="tpt:photo"),
-            InlineKeyboardButton(f"{_ck(pt['carousel'])} Карусель", callback_data="tpt:carousel"),
-            InlineKeyboardButton(f"{_ck(pt['video'])} Видео",       callback_data="tpt:video"),
-        ],
-        # Действия
-        [
-            InlineKeyboardButton("💰 Смета",   callback_data="action:estimate"),
-            InlineKeyboardButton("🧪 Dry-run", callback_data="action:dryrun"),
-            InlineKeyboardButton("🚀 Запустить", callback_data="action:launch"),
-        ],
-        [
-            InlineKeyboardButton("❓ Справка", callback_data=f"help:settings:{username}"),
-            InlineKeyboardButton("← Назад",   callback_data=f"accview:{username}"),
-        ],
+        [InlineKeyboardButton(f"{_ck(bool(groups.get(k)))} {_GROUP_LABEL[k]}",
+                              callback_data=f"grp:{k}")]
+        for k in _GROUP_KEYS
     ]
+    # Режим записи — два тоггла
+    rows.append([
+        InlineKeyboardButton("🔄 Перезаписать ✓" if wm == "replace" else "🔄 Перезаписать",
+                             callback_data="wm:replace"),
+        InlineKeyboardButton("➕ Дополнить ✓" if wm == "append" else "➕ Дополнить",
+                             callback_data="wm:append"),
+    ])
+    rows.append([InlineKeyboardButton("🚀 Запустить", callback_data="action:launch")])
+    rows.append([
+        InlineKeyboardButton("💰 Смета", callback_data="action:estimate"),
+        InlineKeyboardButton("← Назад",  callback_data=f"accview:{username}"),
+    ])
     return InlineKeyboardMarkup(rows)
 
 # ---------------------------------------------------------------------------
@@ -1114,8 +1138,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("accview:"):
         username = data[len("accview:"):]
         context.user_data["username"] = username
-        if "settings" not in context.user_data:
-            context.user_data["settings"] = _default_settings()
+        _get_settings(context)
         fresh = _block_freshness(username)
         sheet_counts = await _read_sheet_counts_live(username)
         await query.edit_message_text(
@@ -1169,9 +1192,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("acc:"):
         username = data[4:]
         context.user_data["username"] = username
-        if "settings" not in context.user_data:
-            context.user_data["settings"] = _default_settings()
-        s = context.user_data["settings"]
+        s = _get_settings(context)
         await query.edit_message_text(
             _settings_text(username, s),
             reply_markup=_settings_keyboard(username, s),
@@ -1182,21 +1203,27 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = context.user_data.get("username", "?")
     s = _get_settings(context)
 
-    if data.startswith("tbl:"):     # toggle block
+    if data.startswith("grp:"):     # toggle group
         key = data[4:]
-        if key in s["blocks"]:
-            s["blocks"][key] = not s["blocks"][key]
+        if key in s.get("groups", {}):
+            s["groups"][key] = not s["groups"][key]
 
-    elif data.startswith("tpt:"):   # toggle post type
-        key = data[4:]
-        if key in s["post_types"]:
-            s["post_types"][key] = not s["post_types"][key]
-
-    elif data.startswith("smo:"):   # set months
-        s["months_back"] = int(data[4:])
+    elif data.startswith("wm:"):    # set write mode (replace/append)
+        mode = data[3:]
+        if mode in ("replace", "append"):
+            s["write_mode"] = mode
 
     # ── Actions ──────────────────────────────────────────────────────────
     elif data == "action:estimate":
+        if not _selected_groups(s):
+            try:
+                await query.edit_message_text(
+                    "⚠️ Выбери хотя бы одну группу для сбора.\n\n" + _settings_text(username, s),
+                    reply_markup=_settings_keyboard(username, s),
+                )
+            except Exception:
+                pass
+            return
         estimate = _estimate_cost(s)
         stages   = _build_stages_list(s)
         estimate += f"\n\nСтейджи: {', '.join(stages)}"
@@ -1208,10 +1235,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    elif data in ("action:dryrun", "action:launch"):
-        dry_run = (data == "action:dryrun")
+    elif data == "action:launch":
+        if not _selected_groups(s):
+            try:
+                await query.edit_message_text(
+                    "⚠️ Выбери хотя бы одну группу для сбора.\n\n" + _settings_text(username, s),
+                    reply_markup=_settings_keyboard(username, s),
+                )
+            except Exception:
+                pass
+            return
         stages = _build_stages_list(s)
-        await _start_run(query, context, username, stages, dry_run=dry_run,
+        await _start_run(query, context, username, stages, dry_run=False,
                          write_mode=s.get("write_mode", "replace"), settings=s)
         return
 
