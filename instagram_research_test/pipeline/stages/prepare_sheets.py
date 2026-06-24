@@ -239,13 +239,6 @@ def _load_sources(username: str) -> dict:
 # Source extractors
 # ---------------------------------------------------------------------------
 
-def _account_label(sources: dict, username: str) -> str:
-    ps = sources.get("profile_summary") or {}
-    _raw_url = ps.get("profile_url", {})
-    url = (_raw_url.get("value") if isinstance(_raw_url, dict) else _raw_url) or ""
-    return url or f"https://www.instagram.com/{username}/"
-
-
 def _bio_url(sources: dict):
     ld = sources.get("link_destination")
     if isinstance(ld, dict):
@@ -365,7 +358,7 @@ def _last_post_date(username: str) -> str:
 
 def _build_profile(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
-    _competitor = _account_label(sources, username)
+    _competitor = username
     ps  = sources.get("profile_summary") or {}
     bio = sources.get("bio_analysis")    or {}
 
@@ -401,7 +394,7 @@ def _build_profile(sources: dict, username: str) -> tuple[list, list]:
 
 def _build_pinned(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
-    _competitor = _account_label(sources, username)
+    _competitor = username
     pi_raw = sources.get("pinned_posts_index")
     pi_list = []
     if isinstance(pi_raw, dict):
@@ -457,7 +450,7 @@ def _build_funnel(sources: dict, username: str) -> tuple[list, list]:
 
     row = {h: "" for h in FUNNEL_HEADERS}
     row["Дата записи"]               = datetime.now().strftime("%d.%m.%Y")
-    row["Конкурент"]                 = _account_label(sources, username)
+    row["Конкурент"]                 = username
     row["Точка входа"]               = "Instagram-профиль"
     row["Первый шаг"]                = first_step
     row["Куда ведет"]                = _redact_url(url)
@@ -473,7 +466,7 @@ def _build_funnel(sources: dict, username: str) -> tuple[list, list]:
 
 def _build_landing(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
-    _competitor = _account_label(sources, username)
+    _competitor = username
     url = _bio_url(sources)
     if not url:
         return [], ["Нет external_url; строка лендинга не создана"]
@@ -507,7 +500,7 @@ def _build_landing(sources: dict, username: str) -> tuple[list, list]:
 
 def _build_highlights(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
-    _competitor = _account_label(sources, username)
+    _competitor = username
 
     visual_data = sources.get("highlights_visual")
     if not visual_data or not isinstance(visual_data, dict):
@@ -556,7 +549,7 @@ def _build_highlights(sources: dict, username: str) -> tuple[list, list]:
 
 def _build_reels(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
-    _competitor = _account_label(sources, username)
+    _competitor = username
 
     reels_raw = sources.get("stage5c2_reels")
     if not reels_raw or not isinstance(reels_raw, dict):
