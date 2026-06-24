@@ -180,24 +180,73 @@ def _read_profile_brief(username: str) -> tuple[str, str]:
     return full_name, followers_str
 
 
-def _read_sheet_counts(username: str) -> dict:
-    """Возвращает {имя_листа: число_строк} из sheets_payload.json."""
-    counts: dict = {}
+# ---------------------------------------------------------------------------
+# Live sheet counts — «В таблице: N» читаем прямо из Google Sheets
+# (mode get_sheet_data), а не из локального sheets_payload.json.
+# ---------------------------------------------------------------------------
+
+_SHEET_COUNT_TTL     = 15.0  # сек: кэш, чтобы не дёргать таблицу на каждый рендер экрана
+_SHEET_COUNT_TIMEOUT = 8.0   # сек: бюджет запроса; если медленно/недоступно — заглушка «—»
+_SHEET_COUNT_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+async def _fetch_competitor_count(client, url, body_base: dict, sheet_name: str, username: str) -> int | None:
+    """Число строк листа, где колонка «Конкурент» == username. None — лист недоступен."""
     try:
-        p = RESEARCH_DIR / "data" / username / "normalized" / "sheets_payload.json"
-        if p.exists():
-            sp = json.loads(p.read_text(encoding="utf-8"))
-            for sheet_name, sheet_data in sp.get("sheets", {}).items():
-                counts[sheet_name] = len(sheet_data.get("rows", []))
+        r = await client.post(url, json={
+            **body_base, "mode": "get_sheet_data",
+            "sheet_name": sheet_name, "column": "Конкурент",
+        })
+        data = r.json()
+        if not data.get("ok"):
+            return None
+        needle = username.strip()
+        return sum(1 for v in (data.get("data") or []) if str(v).strip() == needle)
     except Exception:
-        pass
+        return None
+
+
+async def _read_sheet_counts_live(username: str) -> dict:
+    """{имя_листа: число_строк_аккаунта} из ЖИВОЙ таблицы (mode get_sheet_data).
+
+    Матчит строки по колонке «Конкурент» == username. Значение None означает, что
+    лист недоступен (таймаут/ошибка) — экран покажет «—». Результат кэшируется на
+    _SHEET_COUNT_TTL секунд, чтобы не дёргать таблицу на каждый рендер экрана.
+    """
+    sheets = [name for name, _ in _SHEET_DISPLAY_ORDER]
+    now = time.monotonic()
+    cached = _SHEET_COUNT_CACHE.get(username)
+    if cached and now - cached[0] < _SHEET_COUNT_TTL:
+        return cached[1]
+
+    url = os.environ.get("GOOGLE_SHEETS_WEBAPP_URL", "")
+    if not url:
+        return {name: None for name in sheets}
+
+    body_base = {
+        "secret": os.environ.get("GOOGLE_SHEETS_SYNC_SECRET", ""),
+        "spreadsheet_id": os.environ.get(
+            "GOOGLE_SHEETS_SPREADSHEET_ID", "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
+        ),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=_SHEET_COUNT_TIMEOUT) as client:
+            results = await asyncio.gather(*[
+                _fetch_competitor_count(client, url, body_base, name, username)
+                for name in sheets
+            ])
+        counts = dict(zip(sheets, results))
+    except Exception as e:
+        logger.warning("Live sheet counts failed for @%s: %s", username, e)
+        return {name: None for name in sheets}
+
+    _SHEET_COUNT_CACHE[username] = (now, counts)
     return counts
 
 
-def _get_account_summary(username: str) -> str:
+def _get_account_summary(username: str, sheet_counts: dict) -> str:
     meta = _read_meta(username)
     full_name, followers_str = _read_profile_brief(username)
-    sheet_counts = _read_sheet_counts(username)
 
     lines = [f"📋 @{username}"]
     profile_parts = []
@@ -221,11 +270,9 @@ def _get_account_summary(username: str) -> str:
     table_parts = []
     for sheet_key, short_name in _SHEET_DISPLAY_ORDER:
         count = sheet_counts.get(sheet_key)
-        if count is not None:
-            table_parts.append(f"{short_name}: {count}")
-    if table_parts:
-        lines.append("\n📊 В таблице:")
-        lines.append("  " + " | ".join(table_parts))
+        table_parts.append(f"{short_name}: {count if count is not None else '—'}")
+    lines.append("\n📊 В таблице:")
+    lines.append("  " + " | ".join(table_parts))
 
     return "\n".join(lines)
 
@@ -356,10 +403,9 @@ def _stages_for_blocks(blocks: list[str]) -> list[str]:
     return [s for s in _ALL_STAGES_ORDER if s in wanted]
 
 
-def _account_screen_text(username: str) -> str:
+def _account_screen_text(username: str, sheet_counts: dict) -> str:
     full_name, followers_str = _read_profile_brief(username)
     fresh = _block_freshness(username)
-    sheet_counts = _read_sheet_counts(username)
 
     lines = [f"📋 @{username}"]
     head = []
@@ -383,10 +429,8 @@ def _account_screen_text(username: str) -> str:
     table_parts = []
     for sheet_key, short in _SHEET_DISPLAY_ORDER:
         c = sheet_counts.get(sheet_key)
-        if c is not None:
-            table_parts.append(f"{short}: {c}")
-    if table_parts:
-        lines.append("\n📊 В таблице: " + " | ".join(table_parts))
+        table_parts.append(f"{short}: {c if c is not None else '—'}")
+    lines.append("\n📊 В таблице: " + " | ".join(table_parts))
 
     lines.append("\n──────────────")
     lines.append("🔄 Собрать заново — полный анализ, данные в таблице обновятся")
@@ -893,7 +937,8 @@ async def _run_pipeline_task(
         text += "\n🧪 Это был dry-run — данные не записаны"
     else:
         text += f"\n🔗 Таблица: {SPREADSHEET_URL}"
-        account_summary = _get_account_summary(username)
+        sheet_counts = await _read_sheet_counts_live(username)
+        account_summary = _get_account_summary(username, sheet_counts)
         text += f"\n\n{account_summary}"
     if not ok and log_path.exists():
         text += f"\n📄 Лог: {log_path}"
@@ -1072,8 +1117,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "settings" not in context.user_data:
             context.user_data["settings"] = _default_settings()
         fresh = _block_freshness(username)
+        sheet_counts = await _read_sheet_counts_live(username)
         await query.edit_message_text(
-            _account_screen_text(username),
+            _account_screen_text(username, sheet_counts),
             reply_markup=_account_screen_keyboard(username, fresh),
         )
         return
