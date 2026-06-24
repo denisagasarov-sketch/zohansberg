@@ -65,6 +65,11 @@ def validate_username(username: str) -> str | None:
     username = username.lstrip("@").strip()
     return username if re.match(r'^[a-zA-Z0-9._]{1,30}$', username) else None
 
+
+def _valid_account(uname) -> bool:
+    """True только для реального username (защита от '?' при потере контекста)."""
+    return bool(uname) and bool(re.match(r'^[a-zA-Z0-9._]{1,30}$', str(uname)))
+
 # ---------------------------------------------------------------------------
 # accounts.json helpers
 # ---------------------------------------------------------------------------
@@ -578,10 +583,7 @@ _OPENAI_COSTS = {"03": 0.05, "04": 0.03, "05": 0.02, "07": 0.05, "10": 0.08, "12
 def _default_settings() -> dict:
     return {
         "groups":         {k: True for k in _GROUP_KEYS},
-        "post_types":     {"photo": True, "carousel": True, "video": False},
-        "content_mode":   "period",
-        "months_back":    6,
-        "target_count":   30,
+        "target_count":   30,           # сколько последних постов собирать (фото+карусель)
         "content_filter": "all",
         "write_mode":     "replace",
     }
@@ -655,13 +657,17 @@ def _settings_text(username: str, settings: dict) -> str:
 def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
     groups = settings.get("groups") or {}
     wm     = settings.get("write_mode", "replace")
+    cnt    = settings.get("target_count", 30)
 
-    # 5 групп — чекбоксы (по умолчанию все включены)
+    # 5 групп — чекбоксы с явным ВКЛ/выкл (по умолчанию все включены)
     rows = [
-        [InlineKeyboardButton(f"{_ck(bool(groups.get(k)))} {_GROUP_LABEL[k]}",
-                              callback_data=f"grp:{k}")]
+        [InlineKeyboardButton(
+            f"{'☑️ ВКЛ ·' if groups.get(k) else '⬜ выкл ·'} {_GROUP_LABEL[k]}",
+            callback_data=f"grp:{k}")]
         for k in _GROUP_KEYS
     ]
+    # Количество постов — подэкран
+    rows.append([InlineKeyboardButton(f"📝 Постов: {cnt} ▸", callback_data="cntmenu")])
     # Режим записи — два тоггла
     rows.append([
         InlineKeyboardButton("🔄 Перезаписать ✓" if wm == "replace" else "🔄 Перезаписать",
@@ -675,6 +681,26 @@ def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
         InlineKeyboardButton("← Назад",  callback_data=f"accview:{username}"),
     ])
     return InlineKeyboardMarkup(rows)
+
+
+def _count_text(username: str, settings: dict) -> str:
+    return (
+        f"📝 Сколько последних постов собирать — @{username}\n\n"
+        f"Сейчас: {settings.get('target_count', 30)}.\n"
+        f"Берём последние N постов (фото + карусель), без привязки к периоду."
+    )
+
+
+def _count_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
+    cur = settings.get("target_count", 30)
+
+    def b(n):
+        return InlineKeyboardButton(f"[{n}]" if n == cur else str(n), callback_data=f"cnt:{n}")
+
+    return InlineKeyboardMarkup([
+        [b(10), b(20), b(30), b(50)],
+        [InlineKeyboardButton("← Назад", callback_data=f"acc:{username}")],
+    ])
 
 # ---------------------------------------------------------------------------
 # Main menu / account selection
@@ -876,13 +902,11 @@ async def _run_pipeline_task(
         cmd.append("--dry-run")
 
     env = os.environ.copy()
-    # Pass settings as env vars for future stage reads
-    pt_enabled = [k for k, v in settings["post_types"].items() if v]
-    env["PIPELINE_POST_TYPES"]     = ",".join(pt_enabled)
-    env["PIPELINE_CONTENT_MODE"]   = settings["content_mode"]
-    env["PIPELINE_MONTHS_BACK"]    = str(settings["months_back"])
-    env["PIPELINE_TARGET_COUNT"]   = str(settings["target_count"])
-    env["PIPELINE_CONTENT_FILTER"] = settings["content_filter"]
+    # Посты: всегда фото+карусель, режим «последние N» (count), без периода.
+    env["PIPELINE_POST_TYPES"]     = "photo,carousel"
+    env["PIPELINE_CONTENT_MODE"]   = "count"
+    env["PIPELINE_TARGET_COUNT"]   = str(settings.get("target_count", 30))
+    env["PIPELINE_CONTENT_FILTER"] = settings.get("content_filter", "all")
 
     start_ts = time.time()
     wm_label = _mode_desc(settings.get("write_mode", "replace"))
@@ -967,13 +991,19 @@ async def _run_pipeline_task(
     if not ok and log_path.exists():
         text += f"\n📄 Лог: {log_path}"
 
+    # Навигация после завершения — чтобы не застрять на отчёте
+    nav = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 К конкуренту", callback_data=f"accview:{username}")],
+        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
+    ])
     try:
         if progress_msg_id:
-            await bot.edit_message_text(chat_id=chat_id, message_id=progress_msg_id, text=text)
+            await bot.edit_message_text(chat_id=chat_id, message_id=progress_msg_id,
+                                        text=text, reply_markup=nav)
         else:
-            await bot.send_message(chat_id=chat_id, text=text)
+            await bot.send_message(chat_id=chat_id, text=text, reply_markup=nav)
     except Exception:
-        await bot.send_message(chat_id=chat_id, text=text)
+        await bot.send_message(chat_id=chat_id, text=text, reply_markup=nav)
 
 # ---------------------------------------------------------------------------
 # Handlers
@@ -998,6 +1028,14 @@ async def _start_run(query, context, username: str, stages: list[str],
         await query.answer(
             f"⏳ Уже выполняется анализ @{current_job['account']}. Дождитесь завершения.",
             show_alert=True,
+        )
+        return
+
+    # Защита от потери сессии: username должен быть реальным, не "?".
+    if not _valid_account(username):
+        await query.edit_message_text(
+            "⚠️ Сессия сброшена — выбери конкурента заново.",
+            reply_markup=_accounts_keyboard(),
         )
         return
 
@@ -1203,6 +1241,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = context.user_data.get("username", "?")
     s = _get_settings(context)
 
+    if data == "cntmenu":           # подэкран «Количество постов»
+        await query.edit_message_text(_count_text(username, s),
+                                      reply_markup=_count_keyboard(username, s))
+        return
+
+    if data.startswith("cnt:"):     # выбор количества постов → назад в настройки
+        try:
+            s["target_count"] = int(data[4:])
+        except ValueError:
+            pass
+        await query.edit_message_text(_settings_text(username, s),
+                                      reply_markup=_settings_keyboard(username, s))
+        return
+
     if data.startswith("grp:"):     # toggle group
         key = data[4:]
         if key in s.get("groups", {}):
@@ -1214,7 +1266,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             s["write_mode"] = mode
 
     # ── Actions ──────────────────────────────────────────────────────────
-    elif data == "action:estimate":
+    elif data in ("action:estimate", "action:launch"):
+        # Защита от потери сессии (рестарт бота → username="?").
+        if not _valid_account(username):
+            await query.edit_message_text(
+                "⚠️ Сессия сброшена — выбери конкурента заново.",
+                reply_markup=_accounts_keyboard(),
+            )
+            return
+        # Защита от пустого выбора групп.
         if not _selected_groups(s):
             try:
                 await query.edit_message_text(
@@ -1224,27 +1284,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
             return
-        estimate = _estimate_cost(s)
-        stages   = _build_stages_list(s)
-        estimate += f"\n\nСтейджи: {', '.join(stages)}"
-        await query.edit_message_text(
-            estimate,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("← Назад к настройкам", callback_data=f"acc:{username}")
-            ]]),
-        )
-        return
-
-    elif data == "action:launch":
-        if not _selected_groups(s):
-            try:
-                await query.edit_message_text(
-                    "⚠️ Выбери хотя бы одну группу для сбора.\n\n" + _settings_text(username, s),
-                    reply_markup=_settings_keyboard(username, s),
-                )
-            except Exception:
-                pass
+        if data == "action:estimate":
+            estimate = _estimate_cost(s)
+            stages   = _build_stages_list(s)
+            estimate += f"\n\nСтейджи: {', '.join(stages)}"
+            await query.edit_message_text(
+                estimate,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("← Назад к настройкам", callback_data=f"acc:{username}")
+                ]]),
+            )
             return
+        # action:launch
         stages = _build_stages_list(s)
         await _start_run(query, context, username, stages, dry_run=False,
                          write_mode=s.get("write_mode", "replace"), settings=s)
