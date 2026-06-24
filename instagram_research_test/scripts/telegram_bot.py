@@ -190,8 +190,9 @@ def _read_profile_brief(username: str) -> tuple[str, str]:
 # (mode get_sheet_data), а не из локального sheets_payload.json.
 # ---------------------------------------------------------------------------
 
-_SHEET_COUNT_TTL     = 15.0  # сек: кэш, чтобы не дёргать таблицу на каждый рендер экрана
-_SHEET_COUNT_TIMEOUT = 8.0   # сек: бюджет запроса; если медленно/недоступно — заглушка «—»
+_SHEET_COUNT_TTL         = 15.0  # сек: кэш, чтобы не дёргать таблицу на каждый рендер экрана
+_SHEET_COUNT_TIMEOUT     = 15.0  # сек: бюджет ОДНОГО запроса (запросы идут последовательно)
+_SHEET_COUNT_RETRY_DELAY = 2.0   # сек: пауза перед ретраем, если первое чтение пустое (гонка после записи)
 _SHEET_COUNT_CACHE: dict[str, tuple[float, dict]] = {}
 
 
@@ -204,10 +205,14 @@ async def _fetch_competitor_count(client, url, body_base: dict, sheet_name: str,
         })
         data = r.json()
         if not data.get("ok"):
+            logger.warning("get_sheet_data ok=false: лист '%s' @%s — %s",
+                           sheet_name, username, data.get("errors") or data)
             return None
         needle = username.strip()
         return sum(1 for v in (data.get("data") or []) if str(v).strip() == needle)
-    except Exception:
+    except Exception as e:
+        logger.warning("get_sheet_data ошибка: лист '%s' @%s — %s: %s",
+                       sheet_name, username, type(e).__name__, e)
         return None
 
 
@@ -226,6 +231,7 @@ async def _read_sheet_counts_live(username: str) -> dict:
 
     url = os.environ.get("GOOGLE_SHEETS_WEBAPP_URL", "")
     if not url:
+        logger.warning("Live sheet counts: GOOGLE_SHEETS_WEBAPP_URL не задан")
         return {name: None for name in sheets}
 
     body_base = {
@@ -234,18 +240,29 @@ async def _read_sheet_counts_live(username: str) -> dict:
             "GOOGLE_SHEETS_SPREADSHEET_ID", "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
         ),
     }
-    try:
-        async with httpx.AsyncClient(timeout=_SHEET_COUNT_TIMEOUT) as client:
-            results = await asyncio.gather(*[
-                _fetch_competitor_count(client, url, body_base, name, username)
-                for name in sheets
-            ])
-        counts = dict(zip(sheets, results))
-    except Exception as e:
-        logger.warning("Live sheet counts failed for @%s: %s", username, e)
-        return {name: None for name in sheets}
 
-    _SHEET_COUNT_CACHE[username] = (now, counts)
+    async def _read_once() -> dict:
+        out = {name: None for name in sheets}
+        try:
+            async with httpx.AsyncClient(timeout=_SHEET_COUNT_TIMEOUT) as client:
+                # ПОСЛЕДОВАТЕЛЬНО: Apps Script single-threaded, при параллели поздние
+                # запросы стоят в очереди и упираются в общий дедлайн → таймаут → «—».
+                for name in sheets:
+                    out[name] = await _fetch_competitor_count(client, url, body_base, name, username)
+        except Exception as e:
+            logger.warning("Live sheet counts failed for @%s: %s", username, e)
+        return out
+
+    counts = await _read_once()
+    # Ретрай при полном провале — типично сразу после записи (лок/холодный старт Apps Script).
+    if all(v is None for v in counts.values()):
+        logger.info("Live sheet counts @%s: пусто, ретрай через %.0fс", username, _SHEET_COUNT_RETRY_DELAY)
+        await asyncio.sleep(_SHEET_COUNT_RETRY_DELAY)
+        counts = await _read_once()
+
+    # Кэшируем ТОЛЬКО удачное чтение, чтобы не залипли прочерки на _SHEET_COUNT_TTL секунд.
+    if any(v is not None for v in counts.values()):
+        _SHEET_COUNT_CACHE[username] = (now, counts)
     return counts
 
 
