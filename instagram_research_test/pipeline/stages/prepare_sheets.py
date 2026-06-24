@@ -209,7 +209,10 @@ def _nf(val: str) -> str:
 _SOURCE_MAP = {
     "profile_summary":    "profile_summary.json",
     "bio_analysis":       "bio_analysis.json",
+    "bio_semantic":       "stage5a2e_bio_semantic.json",
     "pinned_posts_index": "pinned_posts_index.json",
+    "pinned_sheet_rows":  "stage5a2c_pinned_posts_google_sheet_rows.json",
+    "pinned_hooks":       "stage5a2d_pinned_hooks.json",
     "link_destination":   "stage5a2f_link_destination.json",
     "landing_analysis":   "stage5a2g_landing_analysis.json",
     "highlights_index":   "highlights_index.json",
@@ -362,12 +365,22 @@ def _build_profile(sources: dict, username: str) -> tuple[list, list]:
     ps  = sources.get("profile_summary") or {}
     bio = sources.get("bio_analysis")    or {}
 
+    # Bio-семантика: приоритет стейдж 05 (stage5a2e_bio_semantic.json → fields.<key>.value),
+    # fallback на rule-based стейдж 01 (bio_analysis.json), если 05 нет или поле пустое.
+    bio_sem    = sources.get("bio_semantic") or {}
+    sem_fields = bio_sem.get("fields") if isinstance(bio_sem, dict) else {}
+    sem_fields = sem_fields if isinstance(sem_fields, dict) else {}
+
     _raw_bio = ps.get("bio_text") or {}
     bio_text = str(_raw_bio.get("value") if isinstance(_raw_bio, dict) else _raw_bio).strip()
 
     def _sem_or_bio(bio_key: str) -> str:
-        v = _fval_str(bio, bio_key)
-        return v if v else ""
+        f = sem_fields.get(bio_key)
+        if isinstance(f, dict):
+            v = f.get("value")
+            if v not in (None, "", []):
+                return _join_list(v) if isinstance(v, list) else str(v)
+        return _fval_str(bio, bio_key) or ""
 
     url = _bio_url(sources)
     cta_dest = _sem_or_bio("cta_destination")
@@ -392,6 +405,14 @@ def _build_profile(sources: dict, username: str) -> tuple[list, list]:
     return [_make_row(PROFILE_HEADERS, row)], warnings
 
 
+def _ig_shortcode(url) -> str:
+    """Достаёт shortcode из ссылки на пост (.../p/<code>/, .../reel/<code>/) для матчинга."""
+    if not isinstance(url, str):
+        return ""
+    m = re.search(r"/(?:p|reel|tv)/([^/?#]+)", url)
+    return m.group(1) if m else ""
+
+
 def _build_pinned(sources: dict, username: str) -> tuple[list, list]:
     warnings = []
     _competitor = username
@@ -406,24 +427,60 @@ def _build_pinned(sources: dict, username: str) -> tuple[list, list]:
         warnings.append("pinned_posts_index.json пусто или отсутствует; нет строк")
         return [], warnings
 
+    # Аналитика закрепов (стейдж 03): rows_as_dicts уже размечен под колонки листа.
+    # Матчим по «Позиция закрепа», запасной матч — по shortcode ссылки (число закрепов может меняться).
+    sheet_rows    = sources.get("pinned_sheet_rows")
+    analysis_rows = sheet_rows.get("rows_as_dicts", []) if isinstance(sheet_rows, dict) else []
+    analysis_by_pos, analysis_by_code = {}, {}
+    for r in analysis_rows:
+        if not isinstance(r, dict):
+            continue
+        pos = str(r.get("Позиция закрепа", "")).strip()
+        if pos:
+            analysis_by_pos[pos] = r
+        code = _ig_shortcode(r.get("Ссылка на пост"))
+        if code:
+            analysis_by_code[code] = r
+    if not analysis_rows:
+        warnings.append("stage5a2c_pinned_posts_google_sheet_rows.json нет; аналитика закрепов пуста")
+
+    # Визуальный анализ карусели (стейдж 04): запасной источник CTA — carousel_cta.
+    hooks_raw   = sources.get("pinned_hooks")
+    hooks_posts = hooks_raw.get("posts", []) if isinstance(hooks_raw, dict) else []
+    hooks_by_pos = {
+        str(h.get("position")).strip(): h
+        for h in hooks_posts
+        if isinstance(h, dict) and h.get("position") is not None
+    }
+
     rows = []
     for item in pi_list:
-        url = _fval(item, "url", "postUrl", "link")
-        caption = _fval_str(item, "caption_preview", "caption", "text")
+        url      = _fval(item, "url", "postUrl", "link")
+        caption  = _fval_str(item, "caption_preview", "caption", "text")
         position = item.get("position")
+        pos_key  = str(position).strip() if position is not None else ""
+        code_key = _ig_shortcode(str(url) if url else "")
+
+        a = analysis_by_pos.get(pos_key) or analysis_by_code.get(code_key) or {}
+        h = hooks_by_pos.get(pos_key) or {}
+
+        # «Какой CTA»: основной файл часто пуст (CTA фильтруется постобработкой) →
+        # запасной carousel_cta из визуального анализа (стейдж 04).
+        cta = str(a.get("Какой CTA") or "").strip() or str(h.get("carousel_cta") or "").strip()
+
         row = {
             "Дата записи":         datetime.now().strftime("%d.%m.%Y"),
             "Конкурент":           _competitor,
             "Ссылка на пост":      _redact_url(str(url)) if url else "",
             "Позиция закрепа":     str(position) if position is not None else "",
-            "Тема поста":          "",
-            "Почему закреплен":    "",
-            "Хук / первый экран":  "",
+            "Тема поста":          str(a.get("Тема поста") or ""),
+            "Почему закреплен":    str(a.get("Почему закреплен") or ""),
+            "Хук / первый экран":  str(a.get("Хук / первый экран") or ""),
             "Что в тексте поста":  caption,
-            "Ключевые смыслы":     "",
-            "Какой CTA":           "",
+            "Ключевые смыслы":     str(a.get("Ключевые смыслы") or ""),
+            "Какой CTA":           cta,
             "Куда ведет CTA":      "",
-            "Роль в воронке":      "",
+            "Роль в воронке":      str(a.get("Роль в воронке") or ""),
         }
         rows.append(_make_row(PINNED_HEADERS, row))
 
