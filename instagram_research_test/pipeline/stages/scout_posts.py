@@ -231,8 +231,47 @@ def drop_codes(verdicts) -> list:
             if v.get("verdict") == "drop" and v.get("short_code")]
 
 
-def scout(username: str, sample_limit: int = 48) -> dict:
-    """Лёгкая разведка аккаунта. Один батч Apify, без GPT и без медиа."""
+# ─────────────────────────────────────────────────────────────────────────────
+# Раскладка разведки по периодам (3/6/12/24 мес → сколько постов)
+# ─────────────────────────────────────────────────────────────────────────────
+_PERIOD_BUCKETS = (3, 6, 12, 24)
+
+
+def _period_breakdown(items, post_types, now, truncated: bool = False) -> list:
+    """Раскладка постов по корзинам месяцев — только timestamp + type, без GPT.
+
+    Для каждой корзины из _PERIOD_BUCKETS: число постов нужных типов не старше
+    N*30 дней + оценка анализа ($ и мин). lower_bound=True, если выборка упёрлась
+    в лимит (truncated) И окно корзины уходит старше самого старого собранного
+    поста — тогда число занижено и в UI показывается как «N+».
+    """
+    parsed = [(_post_type(it.get("type", "Image")), _parse_ts(it.get("timestamp", ""))) for it in items]
+    oldest = min((ts for _, ts in parsed if ts is not None), default=None)
+    out = []
+    for months in _PERIOD_BUCKETS:
+        cutoff = now - timedelta(days=months * 30)
+        count = sum(1 for pt, ts in parsed if pt in post_types and ts is not None and ts >= cutoff)
+        lower_bound = bool(truncated and oldest is not None and cutoff < oldest)
+        out.append({
+            "months": months,
+            "count": count,
+            "lower_bound": lower_bound,
+            "est_cost_usd": round(count * _COST_PER_POST_USD, 2),
+            "est_minutes": round(count * _SECONDS_PER_POST / 60, 1),
+        })
+    return out
+
+
+def scout(username: str, sample_limit: int = 200,
+          post_types: tuple = ("photo", "carousel")) -> dict:
+    """Лёгкая разведка аккаунта одним ГЛУБОКИМ батчем Apify (resultsLimit~200,
+    как period-режим collect), без GPT и без медиа.
+
+    Кроме общих агрегатов считает period_breakdown — раскладку по корзинам
+    месяцев (3/6/12/24): сколько постов нужных типов попадает в каждый период,
+    чтобы пользователь выбирал глубину выборки осознанно. truncated=True, если
+    батч упёрся в resultsLimit (тогда дальние периоды — нижняя оценка).
+    """
     url = f"https://www.instagram.com/{username}/"
     logger.info("[12.5] scout | @%s | sample_limit=%s", username, sample_limit)
 
@@ -255,12 +294,9 @@ def scout(username: str, sample_limit: int = 48) -> dict:
         pt = _post_type(it.get("type", "Image"))
         by_type[pt] = by_type.get(pt, 0) + 1
 
-        ts = it.get("timestamp", "")
-        if ts:
-            try:
-                dates.append(datetime.fromisoformat(ts.replace("Z", "+00:00")))
-            except Exception:
-                pass
+        ts = _parse_ts(it.get("timestamp", ""))
+        if ts is not None:
+            dates.append(ts)
 
         if int(it.get("likesCount") or 0) < 0:
             hidden_likes += 1
@@ -268,8 +304,10 @@ def scout(username: str, sample_limit: int = 48) -> dict:
             est_personal += 1
 
     total = len(items)
+    truncated = total >= sample_limit  # батч упёрся в лимит → дальние периоды занижены
     date_min = min(dates).date().isoformat() if dates else None
     date_max = max(dates).date().isoformat() if dates else None
+    breakdown = _period_breakdown(items, set(post_types), datetime.now(timezone.utc), truncated)
 
     return {
         "account": username,
@@ -279,47 +317,53 @@ def scout(username: str, sample_limit: int = 48) -> dict:
         "date_max": date_max,
         "hidden_likes": hidden_likes,
         "est_personal": est_personal,
-        "est_cost_usd": round(total * _COST_PER_POST_USD, 2),
-        "est_minutes": round(total * _SECONDS_PER_POST / 60, 1),
-        "sample_truncated": total >= sample_limit,  # возможно, постов больше
-        "items": items,  # сырые посты для triage() — один Apify-вызов на разведку
+        "post_types": list(post_types),
+        "period_breakdown": breakdown,
+        "truncated": truncated,
+        "sample_truncated": truncated,  # совместимость со старым ключом
+        "items": items,                 # сырые посты для triage() на выбранном срезе
     }
 
 
-def format_scout_message(s: dict, tri_counts: dict | None = None) -> str:
-    """Готовый текст для Telegram (Markdown). Моноширинный блок со сводкой.
+def format_scout_message(s: dict) -> str:
+    """Готовый текст для Telegram (Markdown): сводка + раскладка глубина→постов.
 
-    tri_counts — опциональная сводка triage() {keep, review, drop}; если передана,
-    в блок добавляется строка релевантности.
+    Для каждой корзины (3/6/12/24 мес) — число постов и оценка анализа ($ и мин).
+    «N+» = выборка упёрлась в лимит, реальных постов в этом периоде больше.
     """
     bt = s["by_type"]
     period = (
         f"{s['date_min']} … {s['date_max']}"
-        if s["date_min"] else "период не определён"
+        if s.get("date_min") else "период не определён"
     )
-    more = " (и, возможно, больше)" if s.get("sample_truncated") else ""
-    triage_seg = ""
-    if tri_counts:
-        triage_seg = (
-            f"Релевантность  : {tri_counts.get('keep', 0)} keep · "
-            f"{tri_counts.get('review', 0)} review · {tri_counts.get('drop', 0)} drop\n"
+    truncated = s.get("truncated") or s.get("sample_truncated")
+    more = " (упёрлись в лимит)" if truncated else ""
+    pts = s.get("post_types") or ["photo", "carousel"]
+
+    table_lines = []
+    for b in s.get("period_breakdown", []):
+        lb = b.get("lower_bound")
+        cnt_str = f"{b['count']}+" if lb else str(b["count"])
+        cost_str = f"${b.get('est_cost_usd', 0)}{'+' if lb else ''}"
+        table_lines.append(
+            f"  {b['months']:>2} мес : {cnt_str:>4}   ≈ {cost_str} · ≈ {b.get('est_minutes', 0)} мин"
         )
+    table = "\n".join(table_lines) or "  (нет данных по периодам)"
+
+    footer = ("N+ = постов больше, выборка упёрлась в лимит"
+              if truncated else "drop отсеивается, mixed помечается «спорный»")
     body = (
         f"@{s['account']} — разведка\n"
-        f"{'─' * 32}\n"
-        f"Найдено постов : {s['total']}{more}\n"
-        f"  фото         : {bt.get('photo', 0)}\n"
-        f"  карусели     : {bt.get('carousel', 0)}\n"
-        f"  видео        : {bt.get('video', 0)}\n"
-        f"Период         : {period}\n"
-        f"Скрытые лайки  : {s['hidden_likes']} из {s['total']}  "
-        f"(ERR по ним = н/д)\n"
-        f"Личное/мусор   : ~{s['est_personal']} (грубая оценка)\n"
-        f"{triage_seg}"
-        f"{'─' * 32}\n"
-        f"drop отсеивается автоматически, review идёт в анализ с пометкой.\n"
-        f"Анализ (keep+review):\n"
-        f"  ≈ ${s['est_cost_usd']} · ≈ {s['est_minutes']} мин"
+        f"{'─' * 34}\n"
+        f"Собрано (выборка): {s['total']}{more}\n"
+        f"  фото {bt.get('photo', 0)} · карусели {bt.get('carousel', 0)} · видео {bt.get('video', 0)}\n"
+        f"Период выборки   : {period}\n"
+        f"Скрытые лайки    : {s['hidden_likes']} из {s['total']} (ERR = н/д)\n"
+        f"{'─' * 34}\n"
+        f"Глубина → постов ({' + '.join(pts)}):\n"
+        f"{table}\n"
+        f"{'─' * 34}\n"
+        f"{footer}"
     )
     return "```\n" + body + "\n```"
 
@@ -328,11 +372,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Stage 12.5: scout posts")
     parser.add_argument("--account", required=True)
-    parser.add_argument("--sample-limit", type=int, default=48)
+    parser.add_argument("--sample-limit", type=int, default=200)
     args = parser.parse_args()
     result = scout(args.account, sample_limit=args.sample_limit)
-    items = result.pop("items", [])  # не печатаем сырые посты в сводке
+    result.pop("items", None)  # не печатаем сырые посты в сводке
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print()
-    verdicts = triage(items, post_types=["photo", "carousel"])
-    print(format_scout_message(result, tri_counts=triage_counts(verdicts)))
+    print(format_scout_message(result))

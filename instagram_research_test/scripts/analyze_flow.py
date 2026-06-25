@@ -39,16 +39,48 @@ from telegram.ext import (
 )
 
 from pipeline.stages.scout_posts import (
-    scout, format_scout_message, triage as scout_triage, triage_counts, drop_codes,
+    scout, format_scout_message, triage as scout_triage, drop_codes,
 )
 from pipeline.stages import collect_posts, analyze_posts
 
 logger = logging.getLogger(__name__)
 
-CHOOSING_SCOPE, CHOOSING_FILTER, CONFIRMING = range(3)
+CHOOSING_PERIOD, CHOOSING_FILTER, CONFIRMING = range(3)
 
 # Telegram режет сообщения на 4096 символов — длинные промпты бьём на части.
 _TG_LIMIT = 3900
+
+# Типы постов, идущие в лист «Посты» (фото + карусели). Используются и для
+# раскладки по периодам в scout, и для сбора/триажа выбранного среза.
+_POST_TYPES = ["photo", "carousel"]
+
+
+def _period_keyboard(s: dict) -> InlineKeyboardMarkup:
+    """Кнопки выбора ГЛУБИНЫ выборки 3/6/12/24 мес с числом постов на каждой."""
+    bd = {b["months"]: b for b in s.get("period_breakdown", [])}
+
+    def lbl(m: int) -> str:
+        b = bd.get(m)
+        if not b:
+            return f"{m} мес"
+        cnt = f"{b['count']}+" if b.get("lower_bound") else str(b["count"])
+        return f"{m} мес · {cnt}"
+
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(lbl(3),  callback_data="period:3"),
+         InlineKeyboardButton(lbl(6),  callback_data="period:6")],
+        [InlineKeyboardButton(lbl(12), callback_data="period:12"),
+         InlineKeyboardButton(lbl(24), callback_data="period:24")],
+        [InlineKeyboardButton("✕ Отмена", callback_data="period:cancel")],
+    ])
+
+
+def _filter_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Только экспертные (без личного)", callback_data="filter:professional")],
+        [InlineKeyboardButton("Все, кроме мусора", callback_data="filter:all")],
+        [InlineKeyboardButton("← Назад", callback_data="filter:back")],
+    ])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,7 +98,9 @@ async def analyze_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     msg = await update.message.reply_text(f"🔍 Разведка @{username}…")
 
-    # scout — блокирующий (Apify), уводим в поток, чтобы не вешать event loop
+    # scout — блокирующий (Apify), уводим в поток, чтобы не вешать event loop.
+    # Глубокий батч (~200) + раскладка по периодам, БЕЗ GPT. Триаж НЕ здесь —
+    # он применяется к ВЫБРАННОМУ срезу уже на запуске (см. confirm_run).
     try:
         s = await asyncio.to_thread(scout, username)
     except Exception as e:
@@ -74,44 +108,21 @@ async def analyze_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await msg.edit_text(f"Не удалось собрать разведку по @{username}: {e}")
         return ConversationHandler.END
 
-    # Триаж на разведке: один дешёвый gpt-4o-mini батч режет мусор/личное ДО
-    # дорогого Vision-анализа. drop — автоматически, без подтверждения юзера.
-    # period-фильтр по дате оставляем collect (scope ещё не выбран) → months_back=None.
-    items = s.pop("items", [])  # сырые посты не держим в user_data["scout"]
-    try:
-        verdicts = await asyncio.to_thread(scout_triage, items, None, ["photo", "carousel"])
-    except Exception:
-        logger.exception("triage failed — продолжаем без триажа (анализ сам отфильтрует)")
-        verdicts = []
-
-    counts = triage_counts(verdicts)
+    context.user_data["scout_items"] = s.pop("items", [])  # сырые посты для триажа среза
     context.user_data["scout"] = s
-    context.user_data["triage_counts"] = counts
-    context.user_data["triage"] = {v["short_code"]: v for v in verdicts if v.get("short_code")}
-    context.user_data["drop_codes"] = drop_codes(verdicts)
 
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"Все {s['total']}", callback_data="scope:all")],
-        [
-            InlineKeyboardButton("10", callback_data="scope:10"),
-            InlineKeyboardButton("30", callback_data="scope:30"),
-            InlineKeyboardButton("50", callback_data="scope:50"),
-        ],
-        [InlineKeyboardButton("За 6 мес.", callback_data="scope:period6")],
-        [InlineKeyboardButton("✕ Отмена", callback_data="scope:cancel")],
-    ])
     await msg.edit_text(
-        format_scout_message(s, tri_counts=counts) + "\n\nСколько постов анализируем?",
+        format_scout_message(s) + "\n\nЗа какой период анализируем?",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kb,
+        reply_markup=_period_keyboard(s),
     )
-    return CHOOSING_SCOPE
+    return CHOOSING_PERIOD
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Шаг 2: выбор объёма
+# Шаг 2: выбор ГЛУБИНЫ (период)
 # ─────────────────────────────────────────────────────────────────────────────
-async def choose_scope(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def choose_period(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
     choice = q.data.split(":", 1)[1]
@@ -120,28 +131,21 @@ async def choose_scope(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await q.edit_message_text("Отменено.")
         return ConversationHandler.END
 
-    if choice == "period6":
-        context.user_data["mode"] = "period"
-        context.user_data["months_back"] = 6
-        context.user_data["target_count"] = None
-        scope_label = "за последние 6 месяцев"
-    else:
-        context.user_data["mode"] = "count"
-        context.user_data["months_back"] = 6
-        s = context.user_data["scout"]
-        context.user_data["target_count"] = s["total"] if choice == "all" else int(choice)
-        scope_label = f"{context.user_data['target_count']} постов"
+    months = int(choice)
+    context.user_data["mode"] = "period"
+    context.user_data["months_back"] = months
 
-    context.user_data["scope_label"] = scope_label
+    bd = {b["months"]: b for b in context.user_data["scout"].get("period_breakdown", [])}
+    b = bd.get(months, {})
+    cnt = f"{b['count']}+" if b.get("lower_bound") else b.get("count", "?")
+    context.user_data["period_label"] = f"за {months} мес (~{cnt} постов)"
+    context.user_data["period_est_cost"] = b.get("est_cost_usd", 0)
+    context.user_data["period_est_minutes"] = b.get("est_minutes", 0)
+    context.user_data["period_lower_bound"] = bool(b.get("lower_bound"))
 
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Только экспертные (без личного)", callback_data="filter:professional")],
-        [InlineKeyboardButton("Все, кроме мусора", callback_data="filter:all")],
-        [InlineKeyboardButton("← Назад", callback_data="filter:back")],
-    ])
     await q.edit_message_text(
-        f"Объём: {scope_label}.\n\nКакой контент берём?",
-        reply_markup=kb,
+        f"Период: {context.user_data['period_label']}.\n\nКакой контент берём?",
+        reply_markup=_filter_keyboard(),
     )
     return CHOOSING_FILTER
 
@@ -155,11 +159,13 @@ async def choose_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     choice = q.data.split(":", 1)[1]
 
     if choice == "back":
-        return await _reshow_scope(q, context)
+        return await _reshow_period(q, context)
 
     context.user_data["content_filter"] = choice
     s = context.user_data["scout"]
+    u = context.user_data
     filter_label = "только экспертные" if choice == "professional" else "все, кроме мусора"
+    plus = "+" if u.get("period_lower_bound") else ""
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Запустить анализ", callback_data="confirm:go")],
@@ -169,9 +175,9 @@ async def choose_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         f"```\n"
         f"Запуск анализа @{s['account']}\n"
         f"{'─' * 28}\n"
-        f"Объём  : {context.user_data['scope_label']}\n"
+        f"Период : {u['period_label']}\n"
         f"Контент: {filter_label}\n"
-        f"Цена   : ≈ ${s['est_cost_usd']} · ≈ {s['est_minutes']} мин\n"
+        f"Оценка : ≈ ${u.get('period_est_cost', 0)}{plus} · ≈ {u.get('period_est_minutes', 0)} мин\n"
         f"```",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kb,
@@ -179,25 +185,14 @@ async def choose_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return CONFIRMING
 
 
-async def _reshow_scope(q, context) -> int:
+async def _reshow_period(q, context) -> int:
     s = context.user_data["scout"]
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"Все {s['total']}", callback_data="scope:all")],
-        [
-            InlineKeyboardButton("10", callback_data="scope:10"),
-            InlineKeyboardButton("30", callback_data="scope:30"),
-            InlineKeyboardButton("50", callback_data="scope:50"),
-        ],
-        [InlineKeyboardButton("За 6 мес.", callback_data="scope:period6")],
-        [InlineKeyboardButton("✕ Отмена", callback_data="scope:cancel")],
-    ])
     await q.edit_message_text(
-        format_scout_message(s, tri_counts=context.user_data.get("triage_counts"))
-        + "\n\nСколько постов анализируем?",
+        format_scout_message(s) + "\n\nЗа какой период анализируем?",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kb,
+        reply_markup=_period_keyboard(s),
     )
-    return CHOOSING_SCOPE
+    return CHOOSING_PERIOD
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -214,21 +209,32 @@ async def confirm_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     username = u["username"]
     await q.edit_message_text(f"⏳ Анализирую @{username}… это займёт несколько минут.")
 
+    months_back = u.get("months_back", 6)
+
     def _run():
-        # drop-коды с разведки не собираем вовсе (нет скачивания медиа / Vision).
+        # Триаж на ВЫБРАННОМ срезе: L0 режет вне периода/типа (бесплатно),
+        # L1 (один gpt-4o-mini батч) — personal. drop-коды не собираем вовсе.
+        items = u.get("scout_items") or []
+        try:
+            verdicts = scout_triage(items, months_back, _POST_TYPES)
+        except Exception:
+            logger.exception("triage failed — продолжаем без триажа (анализ сам отфильтрует)")
+            verdicts = []
+        drop = drop_codes(verdicts)
+        triage_map = {v["short_code"]: v for v in verdicts if v.get("short_code")}
+
         collect_posts.collect(
             username,
-            months_back=u.get("months_back", 6),
-            post_types=["photo", "carousel"],
-            content_mode=u["mode"],
-            target_count=u.get("target_count") or 30,
-            exclude_codes=u.get("drop_codes") or None,
+            months_back=months_back,
+            post_types=_POST_TYPES,
+            content_mode="period",
+            exclude_codes=drop or None,
         )
         # triage-карта: keep/review берутся оттуда, _is_relevant повторно не вызывается.
         return analyze_posts.analyze(
             username,
             content_filter=u.get("content_filter", "all"),
-            triage=u.get("triage") or None,
+            triage=triage_map or None,
         )
 
     try:
@@ -258,7 +264,7 @@ def build_analyze_conversation() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CommandHandler("analyze", analyze_start)],
         states={
-            CHOOSING_SCOPE:  [CallbackQueryHandler(choose_scope, pattern=r"^scope:")],
+            CHOOSING_PERIOD: [CallbackQueryHandler(choose_period, pattern=r"^period:")],
             CHOOSING_FILTER: [CallbackQueryHandler(choose_filter, pattern=r"^filter:")],
             CONFIRMING:      [CallbackQueryHandler(confirm_run, pattern=r"^confirm:")],
         },
