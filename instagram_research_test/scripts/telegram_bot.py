@@ -42,7 +42,9 @@ load_dotenv(RESEARCH_DIR / ".env", override=True)
 if str(RESEARCH_DIR) not in sys.path:
     sys.path.insert(0, str(RESEARCH_DIR))
 
-from analyze_flow import build_analyze_conversation, prompts_handler  # noqa: E402
+from analyze_flow import (  # noqa: E402
+    build_analyze_conversation, build_smart_conversation, prompts_handler,
+)
 
 # ---------------------------------------------------------------------------
 # Global job state (one job at a time)
@@ -742,6 +744,7 @@ def _main_menu_text() -> str:
 
 def _main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Анализировать конкурента", callback_data="smart:start")],
         [
             InlineKeyboardButton("📋 Мои конкуренты", callback_data="show_accounts"),
             InlineKeyboardButton("➕ Добавить нового", callback_data="acc_new"),
@@ -1402,7 +1405,8 @@ def main():
     app.add_handler(CommandHandler("help",   start))
     app.add_handler(CommandHandler("status", cmd_status))
     # Регистрируем ДО общего CallbackQueryHandler: иначе button_callback (без
-    # паттерна) перехватит инлайн-кнопки scope:/filter:/confirm: этого флоу.
+    # паттерна) перехватит инлайн-кнопки smart:/scope:/filter:/confirm: этих флоу.
+    app.add_handler(build_smart_conversation())
     app.add_handler(build_analyze_conversation())
     app.add_handler(prompts_handler())
     app.add_handler(CallbackQueryHandler(button_callback))
