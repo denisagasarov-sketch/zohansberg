@@ -251,15 +251,9 @@ def _compute_metrics(posts: list, followers: int) -> list[dict]:
             "err_above_avg": None,
         })
 
-    # Средний ERR — только по постам с известным ERR (None исключаем).
-    known = [r["err"] for r in results if r["err"] is not None]
-    if known:
-        avg = statistics.mean(known)
-        for r in results:
-            if r["err"] is None:
-                r["err_above_avg"] = "н/д"
-            else:
-                r["err_above_avg"] = "да" if r["err"] > avg else "нет"
+    # err_above_avg НЕ финализируем здесь: средний ERR зависит от фильтрации
+    # (filtered_out исключаются из среднего), а это известно только в analyze().
+    # Там же он и проставляется. Здесь у каждой строки err_above_avg остаётся None.
     return results
 
 
@@ -559,26 +553,14 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all",
 
     followers = _load_followers(username)
     metrics = _compute_metrics(posts, followers)
-    # Средний ERR — только по постам с известным ERR (скрытые лайки → err=None).
-    _known_err = [m["err"] for m in metrics if m["err"] is not None]
-    avg_err = round(statistics.mean(_known_err), 2) if _known_err else None
 
-    data_dir = normalized(username, "stage5e0_posts_index.json").parent.parent
-    tmp_base = data_dir / "tmp" / "posts"
-
-    rows: list[dict] = []
-    ok_count = 0
-    fail_count = 0
-    filtered_count = 0
-    review_count = 0
-
-    for i, (post, m) in enumerate(zip(posts, metrics)):
-        pos = i + 1
-        logger.info("[%d/%d] %s | %s", pos, len(posts), m["post_type"], m["url"])
-
+    # Пред-проход: вердикт фильтра по каждому посту (триаж или _is_relevant).
+    # Делаем ДО Vision, чтобы (а) средний ERR считать только по релевантным
+    # постам и (б) не вызывать _is_relevant дважды.
+    verdicts: list[dict] = []
+    for post, m in zip(posts, metrics):
         short = post.get("shortCode") or post.get("id") or m.get("post_id") or ""
         tri = triage.get(short) if triage else None
-
         if tri is not None:
             # Вердикт уже получен на разведке — НЕ дёргаем _is_relevant повторно.
             verdict = tri.get("verdict", "keep")
@@ -590,22 +572,51 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all",
             # Fallback (триаж не передан / поста нет в нём): старый per-post фильтр.
             relevant, content_type, reason = _is_relevant(m["caption"])
             is_review = content_type == "mixed"
-
-        # фильтр по релевантности (drop / мусор) — без скачивания медиа и Vision
-        if not relevant:
-            logger.info("  FILTERED (drop): %s", reason)
-            filtered_count += 1
-            rows.append(_build_filtered_row(username, m, reason or "мусор"))
-            continue
-
-        # фильтр по content_filter
         type_allowed = (
             content_filter == "all"
             or (content_filter == "professional" and content_type in ("professional", "mixed"))
             or (content_filter == "personal"     and content_type == "personal")
         )
-        if not type_allowed:
-            logger.info("  FILTERED (не тот тип): content_type=%s filter=%s", content_type, content_filter)
+        verdicts.append({
+            "relevant": relevant, "content_type": content_type, "reason": reason,
+            "is_review": is_review, "type_allowed": type_allowed,
+            "kept": relevant and type_allowed,   # True = пойдёт в анализ (не filtered_out)
+        })
+
+    # Средний ERR — только по РЕЛЕВАНТНЫМ (не filtered_out) постам с известным ERR.
+    # Если таких нет (напр. у всех релевантных лайки скрыты) — avg_err=None → «н/д».
+    _known_err = [m["err"] for m, v in zip(metrics, verdicts) if v["kept"] and m["err"] is not None]
+    avg_err = round(statistics.mean(_known_err), 2) if _known_err else None
+    # «ERR выше среднего?» — относительно того же среднего; avg_err is None → «н/д» у всех.
+    for m in metrics:
+        if avg_err is None or m["err"] is None:
+            m["err_above_avg"] = "н/д"
+        else:
+            m["err_above_avg"] = "да" if m["err"] > avg_err else "нет"
+
+    data_dir = normalized(username, "stage5e0_posts_index.json").parent.parent
+    tmp_base = data_dir / "tmp" / "posts"
+
+    rows: list[dict] = []
+    ok_count = 0
+    fail_count = 0
+    filtered_count = 0
+    review_count = 0
+
+    for i, (post, m, v) in enumerate(zip(posts, metrics, verdicts)):
+        pos = i + 1
+        logger.info("[%d/%d] %s | %s", pos, len(posts), m["post_type"], m["url"])
+
+        # фильтр по релевантности (drop / мусор) — без скачивания медиа и Vision
+        if not v["relevant"]:
+            logger.info("  FILTERED (drop): %s", v["reason"])
+            filtered_count += 1
+            rows.append(_build_filtered_row(username, m, v["reason"] or "мусор"))
+            continue
+
+        # фильтр по content_filter
+        if not v["type_allowed"]:
+            logger.info("  FILTERED (не тот тип): content_type=%s filter=%s", v["content_type"], content_filter)
             filtered_count += 1
             rows.append(_build_filtered_row(username, m, "не тот тип контента"))
             continue
@@ -639,7 +650,7 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all",
 
         _postprocess(result, mechanic_note)
         row = _build_row(username, m, avg_err, result)
-        if is_review:
+        if v["is_review"]:
             # mixed → в таблицу, но с явной пометкой для ручного решения Kate.
             review_count += 1
             row["Тема поста"] = f"⚠️ спорный (mixed) · {row['Тема поста']}".rstrip(" ·")
@@ -671,7 +682,7 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all",
     print(f"\n=== Stage 14: Analyze Posts | @{username} ===")
     print(f"Проанализировано: {ok_count}/{len(posts)} | failed: {fail_count} | "
           f"filtered: {filtered_count} | review(mixed): {review_count} | "
-          f"triage: {'scout' if triage_used else 'per_post'} | avg_err: {avg_err}%")
+          f"triage: {'scout' if triage_used else 'per_post'} | avg_err: {_fmt_err(avg_err)}")
     print(f"Сохранено: {output_path}")
     return output
 

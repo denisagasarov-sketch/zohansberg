@@ -697,8 +697,15 @@ def _build_posts(sources: dict, username: str) -> tuple[list, list]:
 
     rows = []
     skipped = 0
+    filtered_out = 0
     for r in input_rows:
         if not isinstance(r, dict):
+            continue
+        # filtered_out-посты (мусор/нерелевантные) в лист НЕ идут — только реально
+        # проанализированные. Маркер ставит analyze_posts._build_filtered_row
+        # ("Заголовок поста" == "filtered_out").
+        if r.get("Заголовок поста") == "filtered_out":
+            filtered_out += 1
             continue
         post_type = r.get("post_type", "")
         if post_type not in allowed_types:
@@ -706,6 +713,8 @@ def _build_posts(sources: dict, username: str) -> tuple[list, list]:
             continue
         rows.append(_make_row(POSTS_HEADERS, {"Дата записи": datetime.now().strftime("%d.%m.%Y"), **r}))
 
+    if filtered_out:
+        warnings.append(f"{filtered_out} filtered_out строк исключено из листа «Посты»")
     if skipped:
         warnings.append(
             f"{skipped} строк исключено по posts_sheet_types "
