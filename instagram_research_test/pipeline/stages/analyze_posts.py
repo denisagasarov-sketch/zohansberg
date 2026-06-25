@@ -223,28 +223,43 @@ def _compute_metrics(posts: list, followers: int) -> list[dict]:
     results = []
     for post in posts:
         raw_type = post.get("type") or "Image"
-        likes = max(0, int(post.get("likesCount") or 0))
+        raw_likes = int(post.get("likesCount") or 0)
+        likes_hidden = raw_likes < 0            # Instagram скрыл лайки (-1)
+        likes = None if likes_hidden else raw_likes
         comments = int(post.get("commentsCount") or 0)
         reposts = int(post.get("sharesCount") or 0)
         views = int(post.get("videoPlayCount") or post.get("videoViewCount") or 0)
-        err = round((likes + comments + reposts) / followers * 100, 2) if followers > 0 else 0.0
+
+        # ERR считаем только если лайки известны И есть followers. Иначе — None (н/д).
+        if likes_hidden or followers <= 0:
+            err = None
+        else:
+            err = round((likes + comments + reposts) / followers * 100, 2)
+
         results.append({
             "post_id": post.get("id") or post.get("shortCode") or "",
             "url": post.get("url") or "",
             "raw_type": raw_type,
             "post_type": _post_type(raw_type),
             "caption": post.get("caption") or "(caption отсутствует)",
-            "likes": likes,
+            "likes": likes,                     # None = скрыто
+            "likes_hidden": likes_hidden,
             "comments": comments,
             "reposts": reposts,
             "views": views,
-            "err": err,
+            "err": err,                         # None = н/д
             "err_above_avg": None,
         })
-    if results:
-        avg = statistics.mean(r["err"] for r in results)
+
+    # Средний ERR — только по постам с известным ERR (None исключаем).
+    known = [r["err"] for r in results if r["err"] is not None]
+    if known:
+        avg = statistics.mean(known)
         for r in results:
-            r["err_above_avg"] = "да" if r["err"] > avg else "нет"
+            if r["err"] is None:
+                r["err_above_avg"] = "н/д"
+            else:
+                r["err_above_avg"] = "да" if r["err"] > avg else "нет"
     return results
 
 
@@ -432,6 +447,14 @@ def _postprocess(result: dict, mechanic_note: str) -> None:
         result["mechanic"] = f"{result['mechanic']} {mechanic_note}".strip()
 
 
+def _fmt_err(err) -> str:
+    return "н/д" if err is None else (str(err).replace(".", ",") + "%")
+
+
+def _fmt_likes(likes):
+    return "скрыто" if likes is None else likes
+
+
 def _build_row(username: str, m: dict, avg_err: float, result: dict) -> dict:
     url = m["url"]
     return {
@@ -454,11 +477,11 @@ def _build_row(username: str, m: dict, avg_err: float, result: dict) -> dict:
         "Как получить?": result.get("lead_magnet_how", ""),
         "Рубрика": result.get("rubric", ""),
         "Просмотры": m["views"],
-        "Лайки": m["likes"],
+        "Лайки": _fmt_likes(m["likes"]),
         "Комментарии": m["comments"],
         "Репосты": m["reposts"],
-        "ERR": str(m["err"]).replace(".", ",") + "%",
-        "Средний ERR": str(avg_err).replace(".", ",") + "%",
+        "ERR": _fmt_err(m["err"]),
+        "Средний ERR": _fmt_err(avg_err),
         "ERR выше среднего?": m["err_above_avg"],
         "Что могло сработать": result.get("what_worked", ""),
         "Что можно протестировать у себя": result.get("what_to_test", ""),
@@ -487,10 +510,10 @@ def _build_filtered_row(username: str, m: dict, reason: str) -> dict:
         "Как получить?": "",
         "Рубрика": "",
         "Просмотры": m["views"],
-        "Лайки": m["likes"],
+        "Лайки": _fmt_likes(m["likes"]),
         "Комментарии": m["comments"],
         "Репосты": m["reposts"],
-        "ERR": str(m["err"]).replace(".", ",") + "%",
+        "ERR": _fmt_err(m["err"]),
         "Средний ERR": "",
         "ERR выше среднего?": "",
         "Что могло сработать": "",
@@ -523,7 +546,9 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -
 
     followers = _load_followers(username)
     metrics = _compute_metrics(posts, followers)
-    avg_err = round(statistics.mean(m["err"] for m in metrics), 2) if metrics else 0.0
+    # Средний ERR — только по постам с известным ERR (скрытые лайки → err=None).
+    _known_err = [m["err"] for m in metrics if m["err"] is not None]
+    avg_err = round(statistics.mean(_known_err), 2) if _known_err else None
 
     data_dir = normalized(username, "stage5e0_posts_index.json").parent.parent
     tmp_base = data_dir / "tmp" / "posts"
@@ -619,5 +644,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stage 14: analyze posts (Metrics + Media + GPT)")
     parser.add_argument("--account", required=True, help="Instagram username")
     parser.add_argument("--dry-run", action="store_true", help="Не вызывать OpenAI")
+    parser.add_argument(
+        "--content-filter", default="all",
+        choices=["all", "professional", "personal"],
+        help="Какой контент анализировать (default: all)",
+    )
     args = parser.parse_args()
-    analyze(args.account, args.dry_run)
+    analyze(args.account, args.dry_run, content_filter=args.content_filter)

@@ -65,6 +65,13 @@ def collect(
     #       через accounts.json (ключи: content_mode, target_count, post_types)
     """
     acc = get_account(username)
+
+    # per-account настройки выборки (если заданы в accounts.json) перекрывают дефолты
+    content_mode  = acc.get("content_mode", content_mode)
+    target_count  = acc.get("target_count", target_count)
+    months_back   = acc.get("months_back", months_back)
+    post_types    = acc.get("post_types", post_types)
+
     url = f"https://www.instagram.com/{username}/"
 
     logger.info(
@@ -99,6 +106,12 @@ def collect(
                 break
             if len(batch) < _BATCH_SIZE:
                 break  # Apify больше не отдаёт
+        if len(accumulated) > target_count:
+            logger.warning(
+                "Собрано %d постов, но target_count=%d — лишние %d НЕ анализируются. "
+                "Увеличьте target_count или используйте period-режим.",
+                len(accumulated), target_count, len(accumulated) - target_count,
+            )
         raw_items = accumulated[:target_count]
         skipped_old = 0
         logger.info(

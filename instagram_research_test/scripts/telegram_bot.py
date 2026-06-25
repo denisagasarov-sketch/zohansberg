@@ -36,6 +36,14 @@ SHEET_TAB_POSTS = f"{SPREADSHEET_URL}#gid=0"
 
 load_dotenv(RESEARCH_DIR / ".env", override=True)
 
+# Кладём корень пайплайна на sys.path, чтобы analyze_flow смог импортировать
+# pipeline.stages.* (бот запускается как `python3 scripts/telegram_bot.py`,
+# поэтому корень проекта по умолчанию НЕ на пути).
+if str(RESEARCH_DIR) not in sys.path:
+    sys.path.insert(0, str(RESEARCH_DIR))
+
+from analyze_flow import build_analyze_conversation, prompts_handler  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Global job state (one job at a time)
 # ---------------------------------------------------------------------------
@@ -1391,6 +1399,10 @@ def main():
     app.add_handler(CommandHandler("start",  start))
     app.add_handler(CommandHandler("help",   start))
     app.add_handler(CommandHandler("status", cmd_status))
+    # Регистрируем ДО общего CallbackQueryHandler: иначе button_callback (без
+    # паттерна) перехватит инлайн-кнопки scope:/filter:/confirm: этого флоу.
+    app.add_handler(build_analyze_conversation())
+    app.add_handler(prompts_handler())
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
