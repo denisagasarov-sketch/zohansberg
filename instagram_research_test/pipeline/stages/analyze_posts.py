@@ -521,14 +521,27 @@ def _build_filtered_row(username: str, m: dict, reason: str) -> dict:
     }
 
 
-def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -> dict:
+def analyze(username: str, dry_run: bool = False, content_filter: str = "all",
+            triage: dict | None = None) -> dict:
     """Анализирует посты через GPT-4o, сохраняет stage5e1_posts_analysis.json.
 
     content_filter:
       "all"          — пропускать всё что is_relevant=true
       "professional" — пропускать только professional и mixed
       "personal"     — пропускать только personal
+
+    triage:
+      dict {short_code: {verdict, content_type, reason}} с этапа разведки
+      (scout_posts.triage). Если передан — вердикт берётся оттуда, дорогой
+      per-post вызов _is_relevant() НЕ делается (не платим за фильтр дважды):
+        verdict=drop   → строка filtered_out, без скачивания медиа и Vision;
+        verdict=review → пост анализируется и помечается «спорный (mixed)»;
+        verdict=keep   → обычный анализ.
+      Если triage не передан (или поста нет в нём) — fallback на _is_relevant()
+      для обратной совместимости (прямой запуск analyze() из CLI без скаута).
     """
+    triage_used = bool(triage)
+    triage = triage or {}
     get_account(username)
     posts, _url_to_raw = _load_posts_index(username)
 
@@ -557,19 +570,32 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -
     ok_count = 0
     fail_count = 0
     filtered_count = 0
+    review_count = 0
 
     for i, (post, m) in enumerate(zip(posts, metrics)):
         pos = i + 1
         logger.info("[%d/%d] %s | %s", pos, len(posts), m["post_type"], m["url"])
 
-        # фильтрация мусора через gpt-4o-mini
-        relevant, content_type, reason = _is_relevant(m["caption"])
+        short = post.get("shortCode") or post.get("id") or m.get("post_id") or ""
+        tri = triage.get(short) if triage else None
 
-        # фильтр по is_relevant
+        if tri is not None:
+            # Вердикт уже получен на разведке — НЕ дёргаем _is_relevant повторно.
+            verdict = tri.get("verdict", "keep")
+            content_type = tri.get("content_type", "professional")
+            reason = tri.get("reason", "") or "триаж"
+            relevant = verdict != "drop"
+            is_review = verdict == "review"
+        else:
+            # Fallback (триаж не передан / поста нет в нём): старый per-post фильтр.
+            relevant, content_type, reason = _is_relevant(m["caption"])
+            is_review = content_type == "mixed"
+
+        # фильтр по релевантности (drop / мусор) — без скачивания медиа и Vision
         if not relevant:
-            logger.info("  FILTERED (мусор): %s", reason)
+            logger.info("  FILTERED (drop): %s", reason)
             filtered_count += 1
-            rows.append(_build_filtered_row(username, m, "мусор"))
+            rows.append(_build_filtered_row(username, m, reason or "мусор"))
             continue
 
         # фильтр по content_filter
@@ -612,7 +638,13 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -
             logger.info("  GPT: OK  mechanic=%s", result.get("mechanic", "")[:50])
 
         _postprocess(result, mechanic_note)
-        rows.append(_build_row(username, m, avg_err, result))
+        row = _build_row(username, m, avg_err, result)
+        if is_review:
+            # mixed → в таблицу, но с явной пометкой для ручного решения Kate.
+            review_count += 1
+            row["Тема поста"] = f"⚠️ спорный (mixed) · {row['Тема поста']}".rstrip(" ·")
+            logger.info("  REVIEW (mixed): помечен для ручного решения")
+        rows.append(row)
 
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -626,6 +658,8 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -
         "posts_ok": ok_count,
         "posts_failed": fail_count,
         "filtered_count": filtered_count,
+        "review_count": review_count,
+        "triage_source": "scout" if triage_used else "per_post",
         "avg_err": avg_err,
         "rows": rows,
     }
@@ -635,7 +669,9 @@ def analyze(username: str, dry_run: bool = False, content_filter: str = "all") -
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n=== Stage 14: Analyze Posts | @{username} ===")
-    print(f"Проанализировано: {ok_count}/{len(posts)} | failed: {fail_count} | filtered: {filtered_count} | avg_err: {avg_err}%")
+    print(f"Проанализировано: {ok_count}/{len(posts)} | failed: {fail_count} | "
+          f"filtered: {filtered_count} | review(mixed): {review_count} | "
+          f"triage: {'scout' if triage_used else 'per_post'} | avg_err: {avg_err}%")
     print(f"Сохранено: {output_path}")
     return output
 

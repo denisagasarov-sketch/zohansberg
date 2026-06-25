@@ -38,7 +38,9 @@ from telegram.ext import (
     filters,
 )
 
-from pipeline.stages.scout_posts import scout, format_scout_message
+from pipeline.stages.scout_posts import (
+    scout, format_scout_message, triage as scout_triage, triage_counts, drop_codes,
+)
 from pipeline.stages import collect_posts, analyze_posts
 
 logger = logging.getLogger(__name__)
@@ -72,7 +74,21 @@ async def analyze_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await msg.edit_text(f"Не удалось собрать разведку по @{username}: {e}")
         return ConversationHandler.END
 
+    # Триаж на разведке: один дешёвый gpt-4o-mini батч режет мусор/личное ДО
+    # дорогого Vision-анализа. drop — автоматически, без подтверждения юзера.
+    # period-фильтр по дате оставляем collect (scope ещё не выбран) → months_back=None.
+    items = s.pop("items", [])  # сырые посты не держим в user_data["scout"]
+    try:
+        verdicts = await asyncio.to_thread(scout_triage, items, None, ["photo", "carousel"])
+    except Exception:
+        logger.exception("triage failed — продолжаем без триажа (анализ сам отфильтрует)")
+        verdicts = []
+
+    counts = triage_counts(verdicts)
     context.user_data["scout"] = s
+    context.user_data["triage_counts"] = counts
+    context.user_data["triage"] = {v["short_code"]: v for v in verdicts if v.get("short_code")}
+    context.user_data["drop_codes"] = drop_codes(verdicts)
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(f"Все {s['total']}", callback_data="scope:all")],
@@ -85,7 +101,7 @@ async def analyze_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         [InlineKeyboardButton("✕ Отмена", callback_data="scope:cancel")],
     ])
     await msg.edit_text(
-        format_scout_message(s) + "\n\nСколько постов анализируем?",
+        format_scout_message(s, tri_counts=counts) + "\n\nСколько постов анализируем?",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kb,
     )
@@ -176,7 +192,8 @@ async def _reshow_scope(q, context) -> int:
         [InlineKeyboardButton("✕ Отмена", callback_data="scope:cancel")],
     ])
     await q.edit_message_text(
-        format_scout_message(s) + "\n\nСколько постов анализируем?",
+        format_scout_message(s, tri_counts=context.user_data.get("triage_counts"))
+        + "\n\nСколько постов анализируем?",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kb,
     )
@@ -198,16 +215,20 @@ async def confirm_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await q.edit_message_text(f"⏳ Анализирую @{username}… это займёт несколько минут.")
 
     def _run():
+        # drop-коды с разведки не собираем вовсе (нет скачивания медиа / Vision).
         collect_posts.collect(
             username,
             months_back=u.get("months_back", 6),
             post_types=["photo", "carousel"],
             content_mode=u["mode"],
             target_count=u.get("target_count") or 30,
+            exclude_codes=u.get("drop_codes") or None,
         )
+        # triage-карта: keep/review берутся оттуда, _is_relevant повторно не вызывается.
         return analyze_posts.analyze(
             username,
             content_filter=u.get("content_filter", "all"),
+            triage=u.get("triage") or None,
         )
 
     try:
@@ -219,9 +240,10 @@ async def confirm_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     ok = result.get("posts_ok", "?")
     filt = result.get("filtered_count", "?")
+    rev = result.get("review_count", 0)
     await q.edit_message_text(
         f"✅ Готово, @{username}.\n"
-        f"Проанализировано: {ok} · отфильтровано: {filt}\n"
+        f"Проанализировано: {ok} · спорных (mixed): {rev} · отфильтровано: {filt}\n"
         f"Результат записан в Google Sheets."
     )
     return ConversationHandler.END
