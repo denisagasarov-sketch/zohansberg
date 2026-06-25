@@ -520,7 +520,7 @@ def _account_screen_text(username: str, sheet_counts: dict) -> str:
 
     lines.append("\n──────────────")
     lines.append("🔄 Собрать заново — полный анализ, данные в таблице обновятся")
-    lines.append("➕ Добавить новые посты — только посты которых ещё нет в таблице")
+    lines.append("🔁 Актуализировать — обновить Посты/Reels по ссылке, история копится")
     lines.append("⚡ Быстрое обновление — пересобрать только устаревшие блоки")
     lines.append("⚙️ Выбрать что собирать — группы листов и режим записи")
 
@@ -531,8 +531,8 @@ def _account_screen_keyboard(username: str, fresh: dict) -> InlineKeyboardMarkup
     rows = [
         [InlineKeyboardButton("⚡ Быстрое обновление", callback_data=f"accrun:stale:{username}")],
         [
-            InlineKeyboardButton("🔄 Собрать заново",        callback_data=f"accrun:all:{username}"),
-            InlineKeyboardButton("➕ Добавить новые посты",  callback_data=f"accrun:append:{username}"),
+            InlineKeyboardButton("🔄 Собрать заново",   callback_data=f"accrun:all:{username}"),
+            InlineKeyboardButton("🔁 Актуализировать",  callback_data=f"accrun:upsert:{username}"),
         ],
         [InlineKeyboardButton("⚙️ Выбрать что собирать", callback_data=f"acc:{username}")],
         [InlineKeyboardButton("🗑 Удалить", callback_data=f"accdel:{username}")],
@@ -669,8 +669,8 @@ def _ck(val: bool) -> str:
 
 def _settings_text(username: str, settings: dict) -> str:
     wm = settings.get("write_mode", "replace")
-    mode_line = ("Перезаписать — заменить строки аккаунта"
-                 if wm == "replace" else "Дополнить — дописать без удаления")
+    mode_line = ("Актуализировать — обновить Посты/Reels по ссылке (история копится)"
+                 if wm == "upsert" else "Перезаписать — заменить строки аккаунта")
     return (
         f"⚙️ Что собрать — @{username}\n\n"
         f"Отмечены группы листов для обновления (по умолчанию — все).\n"
@@ -697,8 +697,8 @@ def _settings_keyboard(username: str, settings: dict) -> InlineKeyboardMarkup:
     rows.append([
         InlineKeyboardButton("🔄 Перезаписать ✓" if wm == "replace" else "🔄 Перезаписать",
                              callback_data="wm:replace"),
-        InlineKeyboardButton("➕ Дополнить ✓" if wm == "append" else "➕ Дополнить",
-                             callback_data="wm:append"),
+        InlineKeyboardButton("🔁 Актуализировать ✓" if wm == "upsert" else "🔁 Актуализировать",
+                             callback_data="wm:upsert"),
     ])
     rows.append([InlineKeyboardButton("🚀 Запустить", callback_data="action:launch")])
     rows.append([
@@ -878,7 +878,7 @@ def _parse_progress(log_path: Path, stages: list[str]) -> str:
 
 def _mode_desc(write_mode: str) -> str:
     """Человекочитаемое описание режима записи для прогресса."""
-    return "полный анализ" if write_mode == "replace" else "добавление новых постов"
+    return "актуализация по ссылке" if write_mode == "upsert" else "полный анализ"
 
 
 def _parse_final_stats(log_path: Path) -> str:
@@ -1220,9 +1220,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             blocks = [b for b, (st, _) in fresh.items() if st in ("stale", "none")]
             stages = _stages_for_blocks(blocks)
             write_mode = "replace"
-        elif action_kind == "append":
-            stages = list(_ALL_STAGES_ORDER)
-            write_mode = "append"
+        elif action_kind == "upsert":
+            # «Актуализировать»: только Reels+Посты (+обязательные 15/15b/16),
+            # запись upsert — слияние по ссылке, история копится.
+            stages = _stages_for_groups(["reels", "posts"])
+            write_mode = "upsert"
         else:  # "all"
             stages = list(_ALL_STAGES_ORDER)
             write_mode = "replace"
@@ -1285,9 +1287,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key in s.get("groups", {}):
             s["groups"][key] = not s["groups"][key]
 
-    elif data.startswith("wm:"):    # set write mode (replace/append)
+    elif data.startswith("wm:"):    # set write mode (replace/upsert)
         mode = data[3:]
-        if mode in ("replace", "append"):
+        if mode in ("replace", "upsert"):
             s["write_mode"] = mode
 
     # ── Actions ──────────────────────────────────────────────────────────

@@ -2,7 +2,8 @@
  * Stage 5D-3: Google Sheets Write Web App
  *
  * Exposes doPost(e) only.
- * Supported modes: "validate", "write", "delete_account"
+ * Supported modes: "validate", "write", "delete_account",
+ *                  "get_sheet_data", "get_account_rows"
  * Rejected modes:  "append", "clear", "sync", and any unknown mode.
  *
  * Required Script Property (Project Settings → Script Properties):
@@ -16,10 +17,14 @@
  *   - Sheets with rows=[] are skipped unless allow_empty_clear=true.
  *   - Atomic: all target sheets are validated before any write begins.
  *   - LockService prevents concurrent writes.
+ *   - When an account's row count changes, its block is resized in place via
+ *     insertRowsAfter()/deleteRows() so neighbouring accounts are shifted, never
+ *     overwritten (required for the upsert «Актуализировать» mode).
  *
- * Allowed write methods: setValues(), clearContent()
- * Forbidden:            clear(), appendRow(), deleteRow(), insertRow(),
- *                       deleteSheet(), insertSheet(), copyTo(), moveActiveSheet()
+ * Allowed write methods: setValues(), clearContent(),
+ *                        insertRowsAfter(), deleteRows(), deleteRow()
+ * Forbidden:            clear(), deleteSheet(), insertSheet(), copyTo(),
+ *                       moveActiveSheet()
  */
 
 var EXPECTED_SPREADSHEET_ID = "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ";
@@ -80,9 +85,10 @@ function doPost(e) {
       );
       return _jsonResponse(response);
     }
-    if (mode !== "validate" && mode !== "write" && mode !== "delete_account" && mode !== "get_sheet_data") {
+    if (mode !== "validate" && mode !== "write" && mode !== "delete_account" &&
+        mode !== "get_sheet_data" && mode !== "get_account_rows") {
       response.errors.push(
-        "Unknown mode: '" + mode + "'. Supported modes: validate, write, delete_account, get_sheet_data."
+        "Unknown mode: '" + mode + "'. Supported modes: validate, write, delete_account, get_sheet_data, get_account_rows."
       );
       return _jsonResponse(response);
     }
@@ -111,6 +117,13 @@ function doPost(e) {
     // Используется ботом для дедупликации (список уже записанных постов).
     if (mode === "get_sheet_data") {
       return _handleGetSheetData(body, response, spreadsheetId);
+    }
+
+    // get_account_rows — read-only: вернуть полные строки одного аккаунта.
+    // Используется upsert-режимом «Актуализировать»: Python сливает старые
+    // строки со свежесобранными по ссылке и пишет полный набор обратно.
+    if (mode === "get_account_rows") {
+      return _handleGetAccountRows(body, response, spreadsheetId);
     }
 
     // Validate start_row
@@ -461,6 +474,83 @@ function _handleGetSheetData(body, response, spreadsheetId) {
 }
 
 
+// ---------------------------------------------------------------------------
+// get_account_rows — read-only: вернуть полные строки одного аккаунта
+// ---------------------------------------------------------------------------
+//
+// Запрос: { mode: "get_account_rows", sheet_name: "Посты", account_label: "kate.jet" }
+// Матчит строки по колонке «Конкурент» (indexOf, как и запись/удаление).
+// Возвращает:
+//   response.headers — строка 1 (заголовки листа),
+//   response.rows    — полные строки данных аккаунта (со строки 3, все колонки).
+// Операция не изменяет таблицу. Пустой rows при ok=true — валидно (аккаунт ещё
+// не записан); сетевая ошибка/ok=false на стороне Python трактуется иначе.
+function _handleGetAccountRows(body, response, spreadsheetId) {
+  var sheetName    = (body.sheet_name || "").toString().trim();
+  var accountLabel = (body.account_label || "").toString().trim();
+  if (!sheetName) {
+    response.errors.push("get_account_rows requires 'sheet_name'.");
+    return _jsonResponse(response);
+  }
+  if (accountLabel.length < 2) {
+    response.errors.push("get_account_rows requires 'account_label' of at least 2 characters.");
+    return _jsonResponse(response);
+  }
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(spreadsheetId);
+  } catch (openErr) {
+    response.errors.push("Cannot open spreadsheet: " + openErr.message);
+    return _jsonResponse(response);
+  }
+  response.spreadsheet_name = ss.getName();
+  response.spreadsheet_url  = ss.getUrl();
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    response.errors.push("Sheet '" + sheetName + "' not found.");
+    return _jsonResponse(response);
+  }
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  // ВАЖНО: getDisplayValues(), НЕ getValues(). getValues() возвращает типизированные
+  // значения ячеек — дата становится Date (→ ISO "2026-06-23T17:00:00.000Z" при JSON),
+  // а ячейка-процент возвращает хранимую долю (0.0276 вместо «2,76%»). При upsert эти
+  // сырые значения попали бы обратно в таблицу и сломали единый формат строк.
+  // getDisplayValues() отдаёт строки ровно как они отображаются («24.06.2026», «2,76%»),
+  // что совпадает с форматом, который генерирует пайплайн.
+  var headers = [];
+  if (lastCol >= 1) {
+    headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  }
+
+  var competitorCol = _findColumnByHeader(sheet, "Конкурент");
+  if (competitorCol === -1) competitorCol = 1;  // fallback to A if header missing
+
+  var rows = [];
+  if (lastRow >= REQUIRED_START_ROW && lastCol >= 1) {
+    var data = sheet.getRange(REQUIRED_START_ROW, 1, lastRow - REQUIRED_START_ROW + 1, lastCol)
+                    .getDisplayValues();
+    for (var i = 0; i < data.length; i++) {
+      var cellVal = String(data[i][competitorCol - 1] || "").trim();
+      if (cellVal !== "" && cellVal.indexOf(accountLabel) !== -1) {
+        rows.push(data[i]);
+      }
+    }
+  }
+
+  response.sheet_name   = sheetName;
+  response.account_label = accountLabel;
+  response.headers      = headers;
+  response.rows         = rows;
+  response.ok           = true;
+  return _jsonResponse(response);
+}
+
+
 // Находит 1-based индекс колонки по заголовку (подстрока), номеру или букве.
 // Возвращает -1, если не найдено.
 function _resolveColumn(sheet, column, lastCol) {
@@ -734,11 +824,26 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
     }
 
     if (firstMatchRow !== -1) {
-      // Found existing rows for this account — clear them
+      // Found existing rows for this account.
       var existingCount = lastMatchRow - firstMatchRow + 1;
-      var clearRange = sheet.getRange(firstMatchRow, 1, existingCount, headers.length);
+
+      // Подогнать высоту блока аккаунта под число новых строк ДО записи, иначе
+      // setValues с rows.length > existingCount вылезет на строки соседнего
+      // аккаунта ниже (рост истории при upsert), а rows.length < existingCount
+      // оставит пустые «дыры». insertRowsAfter сдвигает соседей вниз,
+      // deleteRows — вверх; порядок и данные соседних аккаунтов сохраняются.
+      if (rows.length > existingCount) {
+        sheet.insertRowsAfter(lastMatchRow, rows.length - existingCount);
+      } else if (rows.length > 0 && rows.length < existingCount) {
+        sheet.deleteRows(firstMatchRow + rows.length, existingCount - rows.length);
+      }
+
+      // Очистить актуальную высоту блока (для rows=0 + allow_empty_clear —
+      // очищаем старый блок по месту, строки не удаляем, прежнее поведение).
+      var blockHeight = (rows.length > 0) ? rows.length : existingCount;
+      var clearRange  = sheet.getRange(firstMatchRow, 1, blockHeight, headers.length);
       clearRange.clearContent();
-      result.cleared_range = "A" + firstMatchRow + ":" + lastColLetter + lastMatchRow;
+      result.cleared_range = "A" + firstMatchRow + ":" + lastColLetter + (firstMatchRow + blockHeight - 1);
       result.cleared_rows  = existingCount;
       writeStartRow = firstMatchRow;
 
@@ -747,7 +852,7 @@ function _writeSheet(ss, sheetName, sheetData, allowEmptyClear, accountLabel) {
         result.warnings.push(
           "Row count changed for '" + accountLabel + "' in sheet '" + sheetName + "': " +
           "was " + existingCount + ", now " + rows.length + ". " +
-          "Existing rows cleared, new rows written. Check for gaps if count decreased."
+          "Block resized in place (neighbours shifted), new rows written."
         );
       }
     } else {

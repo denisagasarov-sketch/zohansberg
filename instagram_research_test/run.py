@@ -109,7 +109,8 @@ def _posts(username: str, dry_run: bool) -> dict:
     target_count = _env_int("PIPELINE_TARGET_COUNT", 30)
     post_types_raw = os.environ.get("PIPELINE_POST_TYPES", "")
     post_types = [p.strip() for p in post_types_raw.split(",") if p.strip()] or None
-    # Дедупликация append: shortCode постов, уже записанных в таблицу (бот заполняет).
+    # Необязательный фильтр: shortCode постов, которые не нужно собирать.
+    # Сейчас ботом не задействуется (актуализация идёт через upsert-слияние в стейдже 16).
     exclude_raw = os.environ.get("PIPELINE_EXCLUDE_SHORTCODES", "")
     exclude_codes = [c.strip() for c in exclude_raw.split(",") if c.strip()] or None
     return collect_posts(
@@ -269,8 +270,9 @@ def main() -> None:
     selection.add_argument("--from-stage", help="Запустить с указанного номера")
     parser.add_argument("--dry-run", action="store_true", help="Не вызывать внешние API")
     parser.add_argument(
-        "--write-mode", default="replace", choices=["replace", "append"],
-        help="Режим записи в таблицу: replace (перезаписать) или append (дописать)",
+        "--write-mode", default="replace", choices=["replace", "upsert"],
+        help="Режим записи в таблицу: replace (перезаписать строки аккаунта) или "
+             "upsert (актуализировать Посты/Reels по ссылке, история копится)",
     )
     args = parser.parse_args()
 

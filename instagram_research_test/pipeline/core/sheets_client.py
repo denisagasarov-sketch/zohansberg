@@ -13,16 +13,29 @@ def get_webhook_url() -> str:
     return url
 
 
+_DEFAULT_SPREADSHEET_ID = "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ"
+
+
+def _request_base() -> tuple[str, dict]:
+    """URL веб-приложения + общие поля запроса (secret, spreadsheet_id)."""
+    url = get_webhook_url()
+    base = {
+        "secret": os.getenv("GOOGLE_SHEETS_SYNC_SECRET", ""),
+        "spreadsheet_id": os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", _DEFAULT_SPREADSHEET_ID),
+    }
+    return url, base
+
+
 def write_payload(payload: dict, dry_run: bool = True, write_mode: str = "replace") -> dict:
     """
     Отправляет payload в Google Sheets.
     dry_run=True: только печатает план, не отправляет.
-    write_mode="replace": перезаписывает строки аккаунта (по умолчанию).
-    write_mode="append": дописывает строки без удаления старых.
-    """
-    import logging as _logging
-    _logger = _logging.getLogger(__name__)
 
+    Apps Script всегда заменяет строки аккаунта по колонке «Конкурент»
+    (replace-семантика). Режим «Актуализировать» (upsert) реализован на стороне
+    Python в write_sheets: существующие строки сливаются со свежими ДО отправки,
+    поэтому сюда уже приходит полный актуальный набор строк аккаунта.
+    """
     if dry_run:
         sheets = payload.get("sheets", {})
         print("[DRY RUN] Будет записано:")
@@ -31,22 +44,13 @@ def write_payload(payload: dict, dry_run: bool = True, write_mode: str = "replac
             print(f"  {name}: {len(rows)} строк")
         return {"dry_run": True, "sheets": list(sheets.keys())}
 
-    if write_mode == "append":
-        _logger.warning(
-            "write_mode='append' передан в Apps Script, но Apps Script может не поддерживать этот режим. "
-            "Убедитесь, что скрипт обновлён для обработки поля write_mode='append'."
-        )
-
-    url = get_webhook_url()
-    secret = os.getenv("GOOGLE_SHEETS_SYNC_SECRET", "")
-    spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "1xXyd9B_OmAD48tTSY3K82cv5YKUEMwBmKLFUPcTqDzQ")
+    url, base = _request_base()
     resp = requests.post(
         url,
         json={
-            "secret": secret,
+            **base,
             "mode": "write",
             "write_mode": write_mode,
-            "spreadsheet_id": spreadsheet_id,
             "start_row": 3,
             "account_label": payload.get("account", ""),
             "rename_headers": True,
@@ -56,3 +60,34 @@ def write_payload(payload: dict, dry_run: bool = True, write_mode: str = "replac
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def get_account_rows(sheet_name: str, account_label: str) -> dict:
+    """Читает полные строки одного аккаунта из листа (Apps Script mode=get_account_rows).
+
+    Возврат: {"headers": [...], "rows": [[...], ...]}. Пустой rows валиден
+    (аккаунт ещё не записан в этот лист).
+
+    Поднимает RuntimeError при сетевой ошибке или ok=false — вызывающий код
+    (upsert) обязан отличать «нет строк» от «не смог прочитать», чтобы не
+    затереть историю при недоступности таблицы.
+    """
+    url, base = _request_base()
+    resp = requests.post(
+        url,
+        json={
+            **base,
+            "mode": "get_account_rows",
+            "sheet_name": sheet_name,
+            "account_label": account_label,
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not data.get("ok"):
+        raise RuntimeError(
+            f"get_account_rows ok=false для листа '{sheet_name}' @{account_label}: "
+            f"{data.get('errors') or data}"
+        )
+    return {"headers": data.get("headers") or [], "rows": data.get("rows") or []}
