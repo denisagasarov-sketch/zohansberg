@@ -7,7 +7,7 @@ from pipeline.core.config import get_apify_token
 APIFY_BASE = "https://api.apify.com/v2"
 
 
-def run_actor(actor_id: str, input_data: dict, timeout_secs: int = 300) -> list:
+def run_actor(actor_id: str, input_data: dict, timeout_secs: int = 600) -> list:
     """
     Запускает Apify actor синхронно, возвращает список items из датасета.
     actor_id: например 'apify/instagram-scraper'
