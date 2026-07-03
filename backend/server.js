@@ -1388,6 +1388,51 @@ app.get('/api/gamification', (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Stats: мотивация (рекорды, динамика, вклад за всё время) ─────────────────
+app.get('/api/stats/motivation', (_req, res) => {
+  try {
+    const one = (s, ...p) => db.prepare(s).get(...p)
+    // Вклад за всё время
+    const lifetimeSeconds = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE duration_actual > 0`).s
+    const tasksDone = one(`SELECT COUNT(*) AS n FROM tasks WHERE done_at IS NOT NULL AND deleted_at IS NULL`).n
+    const subtasksDone = one(`SELECT COUNT(*) AS n FROM subtasks WHERE done_at IS NOT NULL`).n
+
+    // Эта неделя (последние 7 дней) vs прошлая (8–14 дней назад)
+    const thisWeek = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= date('now','-6 days')`).s
+    const lastWeek = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= date('now','-13 days') AND date(started_at) < date('now','-6 days')`).s
+    const trendPct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0)
+
+    // Рекорд: лучший день и лучшая неделя (ISO-неделя)
+    const bestDay = one(`
+      SELECT date(started_at) AS day, SUM(duration_actual) AS s
+      FROM work_sessions WHERE duration_actual > 0
+      GROUP BY day ORDER BY s DESC LIMIT 1
+    `) || null
+    const bestWeek = one(`
+      SELECT strftime('%Y-%W', started_at) AS wk, SUM(duration_actual) AS s
+      FROM work_sessions WHERE duration_actual > 0
+      GROUP BY wk ORDER BY s DESC LIMIT 1
+    `) || null
+
+    // Средний фокус в активный день
+    const activeDays = one(`SELECT COUNT(DISTINCT date(started_at)) AS n FROM work_sessions WHERE duration_actual > 0`).n
+    const avgPerActiveDay = activeDays > 0 ? Math.round(lifetimeSeconds / activeDays) : 0
+
+    res.json({
+      lifetime_seconds: lifetimeSeconds,
+      tasks_done: tasksDone,
+      subtasks_done: subtasksDone,
+      this_week_seconds: thisWeek,
+      last_week_seconds: lastWeek,
+      trend_pct: trendPct,
+      best_day: bestDay ? { day: bestDay.day, seconds: bestDay.s } : null,
+      best_week_seconds: bestWeek ? bestWeek.s : 0,
+      active_days: activeDays,
+      avg_per_active_day: avgPerActiveDay,
+    })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Day Plan ────────────────────────────────────────────────────────────────
 
 // GET /api/day-plan?date=YYYY-MM-DD

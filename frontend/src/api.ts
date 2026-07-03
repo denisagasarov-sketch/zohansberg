@@ -87,6 +87,12 @@ export const api = {
   getStats: (period: string) => req<any>('GET', `/stats?period=${period}`),
   getWorklog: (period: string) => req<any>('GET', `/sessions/worklog?period=${period}`),
   getStatsDashboard: (period: string) => req<any>('GET', `/stats/dashboard?period=${period}`),
+  getMotivation: () => req<{
+    lifetime_seconds: number; tasks_done: number; subtasks_done: number
+    this_week_seconds: number; last_week_seconds: number; trend_pct: number
+    best_day: { day: string; seconds: number } | null; best_week_seconds: number
+    active_days: number; avg_per_active_day: number
+  }>('GET', '/stats/motivation'),
   getTodaySummary: () => req<any>('GET', '/today-summary'),
   getWeeklyTime: () => req<{ direction_id: number | null; seconds: number }[]>('GET', '/stats/weekly-time'),
   getWeeklySummary: () => req<any>('GET', '/weekly-summary'),

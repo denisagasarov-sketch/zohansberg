@@ -169,7 +169,6 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, onEndD
         <button onClick={onEndDay} title="Завершить день" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🌆</button>
         <button onClick={onStandup} title="Стендап" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🗣</button>
         <button onClick={() => onNavigate('weekplan')} title="План недели" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🎯</button>
-        <button onClick={() => onNavigate('horizon')} title="Горизонт" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🗓</button>
         <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📓</button>
         <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📊</button>
         <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📦</button>

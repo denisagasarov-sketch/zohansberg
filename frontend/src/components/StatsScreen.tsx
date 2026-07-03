@@ -510,11 +510,60 @@ function BarChart({
   )
 }
 
+// ─── Мотивационный блок (рекорды, динамика, вклад за всё время) ───────────────
+
+interface Motivation {
+  lifetime_seconds: number; tasks_done: number; subtasks_done: number
+  this_week_seconds: number; last_week_seconds: number; trend_pct: number
+  best_day: { day: string; seconds: number } | null; best_week_seconds: number
+  active_days: number; avg_per_active_day: number
+}
+
+function MotivationHero({ m }: { m: Motivation }) {
+  const up = m.trend_pct >= 0
+  const bestDayStr = m.best_day ? new Date(m.best_day.day + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '—'
+  return (
+    <div className="space-y-3">
+      {/* Вклад за всё время — крупно */}
+      <div className="bg-gradient-to-br from-[#20223a] to-[#1c1c1c] border border-[#2a2d4a] rounded-xl p-5">
+        <div className="text-[10px] font-semibold tracking-widest text-[#6a72a0] uppercase mb-1">Всего в фокусе</div>
+        <div className="text-4xl font-bold text-[#f0f0f0]">{fmtDuration(m.lifetime_seconds)}</div>
+        <div className="text-xs text-[#666] mt-1.5">
+          за {m.active_days} {m.active_days % 10 === 1 && m.active_days % 100 !== 11 ? 'активный день' : 'активных дней'} ·
+          {' '}{m.tasks_done} задач и {m.subtasks_done} шагов закрыто
+        </div>
+      </div>
+
+      {/* Динамика недели + рекорды */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Эта неделя</div>
+          <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(m.this_week_seconds)}</div>
+          <div className={`text-xs mt-1 ${up ? 'text-[#4a9d5f]' : 'text-[#c07a55]'}`}>
+            {up ? '▲' : '▼'} {Math.abs(m.trend_pct)}% к прошлой ({fmtDuration(m.last_week_seconds)})
+          </div>
+        </div>
+        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Рекорд дня</div>
+          <div className="text-2xl font-bold text-[#f0f0f0]">{m.best_day ? fmtDuration(m.best_day.seconds) : '—'}</div>
+          <div className="text-xs text-[#666] mt-1">{bestDayStr}</div>
+        </div>
+        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">В среднем в день</div>
+          <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(m.avg_per_active_day)}</div>
+          <div className="text-xs text-[#666] mt-1">рекорд недели {fmtDuration(m.best_week_seconds)}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function StatsScreen({ onClose }: Props) {
   const [period, setPeriod] = useState<Period>('week')
   const [data, setData] = useState<DashboardData | null>(null)
+  const [motivation, setMotivation] = useState<Motivation | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -524,6 +573,8 @@ export default function StatsScreen({ onClose }: Props) {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [period])
+
+  useEffect(() => { api.getMotivation().then(setMotivation).catch(() => {}) }, [])
 
   const colorMap = data ? buildColorMap(data.directions) : new Map()
 
@@ -551,6 +602,8 @@ export default function StatsScreen({ onClose }: Props) {
         {!loading && !data && (
           <div className="text-[#666] text-sm">Не удалось загрузить данные</div>
         )}
+
+        {motivation && <MotivationHero m={motivation} />}
 
         {!loading && data && (
           <>

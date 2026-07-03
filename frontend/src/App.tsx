@@ -8,7 +8,6 @@ import Header from './components/Header'
 import BreakScreen from './components/BreakScreen'
 import StandupModal from './components/modals/StandupModal'
 import MonthlyReviewModal from './components/modals/MonthlyReviewModal'
-import HorizonScreen from './components/HorizonScreen'
 import NowBlock from './components/NowBlock'
 import QueueBlock from './components/QueueBlock'
 import DirectionsPanel from './components/DirectionsPanel'
@@ -516,14 +515,6 @@ export default function App() {
             directions={directions}
             onClose={() => setScreen('main')}
             onChanged={refresh}
-          />
-        )}
-        {screen === 'horizon' && (
-          <HorizonScreen
-            tasks={tasks}
-            directions={directions}
-            onClose={() => setScreen('main')}
-            onTaskClick={handleTaskClick}
           />
         )}
       </div>
