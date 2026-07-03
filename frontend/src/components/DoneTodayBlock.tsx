@@ -71,7 +71,7 @@ export default function DoneTodayBlock({ tasks, directions, onRestore, onTaskCli
                 )}
                 <button
                   onClick={e => { e.stopPropagation(); onRestore(task.id) }}
-                  className="opacity-0 group-hover:opacity-100 text-[10px] text-[#555] hover:text-[#5060a0] shrink-0 transition-opacity"
+                  className="text-[10px] text-[#777] hover:text-[#8090c8] border border-[#333] hover:border-[#5060a0] rounded px-1.5 py-0.5 shrink-0 transition-colors"
                   title="Вернуть в работу (снимет отметку «выполнена» и положит в «Следом»)"
                 >↩ вернуть</button>
               </li>

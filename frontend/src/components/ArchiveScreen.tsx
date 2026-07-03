@@ -111,7 +111,7 @@ export default function ArchiveScreen({ directions, onClose, onChanged }: Props)
                       )}
                       <button
                         onClick={() => restore(task.id)}
-                        className="opacity-0 group-hover:opacity-100 text-xs text-[#555] hover:text-[#5060a0] shrink-0 transition-opacity"
+                        className="text-xs text-[#777] hover:text-[#8090c8] border border-[#333] hover:border-[#5060a0] rounded px-2 py-0.5 shrink-0 transition-colors"
                         title="Вернуть в работу — задача снова появится в «Следом»"
                       >↩ Вернуть</button>
                     </div>
