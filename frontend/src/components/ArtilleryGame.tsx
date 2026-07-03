@@ -153,7 +153,12 @@ export default function ArtilleryGame() {
     syncHud()
 
     let raf = 0, last = performance.now()
-    const loop = (now: number) => { const dt = Math.min(40, now - last); last = now; update(dt); render(c); raf = requestAnimationFrame(loop) }
+    const loop = (now: number) => {
+      const dt = Math.min(40, now - last); last = now
+      // A thrown frame must not kill the loop (rAF errors aren't caught by React)
+      try { update(dt); render(c) } catch (err) { console.error('[ArtilleryGame] frame error', err) }
+      raf = requestAnimationFrame(loop)
+    }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps

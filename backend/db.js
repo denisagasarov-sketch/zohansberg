@@ -177,14 +177,42 @@ function initSchema() {
     db.pragma('foreign_keys = ON')
     console.log('[startup] Migrated priority to v2 (I/II/III/none)')
   }
+
+  // Индексы под самые частые запросы (списки задач, статистика, план дня).
+  // Создаются в конце: миграции выше пересоздают tasks и снесли бы их.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_deleted   ON tasks(deleted_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_done      ON tasks(done_at);
+    CREATE INDEX IF NOT EXISTS idx_sessions_task   ON work_sessions(task_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_start  ON work_sessions(started_at);
+    CREATE INDEX IF NOT EXISTS idx_day_plan_date   ON day_plan(date);
+  `)
 }
 
 function cleanupTrash() {
-  const result = db
-    .prepare("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')")
-    .run()
-  if (result.changes > 0) {
-    console.log(`[startup] Cleaned up ${result.changes} trashed task(s) older than 30 days`)
+  // Purge tasks trashed >30 days ago. work_sessions and day_plan reference
+  // tasks(id) with no ON DELETE CASCADE, so child rows must go first or the
+  // DELETE fails with FOREIGN KEY constraint failed — which, running at
+  // startup, used to crash the whole backend (and KeepAlive couldn't revive it).
+  // Wrapped so cleanup can never take the server down.
+  try {
+    const stale = db
+      .prepare("SELECT id FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')")
+      .all()
+      .map(r => r.id)
+    if (stale.length === 0) return
+    const placeholders = stale.map(() => '?').join(',')
+    const purge = db.transaction(ids => {
+      db.prepare(`DELETE FROM work_sessions WHERE task_id IN (${placeholders})`).run(...ids)
+      db.prepare(`DELETE FROM day_plan WHERE task_id IN (${placeholders})`).run(...ids)
+      return db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`).run(...ids)
+    })
+    const result = purge(stale)
+    if (result.changes > 0) {
+      console.log(`[startup] Cleaned up ${result.changes} trashed task(s) older than 30 days`)
+    }
+  } catch (err) {
+    console.error('[startup] cleanupTrash skipped due to error:', err.message)
   }
 }
 

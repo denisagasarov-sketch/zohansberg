@@ -27,39 +27,38 @@ export function usePomodoro(timerRunning: boolean, onWorkEnd: () => void) {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
   }, [])
 
+  // One interval drives both phases. Side effects (sound, onWorkEnd, phase
+  // transitions) live HERE, in the tick — never inside a setState updater.
+  // Under React.StrictMode (active on the dev server) updaters are double-invoked,
+  // so a side effect inside one would fire twice and leak a second interval.
+  const tick = useCallback(() => {
+    const cur = stateRef.current
+    if (cur.phase === 'work') {
+      if (cur.remaining <= 1) {
+        playSound('done')
+        onWorkEnd()
+        const { brk } = getPomodoroSettings()
+        setState(p => ({ ...p, phase: 'break', remaining: brk }))
+      } else {
+        setState(p => ({ ...p, remaining: p.remaining - 1 }))
+      }
+    } else if (cur.phase === 'break') {
+      if (cur.remaining <= 1) {
+        playSound('start')
+        clearPomo()
+        setState(p => ({ phase: 'idle', remaining: 0, cycle: p.cycle + 1 }))
+      } else {
+        setState(p => ({ ...p, remaining: p.remaining - 1 }))
+      }
+    }
+  }, [clearPomo, onWorkEnd])
+
   const startWork = useCallback(() => {
     clearPomo()
     const { work } = getPomodoroSettings()
     setState(p => ({ phase: 'work', remaining: work, cycle: p.cycle }))
-    intervalRef.current = setInterval(() => {
-      setState(prev => {
-        if (prev.phase !== 'work') return prev
-        if (prev.remaining <= 1) {
-          clearInterval(intervalRef.current!); intervalRef.current = null
-          playSound('done')
-          onWorkEnd()
-          const { brk } = getPomodoroSettings()
-          // auto-start break
-          setTimeout(() => {
-            setState(p => ({ ...p, phase: 'break', remaining: brk }))
-            intervalRef.current = setInterval(() => {
-              setState(pp => {
-                if (pp.phase !== 'break') return pp
-                if (pp.remaining <= 1) {
-                  clearInterval(intervalRef.current!); intervalRef.current = null
-                  playSound('start')
-                  return { phase: 'idle', remaining: 0, cycle: pp.cycle + 1 }
-                }
-                return { ...pp, remaining: pp.remaining - 1 }
-              })
-            }, 1000)
-          }, 0)
-          return { ...prev, phase: 'idle', remaining: 0, cycle: prev.cycle + 1 }
-        }
-        return { ...prev, remaining: prev.remaining - 1 }
-      })
-    }, 1000)
-  }, [clearPomo, onWorkEnd])
+    intervalRef.current = setInterval(tick, 1000)
+  }, [clearPomo, tick])
 
   const skip = useCallback(() => {
     clearPomo()

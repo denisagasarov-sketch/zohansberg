@@ -1,11 +1,46 @@
 const express = require('express')
 const cors = require('cors')
+const fs = require('fs')
+const path = require('path')
+const os = require('os')
 const { db, initSchema, cleanupTrash } = require('./db')
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 initSchema()
 cleanupTrash()
+
+// ─── Maintenance: ежедневный бэкап + WAL checkpoint ──────────────────────────
+// База — единственная копия всех данных; бэкапим раз в день в BACKUP_DIR
+// (по умолчанию ~/FocusBoardBackups), храним последние 30. WAL-checkpoint
+// нужен потому, что процесс живёт вечно (KeepAlive) и сам его не делает —
+// без этого focus.db-wal растёт неограниченно.
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'FocusBoardBackups')
+
+async function dailyBackup() {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true })
+    const stamp = new Date().toISOString().slice(0, 10)
+    const dest = path.join(BACKUP_DIR, `focus-${stamp}.db`)
+    if (!fs.existsSync(dest)) {
+      await db.backup(dest) // онлайн-бэкап средствами SQLite — безопасен при работе
+      console.log(`[backup] saved ${dest}`)
+    }
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^focus-.*\.db$/.test(f)).sort()
+    for (const f of files.slice(0, -30)) fs.unlinkSync(path.join(BACKUP_DIR, f))
+  } catch (err) {
+    console.error('[backup] failed:', err.message)
+  }
+}
+
+function walCheckpoint() {
+  try { db.pragma('wal_checkpoint(TRUNCATE)') } catch (err) { console.error('[wal]', err.message) }
+}
+
+dailyBackup()
+walCheckpoint()
+setInterval(dailyBackup, 6 * 60 * 60 * 1000)  // проверка 4 раза в день, файл на дату один
+setInterval(walCheckpoint, 60 * 60 * 1000)
 
 // ─── Recurring helpers ────────────────────────────────────────────────────────
 
@@ -37,17 +72,28 @@ function spawnRecurringNext(task) {
 const app = express()
 const PORT = process.env.PORT || 3001
 
-app.use(cors({ origin: 'http://localhost:5173' }))
+// Allow the Vite dev server (Safari Web App) and the Electron app's bundled
+// frontend (served on 4173). Requests with no Origin (same-origin, curl) pass too.
+const ALLOWED_ORIGINS = new Set(['http://localhost:5173', 'http://localhost:4173'])
+app.use(cors({ origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.has(origin)) }))
 app.use(express.json())
+
+// ─── Client-side crash capture ─────────────────────────────────────────────────
+// The Safari Web App window has no devtools we can read, and renderer-level JS
+// crashes never reach the OS logs. This gives them a paper trail in client-errors.log.
+app.post('/api/client-error', (req, res) => {
+  try {
+    const { kind, message, stack, url, userAgent, ts } = req.body || {}
+    const line = JSON.stringify({ at: new Date().toISOString(), kind, message, stack, url, userAgent, ts }) + '\n'
+    fs.appendFileSync(path.join(__dirname, 'client-errors.log'), line)
+  } catch { /* never let logging break the response */ }
+  res.json({ ok: true })
+})
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 function nowIso() {
   return new Date().toISOString().replace('T', ' ').slice(0, 19)
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 /** Move the current 'now' task (if any, excluding excludeId) back to 'queue'. */
@@ -756,12 +802,17 @@ app.post('/api/ai/analyze', async (req, res) => {
 })
 
 // POST /api/ai/suggest-title — 3 AI title suggestions via OpenAI
-const _fs = require('fs')
-const AI_LOG = require('path').join(__dirname, 'ai-suggest.log')
+const AI_LOG = path.join(__dirname, 'ai-suggest.log')
 function aiLog(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`
   process.stderr.write(line)
-  _fs.appendFileSync(AI_LOG, line)
+  try {
+    // Ротация: при 1 МБ переносим в .old (одна прошлая копия), лог не растёт бесконечно
+    if (fs.existsSync(AI_LOG) && fs.statSync(AI_LOG).size > 1_000_000) {
+      fs.renameSync(AI_LOG, AI_LOG + '.old')
+    }
+    fs.appendFileSync(AI_LOG, line)
+  } catch { /* логирование не должно ронять запрос */ }
 }
 
 app.post('/api/ai/suggest-title', async (req, res) => {
@@ -810,8 +861,7 @@ app.post('/api/ai/suggest-title', async (req, res) => {
     messages: [{ role: 'user', content: prompt }],
   }
 
-  aiLog(`key prefix: ${key.slice(0, 10)}… | title: "${title.trim()}"`)
-  aiLog(`request body: ${JSON.stringify(requestBody)}`)
+  aiLog(`suggest-title: "${title.trim()}"`)
 
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -821,7 +871,7 @@ app.post('/api/ai/suggest-title', async (req, res) => {
     })
     const rawText = await r.text()
     aiLog(`OpenAI status: ${r.status}`)
-    aiLog(`OpenAI response: ${rawText}`)
+    if (!r.ok) aiLog(`OpenAI error body: ${rawText.slice(0, 500)}`)
 
     if (!r.ok) {
       let errMsg = rawText
@@ -1138,9 +1188,12 @@ app.post('/api/day-plan', (req, res) => {
   try {
     const { date, task_ids } = req.body
     if (!date || !Array.isArray(task_ids)) return res.status(400).json({ error: 'date and task_ids required' })
-    db.prepare(`DELETE FROM day_plan WHERE date = ?`).run(date)
-    const insert = db.prepare(`INSERT INTO day_plan (date, task_id, order_index) VALUES (?, ?, ?)`)
-    task_ids.forEach((id, i) => insert.run(date, Number(id), i))
+    // Транзакция: иначе сбой между DELETE и INSERT стирает план дня
+    db.transaction(() => {
+      db.prepare(`DELETE FROM day_plan WHERE date = ?`).run(date)
+      const insert = db.prepare(`INSERT INTO day_plan (date, task_id, order_index) VALUES (?, ?, ?)`)
+      task_ids.forEach((id, i) => insert.run(date, Number(id), i))
+    })()
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
@@ -1314,14 +1367,15 @@ app.get('/api/export/tasks.csv', (_req, res) => {
 
 // ─── Frontend static (SPA) ───────────────────────────────────────────────────
 
-const _path = require('path')
-app.use(express.static(_path.join(__dirname, '..', 'frontend', 'dist')))
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')))
 app.use((_req, res) => {
-  res.sendFile(_path.join(__dirname, '..', 'frontend', 'dist', 'index.html'))
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'))
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`Focus Board backend → http://localhost:${PORT}`)
+// Только localhost: API с личными задачами не должен быть виден другим
+// устройствам в той же Wi-Fi-сети.
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`Focus Board backend → http://127.0.0.1:${PORT}`)
 })
