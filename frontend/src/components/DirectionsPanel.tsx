@@ -3,7 +3,8 @@ import type { Task, Direction } from '../types'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
-import { PriorityPicker } from './PriorityPicker'
+import { PriorityPicker, prioritiesOn } from './PriorityPicker'
+import Icon from './Icon'
 
 interface Props {
   tasks: Task[]
@@ -72,7 +73,7 @@ function TaskRow({ task, index, onClick, onDragStart, onDragOver, onDrop, onAddT
       <span className="text-[#505050] text-[10px] font-mono w-3 shrink-0 select-none">{index}</span>
 
       {/* Priority symbol */}
-      <div className="relative shrink-0">
+      <div className={`relative shrink-0 ${prioritiesOn() ? '' : 'hidden'}`}>
         <button
           onClick={e => { e.stopPropagation(); setShowPicker(v => !v) }}
           className="text-[11px] font-mono w-4 text-center leading-none transition-opacity hover:opacity-100"
@@ -502,7 +503,7 @@ export default function DirectionsPanel({ tasks, directions, onTaskClick, onReor
                 className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
                 onClick={() => toggleCollapse('someday')}
               >
-                <span className="text-xs font-medium text-[#555]">☁ Когда-нибудь</span>
+                <span className="text-xs font-medium text-[#555] inline-flex items-center gap-1.5"><Icon name="moon" size={13} /> Когда-нибудь</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-[#383838]">{somedayTasks.length}</span>
                   <span className="text-[10px] text-[#383838]">{isCollapsed ? '▶' : '▼'}</span>

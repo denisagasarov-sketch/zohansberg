@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { PRIORITY_OPTIONS, priorityLabel, priorityColor } from '../utils/priority'
 
+// Приоритеты можно выключить в настройках — тогда бейджи не показываются
+export const prioritiesOn = () => localStorage.getItem('show_priorities') !== 'false'
+
 let pickerSeq = 0
 
 export function PriorityPicker({ current, onChange, onClose }: {
@@ -46,6 +49,8 @@ export function PriorityBadge({ priority, onChange }: {
 }) {
   const [open, setOpen] = useState(false)
   const isNone = !priority || priority === 'none'
+
+  if (!prioritiesOn()) return null
 
   return (
     <div className="relative shrink-0">

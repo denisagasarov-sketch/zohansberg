@@ -1,18 +1,13 @@
 import { useState } from 'react'
 import { playSound } from '../../sound'
+import { MoodIcon } from '../Icon'
 
 interface Props {
   onClose: () => void
   onSave: (mood: number, goal: string, content: string) => void
 }
 
-const MOODS = [
-  { value: 1, emoji: '😔' },
-  { value: 2, emoji: '😐' },
-  { value: 3, emoji: '🙂' },
-  { value: 4, emoji: '😄' },
-  { value: 5, emoji: '🚀' },
-]
+const MOODS = [1, 2, 3, 4, 5]
 
 function formatDate() {
   const now = new Date()
@@ -45,16 +40,17 @@ export default function CheckinModal({ onClose, onSave }: Props) {
 
         <div className="mb-4">
           <label className="block text-sm text-[#666] mb-3">Как ты сегодня?</label>
-          <div className="flex gap-3 justify-center">
+          <div className="flex gap-4 justify-center">
             {MOODS.map(m => (
               <button
-                key={m.value}
-                onClick={() => setMood(m.value)}
-                className={`text-3xl transition-all duration-150 ${
-                  mood === m.value ? 'scale-125' : 'opacity-50 hover:opacity-80'
+                key={m}
+                onClick={() => setMood(m)}
+                className={`transition-all duration-150 ${
+                  mood === m ? 'text-[#8090c8] scale-125' : 'text-[#555] hover:text-[#888]'
                 }`}
+                aria-label={`Настроение ${m}`}
               >
-                {m.emoji}
+                <MoodIcon mood={m} size={30} />
               </button>
             ))}
           </div>

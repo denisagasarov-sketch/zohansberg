@@ -3,12 +3,13 @@ import { api } from '../api'
 import type { JournalEntry } from '../types'
 import { playSound } from '../sound'
 import CheckinModal from './modals/CheckinModal'
+import Icon, { MoodIcon } from './Icon'
 
 interface Props {
   onClose: () => void
 }
 
-const MOOD_EMOJI: Record<number, string> = { 1: '😔', 2: '😐', 3: '🙂', 4: '😄', 5: '🚀' }
+const MOOD_LABEL: Record<number, string> = { 1: 'плохо', 2: 'так себе', 3: 'норм', 4: 'хорошо', 5: 'отлично' }
 
 function groupByDay(entries: JournalEntry[]): Map<string, JournalEntry[]> {
   const map = new Map<string, JournalEntry[]>()
@@ -74,7 +75,7 @@ export default function JournalScreen({ onClose }: Props) {
     setAnalysis(null)
     const week = entries.slice(0, 50)
     const text = week.map(e => {
-      if (e.type === 'checkin') return `[Чекин] Настроение: ${MOOD_EMOJI[e.mood ?? 0] ?? e.mood}, Цель: ${e.goal ?? ''}, Мысли: ${e.content ?? ''}`
+      if (e.type === 'checkin') return `[Чекин] Настроение: ${MOOD_LABEL[e.mood ?? 0] ?? e.mood}, Цель: ${e.goal ?? ''}, Мысли: ${e.content ?? ''}`
       return `[Мысль] ${e.content ?? ''}`
     }).join('\n')
     try {
@@ -142,9 +143,9 @@ export default function JournalScreen({ onClose }: Props) {
             </button>
             <button
               onClick={() => setShowCheckin(true)}
-              className="text-xs px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] rounded transition-colors text-[#666]"
+              className="text-xs px-3 py-1.5 bg-[#1c1c1c] border border-[#252525] hover:border-[#5060a0] hover:text-[#8090c8] rounded transition-colors text-[#666] inline-flex items-center gap-1.5"
             >
-              ☀ Чек-ин
+              <Icon name="sun" size={14} /> Чек-ин
             </button>
           </div>
 
@@ -178,7 +179,7 @@ export default function JournalScreen({ onClose }: Props) {
                     return (
                       <div key={entry.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg px-3 py-2.5">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl">{MOOD_EMOJI[entry.mood ?? 0] ?? '·'}</span>
+                          <span className="text-[#8090c8]">{entry.mood ? <MoodIcon mood={entry.mood} size={20} /> : <Icon name="sun" size={18} />}</span>
                           <span className="text-xs text-[#666]">Чекин</span>
                           <span className="text-[10px] text-[#383838] ml-auto">
                             {new Date(entry.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
@@ -192,7 +193,7 @@ export default function JournalScreen({ onClose }: Props) {
                   return (
                     <div key={entry.id} className="bg-[#1c1c1c] border border-[#252525] rounded-lg px-3 py-2">
                       <div className="flex items-start gap-2">
-                        <span className="text-[#383838] text-sm mt-0.5">💭</span>
+                        <span className="text-[#555] mt-0.5"><Icon name="thought" size={15} /></span>
                         <p className="flex-1 text-sm text-[#f0f0f0]">{entry.content}</p>
                         <span className="text-[10px] text-[#383838] shrink-0 mt-0.5">
                           {new Date(entry.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}

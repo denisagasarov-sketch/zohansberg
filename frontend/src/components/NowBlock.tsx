@@ -5,7 +5,7 @@ import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
 import { priorityLabel, priorityColor } from '../utils/priority'
-import { PriorityPicker } from './PriorityPicker'
+import { PriorityPicker, prioritiesOn } from './PriorityPicker'
 
 interface Props {
   task: Task | null
@@ -96,7 +96,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             onClick={() => onTaskClick(task)}
           >
             <div className="flex items-start gap-2 mb-1.5">
-              <div className="relative shrink-0 mt-[3px]">
+              <div className={`relative shrink-0 mt-[3px] ${prioritiesOn() ? '' : 'hidden'}`}>
                 <button
                   onClick={e => { e.stopPropagation(); setShowPrio(v => !v) }}
                   className={`text-[13px] font-mono leading-tight transition-opacity ${task.priority && task.priority !== 'none' ? '' : 'opacity-30 hover:opacity-100'}`}
@@ -178,7 +178,7 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
             {pomodoroPhase !== 'idle' && (
               <div className={`flex items-center gap-2 mt-2 px-2 py-1 rounded-lg text-xs ${pomodoroPhase === 'break' ? 'bg-[#1a3a1a]' : 'bg-[#1a1a3a]'}`}>
                 <span className={pomodoroPhase === 'break' ? 'text-[#4a9a4a]' : 'text-[#8090c8]'}>
-                  {pomodoroPhase === 'break' ? '☕ Перерыв' : '🍅 Помодоро'}
+                  {pomodoroPhase === 'break' ? 'Перерыв' : 'Помодоро'}
                 </span>
                 <span className="font-mono text-[#f0f0f0]">
                   {padZ(Math.floor(pomodoroRemaining / 60))}:{padZ(pomodoroRemaining % 60)}

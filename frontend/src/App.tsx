@@ -56,6 +56,7 @@ export default function App() {
   const [weeklyTime, setWeeklyTime] = useState<Record<number, number>>({})
   const [todayCheckin, setTodayCheckin] = useState<TodayCheckin | null>(null)
   const [lastSessionNote, setLastSessionNote] = useState<{ note: string; when: string } | null>(null)
+  const [displayVer, setDisplayVer] = useState(0) // перерисовка при смене настроек отображения
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
   const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks, undo } = useTasks()
@@ -316,6 +317,14 @@ export default function App() {
     return () => window.removeEventListener('journal-updated', handler)
   }, [])
 
+  // Настройки отображения (приоритеты, полоса геймификации) — перерисовать при смене
+  useEffect(() => {
+    const handler = () => setDisplayVer(v => v + 1)
+    window.addEventListener('display-settings-changed', handler)
+    return () => window.removeEventListener('display-settings-changed', handler)
+  }, [])
+  const showGamebar = displayVer >= 0 && localStorage.getItem('show_gamebar') !== 'false'
+
 
   const handleOpenNewTask = useCallback(() => {
     setSelectedTask(null)
@@ -401,7 +410,7 @@ export default function App() {
                 onCheckin={() => setShowCheckin(true)}
                 onOpenJournal={() => setScreen('journal')}
               />
-              <GamificationBar />
+              {showGamebar && <GamificationBar />}
               <NowBlock
                 task={nowTask}
                 directions={directions}

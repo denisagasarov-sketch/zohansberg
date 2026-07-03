@@ -1603,6 +1603,20 @@ app.get('/api/stats/motivation', (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/stats/by-hour — распределение фокуса по часам суток (когда я продуктивен)
+app.get('/api/stats/by-hour', (_req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT CAST(strftime('%H', started_at) AS INTEGER) AS hour, SUM(duration_actual) AS seconds
+      FROM work_sessions WHERE duration_actual > 0
+      GROUP BY hour
+    `).all()
+    const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, seconds: 0 }))
+    rows.forEach(r => { if (r.hour != null) hours[r.hour].seconds = r.seconds })
+    res.json(hours)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Day Plan ────────────────────────────────────────────────────────────────
 
 // GET /api/day-plan?date=YYYY-MM-DD

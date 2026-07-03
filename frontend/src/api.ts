@@ -90,6 +90,7 @@ export const api = {
   getStats: (period: string) => req<any>('GET', `/stats?period=${period}`),
   getWorklog: (period: string) => req<any>('GET', `/sessions/worklog?period=${period}`),
   getStatsDashboard: (period: string) => req<any>('GET', `/stats/dashboard?period=${period}`),
+  getByHour: () => req<{ hour: number; seconds: number }[]>('GET', '/stats/by-hour'),
   getMotivation: () => req<{
     lifetime_seconds: number; tasks_done: number; subtasks_done: number
     this_week_seconds: number; last_week_seconds: number; trend_pct: number

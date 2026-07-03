@@ -37,6 +37,12 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [localDirs, setLocalDirs] = useState<Direction[]>([])
   // Тумблеры авто-модалок/напоминаний. Дубли (вечерний итог, месячное ревью)
   // выключены по умолчанию — их заменяет «нить дня».
+  // Тумблеры отображения элементов интерфейса
+  const DISPLAY: { key: string; label: string; defaultOn: boolean }[] = [
+    { key: 'show_priorities', label: 'Показывать приоритеты задач', defaultOn: true },
+    { key: 'show_gamebar',    label: 'Показывать полосу серии и колец', defaultOn: true },
+  ]
+
   const REMINDERS: { key: string; label: string; defaultOn: boolean }[] = [
     { key: 'checkin_enabled',        label: 'Утренний чек-ин',                 defaultOn: true },
     { key: 'intent_enabled',         label: 'Спрашивать намерение перед стартом', defaultOn: true },
@@ -50,12 +56,13 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
     return v === null ? defaultOn : v !== 'false'
   }
   const [reminders, setReminders] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(REMINDERS.map(r => [r.key, flagOn(r.key, r.defaultOn)]))
+    () => Object.fromEntries([...REMINDERS, ...DISPLAY].map(r => [r.key, flagOn(r.key, r.defaultOn)]))
   )
   const toggleReminder = (key: string) => {
     setReminders(prev => {
       const v = !prev[key]
       localStorage.setItem(key, String(v))
+      window.dispatchEvent(new CustomEvent('display-settings-changed'))
       return { ...prev, [key]: v }
     })
   }
@@ -318,6 +325,24 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
               className="flex-1 accent-[#5060a0]"
             />
             <span className="text-xs text-[#666] w-8">{Math.round(volume * 100)}%</span>
+          </div>
+        </section>
+
+        {/* Интерфейс */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Интерфейс</h2>
+          <div className="space-y-2.5">
+            {DISPLAY.map(r => (
+              <div key={r.key} className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleReminder(r.key)}
+                  className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${reminders[r.key] ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${reminders[r.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+                <span className="text-sm text-[#999]">{r.label}</span>
+              </div>
+            ))}
           </div>
         </section>
 

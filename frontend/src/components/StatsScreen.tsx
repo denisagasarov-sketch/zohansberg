@@ -558,12 +558,102 @@ function MotivationHero({ m }: { m: Motivation }) {
   )
 }
 
+// ─── Когда я продуктивен (фокус по часам суток) ───────────────────────────────
+function ByHourChart({ data }: { data: { hour: number; seconds: number }[] }) {
+  const max = Math.max(1, ...data.map(d => d.seconds))
+  const peak = data.reduce((a, b) => (b.seconds > a.seconds ? b : a), data[0])
+  return (
+    <div>
+      <div className="flex items-end gap-[3px] h-28">
+        {data.map(d => (
+          <div key={d.hour} className="flex-1 flex flex-col justify-end" title={`${d.hour}:00 — ${fmtDuration(d.seconds)}`}>
+            <div className="w-full rounded-t-sm transition-all"
+              style={{ height: `${(d.seconds / max) * 100}%`, minHeight: d.seconds > 0 ? 2 : 0, backgroundColor: d.hour === peak.hour ? '#5060a0' : '#33384d' }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-[#555] mt-1.5">
+        <span>0</span><span>6</span><span>12</span><span>18</span><span>23</span>
+      </div>
+      {peak.seconds > 0 && (
+        <div className="text-xs text-[#8090c8] mt-2">Пик формы: около {peak.hour}:00 — планируй сложное на это время.</div>
+      )}
+    </div>
+  )
+}
+
+// ─── Цель vs факт по направлениям (текущая неделя) ────────────────────────────
+function GoalVsActual({ directions, weekly }: { directions: { id: number; name: string; weekly_goal_seconds: number }[]; weekly: Record<number, number> }) {
+  const rows = directions.filter(d => d.weekly_goal_seconds > 0)
+  if (rows.length === 0) return <div className="text-xs text-[#666]">Задай цели в «Плане недели», чтобы видеть прогресс.</div>
+  return (
+    <div className="space-y-2.5">
+      {rows.map(d => {
+        const done = weekly[d.id] ?? 0
+        const pct = Math.min(100, Math.round((done / d.weekly_goal_seconds) * 100))
+        const over = done >= d.weekly_goal_seconds
+        return (
+          <div key={d.id}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-[#ccc]">{d.name}</span>
+              <span className="text-[#666]">{fmtDuration(done)} / {Math.round(d.weekly_goal_seconds / 3600)}ч</span>
+            </div>
+            <div className="h-2 bg-[#252525] rounded-full overflow-hidden">
+              <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: over ? '#4a9d5f' : '#5060a0' }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Календарь постоянства (тепловая карта года) ──────────────────────────────
+function heatColor(seconds: number): string {
+  if (!seconds) return '#1e1e1e'
+  const h = seconds / 3600
+  if (h < 1) return '#1d3a24'
+  if (h < 2.5) return '#2e6b3f'
+  if (h < 4.5) return '#3f9d57'
+  return '#5ed17a'
+}
+function ConsistencyHeatmap({ data }: { data: { day: string; seconds: number }[] }) {
+  const map = new Map(data.map(d => [d.day, d.seconds]))
+  const cells: { date: string; seconds: number }[] = []
+  const today = new Date()
+  const start = new Date(today); start.setDate(start.getDate() - 364)
+  start.setDate(start.getDate() - start.getDay())
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10)
+    cells.push({ date: key, seconds: map.get(key) ?? 0 })
+  }
+  const weeks: typeof cells[] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return (
+    <div className="flex gap-[3px] overflow-x-auto pb-1">
+      {weeks.map((w, i) => (
+        <div key={i} className="flex flex-col gap-[3px]">
+          {w.map(c => (
+            <div key={c.date} title={`${c.date}: ${fmtDuration(c.seconds)}`}
+              className="w-[9px] h-[9px] rounded-[2px]" style={{ backgroundColor: heatColor(c.seconds) }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function StatsScreen({ onClose }: Props) {
   const [period, setPeriod] = useState<Period>('week')
   const [data, setData] = useState<DashboardData | null>(null)
   const [motivation, setMotivation] = useState<Motivation | null>(null)
+  const [byHour, setByHour] = useState<{ hour: number; seconds: number }[]>([])
+  const [heatmap, setHeatmap] = useState<{ day: string; seconds: number }[]>([])
+  const [consistency, setConsistency] = useState<{ streak: number; best: number; active: number } | null>(null)
+  const [dirGoals, setDirGoals] = useState<{ id: number; name: string; weekly_goal_seconds: number }[]>([])
+  const [weekly, setWeekly] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -574,7 +664,17 @@ export default function StatsScreen({ onClose }: Props) {
     }).catch(() => setLoading(false))
   }, [period])
 
-  useEffect(() => { api.getMotivation().then(setMotivation).catch(() => {}) }, [])
+  useEffect(() => {
+    api.getMotivation().then(setMotivation).catch(() => {})
+    api.getByHour().then(setByHour).catch(() => {})
+    api.getGamification().then(g => { setHeatmap(g.heatmap); setConsistency({ streak: g.streak, best: g.best_streak, active: g.active_days_total }) }).catch(() => {})
+    api.getAllDirections().then((d: any[]) => setDirGoals(d.filter(x => !x.archived))).catch(() => {})
+    api.getWeeklyTime().then(rows => {
+      const m: Record<number, number> = {}
+      rows.forEach(r => { if (r.direction_id != null) m[r.direction_id] = r.seconds })
+      setWeekly(m)
+    }).catch(() => {})
+  }, [])
 
   const colorMap = data ? buildColorMap(data.directions) : new Map()
 
@@ -634,6 +734,33 @@ export default function StatsScreen({ onClose }: Props) {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Когда я продуктивен */}
+            {byHour.some(h => h.seconds > 0) && (
+              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Когда я продуктивен</div>
+                <ByHourChart data={byHour} />
+              </div>
+            )}
+
+            {/* Цель vs факт по направлениям */}
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Цель недели vs факт</div>
+              <GoalVsActual directions={dirGoals} weekly={weekly} />
+            </div>
+
+            {/* Календарь постоянства */}
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase">Календарь постоянства</div>
+                {consistency && (
+                  <div className="text-[10px] text-[#666]">
+                    серия {consistency.streak} · рекорд {consistency.best} · {consistency.active} активных дней
+                  </div>
+                )}
+              </div>
+              <ConsistencyHeatmap data={heatmap} />
             </div>
 
             {/* Export */}

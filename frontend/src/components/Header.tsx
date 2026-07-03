@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api'
 import type { Screen } from '../types'
+import Icon from './Icon'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -139,7 +140,7 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, onEndD
         )}
         {parsing && (
           <div className="absolute top-8 left-0 z-50 bg-[#1c1c1c] border border-[#252525] rounded px-3 py-1.5 text-xs text-[#8090c8] shadow-lg whitespace-nowrap">
-            ✨ Разбираю…
+            Разбираю…
           </div>
         )}
         {showTypeDropdown && (
@@ -147,9 +148,9 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, onEndD
             <div className="text-[#666] mb-2 truncate max-w-xs">&ldquo;{pendingText}&rdquo;</div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[#666] text-xs">Это:</span>
-              <button onClick={handleSmartTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">✨ Умная задача</button>
-              <button onClick={handleTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#383838] transition-colors text-xs text-[#999]">📋 Просто задача</button>
-              <button onClick={handleThought} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs">💭 Мысль</button>
+              <button onClick={handleSmartTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs inline-flex items-center gap-1"><Icon name="sparkles" size={13} /> Умная задача</button>
+              <button onClick={handleTask} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#383838] transition-colors text-xs text-[#999] inline-flex items-center gap-1"><Icon name="check" size={13} /> Просто задача</button>
+              <button onClick={handleThought} className="px-2 py-1 bg-[#252525] rounded hover:bg-[#5060a0] transition-colors text-xs inline-flex items-center gap-1"><Icon name="thought" size={13} /> Мысль</button>
               <span className="text-[#383838] text-xs">Esc — отмена</span>
             </div>
           </div>
@@ -165,14 +166,14 @@ export default function Header({ onNavigate, onTaskCreated, onOpenEditor, onEndD
 
       <div className="flex-1 text-center text-[#666] text-xs tabular-nums select-none">{datetime}</div>
 
-      <nav className="flex items-center gap-1">
-        <button onClick={onEndDay} title="Завершить день" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🌆</button>
-        <button onClick={onStandup} title="Стендап" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🗣</button>
-        <button onClick={() => onNavigate('weekplan')} title="План недели" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">🎯</button>
-        <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📓</button>
-        <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📊</button>
-        <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">📦</button>
-        <button onClick={() => onNavigate('settings')} title="Настройки" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] text-base transition-colors">⚙️</button>
+      <nav className="flex items-center gap-0.5 text-[#888]">
+        <button onClick={onEndDay} title="Завершить день" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="sunset" /></button>
+        <button onClick={onStandup} title="Стендап" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="message" /></button>
+        <button onClick={() => onNavigate('weekplan')} title="План недели" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="target" /></button>
+        <button onClick={() => onNavigate('journal')} title="Дневник" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="book" /></button>
+        <button onClick={() => onNavigate('stats')} title="Статистика" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="chart" /></button>
+        <button onClick={() => onNavigate('archive')} title="Архив" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="archive" /></button>
+        <button onClick={() => onNavigate('settings')} title="Настройки" className="w-7 h-7 flex items-center justify-center rounded hover:bg-[#252525] hover:text-[#f0f0f0] transition-colors"><Icon name="settings" /></button>
       </nav>
     </header>
   )

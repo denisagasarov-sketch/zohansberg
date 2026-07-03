@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DayThread, DayThreadEvent } from '../types'
 import { api } from '../api'
-
-const MOOD: Record<number, string> = { 1: '😔', 2: '😐', 3: '🙂', 4: '😄', 5: '🚀' }
+import Icon, { MoodIcon, type IconName } from './Icon'
 
 function fmt(s: number): string {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
@@ -13,8 +12,8 @@ function fmt(s: number): string {
 function time(iso: string) {
   return new Date(iso.replace(' ', 'T')).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
-function icon(k: DayThreadEvent['kind']) {
-  return k === 'subtask_done' ? '✓' : k === 'task_done' ? '🎯' : k === 'session_note' ? '📝' : '💭'
+function eventIcon(k: DayThreadEvent['kind']): IconName {
+  return k === 'subtask_done' ? 'check' : k === 'task_done' ? 'target' : k === 'session_note' ? 'note' : 'thought'
 }
 
 export default function DayThreadBlock() {
@@ -48,7 +47,7 @@ export default function DayThreadBlock() {
         <div className="px-4 pb-3 border-t border-[#252525] pt-3">
           {checkin?.goal && (
             <div className="flex items-start gap-2 mb-3">
-              <span className="text-base leading-none">{MOOD[checkin.mood ?? 0] ?? '☀'}</span>
+              <span className="text-[#8090c8] shrink-0 mt-0.5">{checkin.mood ? <MoodIcon mood={checkin.mood} size={16} /> : <Icon name="sun" size={16} />}</span>
               <div>
                 <div className="text-[10px] text-[#5a6db0] uppercase tracking-wide">Цель дня</div>
                 <div className="text-sm text-[#f0f0f0]">{checkin.goal}</div>
@@ -62,7 +61,7 @@ export default function DayThreadBlock() {
               {events.map((e, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   <span className="text-[#555] text-[10px] tabular-nums w-9 shrink-0 mt-0.5">{time(e.at)}</span>
-                  <span className="shrink-0 text-xs mt-0.5">{icon(e.kind)}</span>
+                  <span className={`shrink-0 mt-0.5 ${e.kind === 'subtask_done' || e.kind === 'task_done' ? 'text-[#4a9d5f]' : 'text-[#666]'}`}><Icon name={eventIcon(e.kind)} size={13} /></span>
                   <span className="flex-1">
                     <span className={e.kind === 'thought' || e.kind === 'session_note' ? 'text-[#9aa4c8]' : 'text-[#e0e0e0]'}>{e.text}</span>
                     {e.task && <span className="text-[10px] text-[#555]"> · {e.task}</span>}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SubtaskList from './SubtaskList'
+import Icon from './Icon'
 import type { Task, Direction } from '../types'
 import { api } from '../api'
 import { playSound } from '../sound'
@@ -287,9 +288,9 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               onClick={handleImproveTitle}
               disabled={!title.trim() || aiLoading}
               title="Улучшить формулировку (AI)"
-              className="absolute top-2 right-2 text-base text-[#383838] hover:text-[#8090c8] disabled:opacity-30 transition-colors"
+              className="absolute top-2 right-2 text-[#383838] hover:text-[#8090c8] disabled:opacity-30 transition-colors"
             >
-              {aiLoading ? '…' : '✨'}
+              {aiLoading ? <span className="text-base">…</span> : <Icon name="sparkles" size={18} />}
             </button>
             {aiSuggestions.length > 0 && (
               <div className="mt-2 space-y-1">
