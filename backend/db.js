@@ -83,6 +83,7 @@ function initSchema() {
   try { db.exec(`ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN direction_order INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE work_sessions ADD COLUMN note TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE work_sessions ADD COLUMN elapsed_seconds INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN in_queue INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN someday INTEGER NOT NULL DEFAULT 0`) } catch {}
 

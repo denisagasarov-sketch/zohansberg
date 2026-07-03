@@ -64,7 +64,7 @@ function spawnRecurringNext(task) {
   if (existing) return
   db.prepare(`
     INSERT INTO tasks (title, direction_id, priority, notes, recurrence, recurrence_last_date, deadline, duration_plan, in_queue, someday, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,0,0,datetime('now'),datetime('now'))
+    VALUES (?,?,?,?,?,?,?,?,1,0,datetime('now'),datetime('now'))
   `).run(task.title, task.direction_id, task.priority, task.notes, task.recurrence, nextDate, nextDate, task.duration_plan)
   db.prepare(`UPDATE tasks SET recurrence_last_date = ? WHERE id = ?`).run(nextDate, task.id)
 }
@@ -318,13 +318,16 @@ app.post('/api/tasks/reorder-direction', (req, res) => {
 // POST /api/tasks — create task
 app.post('/api/tasks', (req, res) => {
   try {
-    const { title, direction_id, priority, slot, deadline, duration_plan, notes } = req.body
-    if (!title?.trim()) return res.status(400).json({ error: 'title is required' })
+    const { title, direction_id, priority, slot, deadline, duration_plan, notes, recurrence, in_queue } = req.body
+    if (typeof title !== 'string' || !title.trim()) return res.status(400).json({ error: 'title is required' })
     const safeSlot = slot === 'now' ? 'now' : 'queue'
     if (safeSlot === 'now') evictNowTask()
+    // Задача, созданная «в очередь», должна попадать в список «Следом»: очередь
+    // фильтруется по in_queue=1. Явный in_queue уважаем, иначе queue-задача → в очередь.
+    const inQueueVal = in_queue !== undefined ? (in_queue ? 1 : 0) : (safeSlot === 'queue' ? 1 : 0)
     const result = db.prepare(`
-      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, direction_id, priority, slot, deadline, duration_plan, notes, recurrence, in_queue)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       direction_id ?? null,
@@ -333,6 +336,8 @@ app.post('/api/tasks', (req, res) => {
       deadline ?? null,
       duration_plan ?? null,
       notes ?? null,
+      recurrence ?? null,
+      inQueueVal,
     )
     res.status(201).json(db.prepare(`${TASK_WITH_DIR} WHERE t.id = ?`).get(result.lastInsertRowid))
   } catch (err) {
@@ -349,7 +354,8 @@ app.patch('/api/tasks/:id', (req, res) => {
 
     const allowed = ['title', 'direction_id', 'priority', 'slot', 'slot_order',
                      'deadline', 'duration_plan', 'duration_fact', 'notes',
-                     'direction_order', 'done_at', 'in_queue', 'someday']
+                     'direction_order', 'done_at', 'in_queue', 'someday',
+                     'recurrence', 'recurrence_last_date']
     const fields = []
     const vals = []
 
@@ -474,18 +480,28 @@ app.patch('/api/sessions/:id', (req, res) => {
     const { ended_at, duration_actual, note } = req.body
     const fields = []
     const vals = []
+    // Валидируем длительность: мусор (NaN/строка/отрицательное) раньше затирал
+    // duration_fact задачи в NULL. Теперь такое отклоняем.
+    let durNum = null
+    if (duration_actual !== undefined) {
+      durNum = Number(duration_actual)
+      if (!Number.isFinite(durNum) || durNum < 0) {
+        return res.status(400).json({ error: 'duration_actual must be a non-negative number' })
+      }
+      fields.push('duration_actual = ?'); vals.push(durNum)
+    }
     if (ended_at !== undefined) { fields.push('ended_at = ?'); vals.push(ended_at) }
-    if (duration_actual !== undefined) { fields.push('duration_actual = ?'); vals.push(duration_actual) }
     if (note !== undefined) { fields.push('note = ?'); vals.push(note) }
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
 
     vals.push(id)
     db.prepare(`UPDATE work_sessions SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
 
-    // Accumulate duration_fact on the task
-    if (duration_actual != null && session.task_id) {
+    // Начисляем в duration_fact ТОЛЬКО при первом закрытии сессии (open → closed).
+    // Иначе повторный PATCH (ретрай/двойной клик «стоп») задваивал учтённое время.
+    if (durNum != null && session.task_id && session.ended_at == null) {
       db.prepare(`UPDATE tasks SET duration_fact = COALESCE(duration_fact, 0) + ?, updated_at = ? WHERE id = ?`)
-        .run(Number(duration_actual), nowIso(), session.task_id)
+        .run(durNum, nowIso(), session.task_id)
     }
 
     res.json(db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(id))
@@ -522,6 +538,13 @@ app.post('/api/tasks/:id/sessions', (req, res) => {
     }
 
     const dur = Number(duration_seconds)
+    // Ручная сессия: раньше принимались отрицательное/перевёрнутое время и портили статистику
+    if (!Number.isFinite(dur) || dur <= 0) {
+      return res.status(400).json({ error: 'duration_seconds must be a positive number' })
+    }
+    if (String(ended_at) < String(started_at)) {
+      return res.status(400).json({ error: 'ended_at must be after started_at' })
+    }
     const result = db.prepare(
       `INSERT INTO work_sessions (task_id, started_at, ended_at, duration_actual, note) VALUES (?, ?, ?, ?, ?)`
     ).run(task_id, started_at, ended_at, dur, note ?? null)
