@@ -273,7 +273,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Title + AI */}
           <div className="relative">
             <textarea
@@ -322,62 +322,62 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
             </div>
           </div>
 
-          {/* Deadline */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Дедлайн</label>
-            <div className="flex gap-2 items-center">
+          {/* Дедлайн + Время — в один ряд */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Дедлайн</label>
+              <div className="flex gap-1 items-center">
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={e => setDeadline(e.target.value)}
+                  className="flex-1 min-w-0 bg-[#141414] border border-[#252525] rounded px-2 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] [color-scheme:dark]"
+                />
+                {deadline && (
+                  <button onClick={() => setDeadline('')} className="text-[#666] hover:text-[#f0f0f0] text-sm shrink-0">×</button>
+                )}
+              </div>
+            </div>
+            <div className="w-24 shrink-0">
+              <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Время, ч</label>
               <input
-                type="date"
-                value={deadline}
-                onChange={e => setDeadline(e.target.value)}
-                className="flex-1 bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] [color-scheme:dark]"
+                type="number"
+                min={0}
+                step={0.5}
+                value={durationPlan}
+                onChange={e => setDurationPlan(e.target.value)}
+                placeholder="0.5"
+                className="w-full bg-[#141414] border border-[#252525] rounded px-2 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
               />
-              {deadline && (
-                <button onClick={() => setDeadline('')} className="text-[#666] hover:text-[#f0f0f0] text-sm">×</button>
-              )}
             </div>
           </div>
 
-          {/* Duration */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Время (ч)</label>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={durationPlan}
-              onChange={e => setDurationPlan(e.target.value)}
-              placeholder="0.5"
-              className="w-28 bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
-            />
+          {/* Повтор + Когда-нибудь — в один ряд */}
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Повтор</label>
+              <select
+                value={recurrence}
+                onChange={e => setRecurrence(e.target.value)}
+                className="w-full bg-[#141414] border border-[#252525] rounded px-2 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
+              >
+                <option value="">Нет</option>
+                <option value="daily">Каждый день</option>
+                <option value="weekdays">Будни</option>
+                <option value="weekly">Каждую неделю</option>
+                <option value="monthly">Каждый месяц</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none h-8 px-2">
+              <input
+                type="checkbox"
+                checked={someday}
+                onChange={e => setSomeday(e.target.checked)}
+                className="w-3.5 h-3.5 accent-[#5060a0]"
+              />
+              <span className="text-xs text-[#999]">Когда-нибудь</span>
+            </label>
           </div>
-
-          {/* Recurrence */}
-          <div>
-            <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Повтор</label>
-            <select
-              value={recurrence}
-              onChange={e => setRecurrence(e.target.value)}
-              className="bg-[#141414] border border-[#252525] rounded px-2 py-1 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0]"
-            >
-              <option value="">Нет</option>
-              <option value="daily">Каждый день</option>
-              <option value="weekdays">Будни</option>
-              <option value="weekly">Каждую неделю</option>
-              <option value="monthly">Каждый месяц</option>
-            </select>
-          </div>
-
-          {/* Someday */}
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={someday}
-              onChange={e => setSomeday(e.target.checked)}
-              className="w-3.5 h-3.5 accent-[#5060a0]"
-            />
-            <span className="text-xs text-[#666]">Когда-нибудь</span>
-          </label>
 
           {/* Sessions block — only for existing tasks */}
           {task && (
