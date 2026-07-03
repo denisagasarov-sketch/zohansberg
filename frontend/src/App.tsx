@@ -31,6 +31,7 @@ import JournalScreen from './components/JournalScreen'
 import TodayGoalBar, { type TodayCheckin } from './components/TodayGoalBar'
 import GamificationBar from './components/GamificationBar'
 import DayThreadBlock from './components/DayThreadBlock'
+import WeekPlanScreen from './components/WeekPlanScreen'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('main')
@@ -128,8 +129,8 @@ export default function App() {
       }
     }
 
-    // Monthly/quarterly review (1st–3rd of month)
-    if (flag('monthly_review_enabled')) {
+    // Monthly/quarterly review (1st–3rd of month) — выкл по умолчанию (дубль)
+    if (localStorage.getItem('monthly_review_enabled') === 'true') {
       const dom = now.getDate()
       if (dom <= 3) {
         const month = now.getMonth()
@@ -166,7 +167,7 @@ export default function App() {
   // Show evening summary after 19:00
   useEffect(() => {
     const check = () => {
-      if (localStorage.getItem('evening_enabled') === 'false') return
+      if (localStorage.getItem('evening_enabled') !== 'true') return // выкл по умолчанию (дубль «нити дня»)
       const now = new Date()
       if (now.getHours() < 19) return
       const today = now.toISOString().slice(0, 10)
@@ -509,6 +510,13 @@ export default function App() {
 
         {screen === 'journal' && (
           <JournalScreen onClose={() => setScreen('main')} />
+        )}
+        {screen === 'weekplan' && (
+          <WeekPlanScreen
+            directions={directions}
+            onClose={() => setScreen('main')}
+            onChanged={refresh}
+          />
         )}
         {screen === 'horizon' && (
           <HorizonScreen

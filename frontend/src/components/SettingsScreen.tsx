@@ -26,6 +26,31 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [editingName, setEditingName] = useState('')
   const dragDirRef = useRef<number | null>(null)
   const [localDirs, setLocalDirs] = useState<Direction[]>([])
+  // Тумблеры авто-модалок/напоминаний. Дубли (вечерний итог, месячное ревью)
+  // выключены по умолчанию — их заменяет «нить дня».
+  const REMINDERS: { key: string; label: string; defaultOn: boolean }[] = [
+    { key: 'checkin_enabled',        label: 'Утренний чек-ин',                 defaultOn: true },
+    { key: 'intent_enabled',         label: 'Спрашивать намерение перед стартом', defaultOn: true },
+    { key: 'break_screen_enabled',   label: 'Экран перерыва на паузе',         defaultOn: true },
+    { key: 'weekly_review_enabled',  label: 'Недельное ревью (пт–вс вечером)', defaultOn: true },
+    { key: 'evening_enabled',        label: 'Вечерний итог (дубль «нити дня»)', defaultOn: false },
+    { key: 'monthly_review_enabled', label: 'Месячное/квартальное ревью',      defaultOn: false },
+  ]
+  const flagOn = (key: string, defaultOn: boolean) => {
+    const v = localStorage.getItem(key)
+    return v === null ? defaultOn : v !== 'false'
+  }
+  const [reminders, setReminders] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(REMINDERS.map(r => [r.key, flagOn(r.key, r.defaultOn)]))
+  )
+  const toggleReminder = (key: string) => {
+    setReminders(prev => {
+      const v = !prev[key]
+      localStorage.setItem(key, String(v))
+      return { ...prev, [key]: v }
+    })
+  }
+
   // hidden easter egg: tap the «Настройки» title 7 times to unlock the worms game
   const [titleTaps, setTitleTaps] = useState(0)
   const [showGame, setShowGame] = useState(false)
@@ -278,6 +303,25 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
             />
             <span className="text-xs text-[#666] w-8">{Math.round(volume * 100)}%</span>
           </div>
+        </section>
+
+        {/* Напоминания и авто-окна */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-3">Напоминания и авто-окна</h2>
+          <div className="space-y-2.5">
+            {REMINDERS.map(r => (
+              <div key={r.key} className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleReminder(r.key)}
+                  className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${reminders[r.key] ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${reminders[r.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+                <span className="text-sm text-[#999]">{r.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-[#555] mt-2">Выключенные окна не будут всплывать сами — ничего не удаляется.</p>
         </section>
 
         {/* Anthropic API */}
