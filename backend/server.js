@@ -100,6 +100,41 @@ async function sendTelegram(text) {
   } catch (e) { return { ok: false, error: e.message } }
 }
 
+function buildCheckpointReport() {
+  const today = todayStr()
+  const seconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s
+  const subs = db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n
+  const tasksDone = db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
+  const inFocus = !!db.prepare(`SELECT id FROM work_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).get()
+  const streak = currentStreak()
+  const hour = new Date().getHours()
+  const part = hour < 15 ? 'Полдень' : 'День к концу'
+  const did = seconds > 0 || tasksDone > 0 || subs > 0
+  const doneStr = did ? `пока ${fmtHM(seconds)} в фокусе, закрыто ${tasksDone} задач и ${subs} шагов` : 'подходов ещё не было'
+
+  if (inFocus) {
+    return `⚡ ${part}. Ты сейчас в потоке — красавчик, так держать. Сегодня уже ${fmtHM(seconds)}.`
+  }
+  if (!did) {
+    return `⏰ ${part}, а день ещё не начат.` + (streak > 0 ? ` Один маленький подход — и цепочка из ${streak} дн. жива.` : ` Начни с одного короткого шага — этого достаточно.`)
+  }
+  return `⏰ ${part} — ${doneStr}. С чего продолжишь?`
+}
+
+function checkCheckpoints() {
+  try {
+    if (getSettingVal('tg_checkpoint_enabled') !== 'true') return
+    const times = (getSettingVal('tg_checkpoint_times') || '13:00,17:00').split(',').map(s => s.trim())
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    if (!times.includes(hhmm)) return
+    const stamp = `${todayStr()} ${hhmm}`
+    if (getSettingVal('tg_checkpoint_last') === stamp) return // этот чекпоинт уже отправлен
+    db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_checkpoint_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(stamp)
+    sendTelegram(buildCheckpointReport()).then(r => { if (!r.ok) console.error('[telegram] checkpoint', r.error) })
+  } catch (e) { console.error('[telegram] checkpoint scheduler', e.message) }
+}
+
 function checkEveningReport() {
   try {
     if (getSettingVal('tg_report_enabled') !== 'true') return
@@ -112,7 +147,7 @@ function checkEveningReport() {
     sendTelegram(buildEveningReport()).then(r => { if (!r.ok) console.error('[telegram]', r.error) })
   } catch (e) { console.error('[telegram] scheduler', e.message) }
 }
-setInterval(checkEveningReport, 60 * 1000)
+setInterval(() => { checkEveningReport(); checkCheckpoints() }, 60 * 1000)
 
 // ─── Recurring helpers ────────────────────────────────────────────────────────
 

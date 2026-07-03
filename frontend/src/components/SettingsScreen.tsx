@@ -25,6 +25,7 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [tgChatId, setTgChatId] = useState('')
   const [tgTime, setTgTime] = useState('21:00')
   const [tgEnabled, setTgEnabled] = useState(false)
+  const [tgCheckpoints, setTgCheckpoints] = useState(false)
   const [tgTest, setTgTest] = useState<'idle' | 'sending' | 'ok' | 'fail'>('idle')
   const [tgErr, setTgErr] = useState('')
   const [newDirName, setNewDirName] = useState('')
@@ -87,6 +88,7 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
       if (s.tg_chat_id) setTgChatId(s.tg_chat_id)
       if (s.tg_report_time) setTgTime(s.tg_report_time)
       setTgEnabled(s.tg_report_enabled === 'true')
+      setTgCheckpoints(s.tg_checkpoint_enabled === 'true')
     }).catch(() => {})
   }, [])
 
@@ -346,6 +348,15 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
               <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${tgEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
             </button>
             <span className="text-sm text-[#999]">Присылать вечерний отчёт</span>
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <button
+              onClick={() => { const v = !tgCheckpoints; setTgCheckpoints(v); saveSetting('tg_checkpoint_enabled', String(v)) }}
+              className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${tgCheckpoints ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${tgCheckpoints ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+            <span className="text-sm text-[#999]">Чекпоинты в 13:00 и 17:00</span>
           </div>
           <div className="space-y-2">
             <input
