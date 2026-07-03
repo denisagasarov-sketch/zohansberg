@@ -123,6 +123,12 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                 <span className="text-[#666]">{task.duration_plan}ч план</span>
               )}
             </div>
+            {/* Заметка к задаче — видна прямо в фокус-карточке, а не только в редакторе */}
+            {task.notes && (
+              <p className="text-xs text-[#8a8a8a] mt-2 whitespace-pre-wrap leading-relaxed max-h-20 overflow-y-auto border-l-2 border-[#333] pl-2">
+                {task.notes}
+              </p>
+            )}
           </div>
 
           {/* Timer */}

@@ -105,6 +105,7 @@ export default function JournalScreen({ onClose }: Props) {
       await api.createJournalEntry({ type: 'checkin', mood, goal, content })
       playSound('checkin_save')
       setShowCheckin(false)
+      window.dispatchEvent(new CustomEvent('journal-updated')) // обновить «Цель дня» на главном
       await load()
     } catch (e) { console.error(e) }
   }

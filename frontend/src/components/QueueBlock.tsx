@@ -124,6 +124,7 @@ export default function QueueBlock({ tasks, directions, onTaskClick, onReorder, 
                 <span className="text-[#383838] text-xs font-mono w-4 shrink-0">{idx + 1}</span>
                 <PriorityBadge priority={task.priority} onChange={v => onPriorityChange(task.id, v)} />
                 <span className="flex-1 text-sm text-[#f0f0f0] truncate">{task.title}</span>
+                {task.notes && <span className="text-[10px] shrink-0 opacity-50" title={task.notes}>📝</span>}
                 {task.recurrence && <span className="text-[10px] text-[#5060a0]/60 shrink-0" title="Повторяющаяся задача">↺</span>}
                 {task.deadline && (
                   <span className="text-[10px] text-[#666] shrink-0">

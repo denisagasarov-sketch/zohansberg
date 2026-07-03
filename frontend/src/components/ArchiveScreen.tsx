@@ -5,6 +5,7 @@ import { api } from '../api'
 interface Props {
   directions: Direction[]
   onClose: () => void
+  onChanged?: () => void
 }
 
 function groupByDay(tasks: Task[]): Map<string, Task[]> {
@@ -31,11 +32,20 @@ function formatDuration(s: number) {
   return `${m}м`
 }
 
-export default function ArchiveScreen({ directions, onClose }: Props) {
+export default function ArchiveScreen({ directions, onClose, onChanged }: Props) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDir, setFilterDir] = useState<number | null>(null)
   const [search, setSearch] = useState('')
+
+  const restore = async (id: number) => {
+    // Вернуть задачу в работу: снять «выполнена», положить в очередь «Следом»
+    try {
+      await api.updateTask(id, { done_at: null, in_queue: true })
+      onChanged?.()
+      await load()
+    } catch (e) { console.error(e) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -86,17 +96,27 @@ export default function ArchiveScreen({ directions, onClose }: Props) {
               {grouped.get(key)!.map(task => {
                 const dir = directions.find(d => d.id === task.direction_id)
                 return (
-                  <div key={task.id} className="bg-[#1c1c1c] border border-[#252525] rounded px-3 py-2 flex items-center gap-3">
-                    <span className="text-[#666] text-sm">✓</span>
-                    <span className="flex-1 text-sm text-[#f0f0f0]">{task.title}</span>
-                    {dir && <span className="text-xs text-[#666]">{dir.name}</span>}
-                    {task.duration_fact > 0 && (
-                      <span className="text-xs text-[#5060a0]">{formatDuration(task.duration_fact)}</span>
-                    )}
-                    {task.done_at && (
-                      <span className="text-xs text-[#383838]">
-                        {new Date(task.done_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                  <div key={task.id} className="group bg-[#1c1c1c] border border-[#252525] rounded px-3 py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[#666] text-sm">✓</span>
+                      <span className="flex-1 text-sm text-[#f0f0f0]">{task.title}</span>
+                      {dir && <span className="text-xs text-[#666]">{dir.name}</span>}
+                      {task.duration_fact > 0 && (
+                        <span className="text-xs text-[#5060a0]">{formatDuration(task.duration_fact)}</span>
+                      )}
+                      {task.done_at && (
+                        <span className="text-xs text-[#383838]">
+                          {new Date(task.done_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => restore(task.id)}
+                        className="opacity-0 group-hover:opacity-100 text-xs text-[#555] hover:text-[#5060a0] shrink-0 transition-opacity"
+                        title="Вернуть в работу — задача снова появится в «Следом»"
+                      >↩ Вернуть</button>
+                    </div>
+                    {task.notes && (
+                      <p className="text-xs text-[#666] mt-1.5 ml-7 whitespace-pre-wrap">{task.notes}</p>
                     )}
                   </div>
                 )

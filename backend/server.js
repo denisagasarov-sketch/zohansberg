@@ -590,15 +590,16 @@ app.get('/api/journal', (_req, res) => {
   }
 })
 
-// GET /api/journal/today-checkin
+// GET /api/journal/today-checkin — вместе с содержимым, чтобы цель дня
+// можно было показывать на главном экране весь день
 app.get('/api/journal/today-checkin', (_req, res) => {
   try {
     const row = db.prepare(`
-      SELECT id FROM journal_entries
+      SELECT id, mood, goal, content FROM journal_entries
       WHERE type = 'checkin' AND date(created_at) = date('now')
-      LIMIT 1
+      ORDER BY id DESC LIMIT 1
     `).get()
-    res.json({ exists: !!row })
+    res.json({ exists: !!row, mood: row?.mood ?? null, goal: row?.goal ?? null, content: row?.content ?? null })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -28,6 +28,8 @@ import ArchiveScreen from './components/ArchiveScreen'
 import TrashScreen from './components/TrashScreen'
 import StatsScreen from './components/StatsScreen'
 import JournalScreen from './components/JournalScreen'
+import TodayGoalBar, { type TodayCheckin } from './components/TodayGoalBar'
+import DoneTodayBlock from './components/DoneTodayBlock'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('main')
@@ -51,6 +53,7 @@ export default function App() {
   const [sessionIntent, setSessionIntent] = useState('')
   const [todayTime, setTodayTime] = useState(0)
   const [weeklyTime, setWeeklyTime] = useState<Record<number, number>>({})
+  const [todayCheckin, setTodayCheckin] = useState<TodayCheckin | null>(null)
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
   const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks, undo } = useTasks()
@@ -81,12 +84,12 @@ export default function App() {
   const checkDayTransitions = useCallback((today: string) => {
     const flag = (key: string) => localStorage.getItem(key) !== 'false'
 
-    // Check-in
-    if (flag('checkin_enabled')) {
-      api.getTodayCheckin().then(r => {
-        if (!r.exists) setShowCheckin(true)
-      }).catch(() => {})
-    }
+    // Check-in: содержимое нужно всегда (цель дня на главном экране),
+    // автопоказ окна — только если включён в настройках
+    api.getTodayCheckin().then(r => {
+      setTodayCheckin(r)
+      if (flag('checkin_enabled') && !r.exists) setShowCheckin(true)
+    }).catch(() => {})
 
     // Morning plan
     api.getDayPlan(today).then(rows => {
@@ -282,9 +285,22 @@ export default function App() {
   const handleCheckinSave = useCallback(async (mood: number, goal: string, content: string) => {
     try {
       await api.createJournalEntry({ type: 'checkin', mood, goal, content })
+      setTodayCheckin({ exists: true, mood, goal, content })
     } catch (e) { console.error(e) }
     setShowCheckin(false)
   }, [])
+
+  // Чек-ин, сделанный из экрана дневника, тоже должен обновить «Цель дня»
+  useEffect(() => {
+    const handler = () => { api.getTodayCheckin().then(setTodayCheckin).catch(() => {}) }
+    window.addEventListener('journal-updated', handler)
+    return () => window.removeEventListener('journal-updated', handler)
+  }, [])
+
+  const handleRestoreDone = useCallback(async (taskId: number) => {
+    // Снять «выполнена» и вернуть в очередь «Следом»
+    await updateTask(taskId, { done_at: null, in_queue: true } as any)
+  }, [updateTask])
 
   const handleOpenNewTask = useCallback(() => {
     setSelectedTask(null)
@@ -363,6 +379,11 @@ export default function App() {
           <div className="h-full flex gap-0">
             {/* Left column */}
             <div className="w-[58%] flex flex-col gap-3 p-4 overflow-y-auto border-r border-[#252525]">
+              <TodayGoalBar
+                checkin={todayCheckin}
+                onCheckin={() => setShowCheckin(true)}
+                onOpenJournal={() => setScreen('journal')}
+              />
               <NowBlock
                 task={nowTask}
                 directions={directions}
@@ -411,6 +432,12 @@ export default function App() {
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
+              <DoneTodayBlock
+                tasks={tasks}
+                directions={directions}
+                onRestore={handleRestoreDone}
+                onTaskClick={handleTaskClick}
+              />
               <div className="flex-1" />
             </div>
 
@@ -450,6 +477,7 @@ export default function App() {
           <ArchiveScreen
             directions={directions}
             onClose={() => setScreen('main')}
+            onChanged={refresh}
           />
         )}
 

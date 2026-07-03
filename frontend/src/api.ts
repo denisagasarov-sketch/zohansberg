@@ -62,7 +62,8 @@ export const api = {
   // Journal
   getJournal: () => req<any[]>('GET', '/journal'),
   createJournalEntry: (data: any) => req('POST', '/journal', data),
-  getTodayCheckin: () => req<{ exists: boolean }>('GET', '/journal/today-checkin'),
+  getTodayCheckin: () =>
+    req<{ exists: boolean; mood: number | null; goal: string | null; content: string | null }>('GET', '/journal/today-checkin'),
 
   // Settings
   getSettings: () => req<any>('GET', '/settings'),
