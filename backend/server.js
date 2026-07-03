@@ -67,24 +67,32 @@ function currentStreak() {
   return streak
 }
 
-function buildEveningReport() {
+function eveningFacts() {
   const today = todayStr()
-  const seconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s
-  const sessions = db.prepare(`SELECT COUNT(*) n FROM work_sessions WHERE date(started_at)=? AND duration_actual>0`).get(today).n
-  const subs = db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n
-  const tasksDone = db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
-  const checkin = db.prepare(`SELECT goal FROM journal_entries WHERE type='checkin' AND date(created_at)=? ORDER BY id DESC LIMIT 1`).get(today)
-  const streak = currentStreak()
-
-  const lines = [`🌆 Итог дня`]
-  if (seconds === 0 && tasksDone === 0 && subs === 0) {
-    lines.push(`Сегодня подходов не было. Бывает — завтра новый день.`)
-  } else {
-    lines.push(`${sessions} подход(ов), ${fmtHM(seconds)} в фокусе, закрыто задач: ${tasksDone}, шагов: ${subs}.`)
+  return {
+    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s,
+    sessions: db.prepare(`SELECT COUNT(*) n FROM work_sessions WHERE date(started_at)=? AND duration_actual>0`).get(today).n,
+    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n,
+    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n,
+    goal: db.prepare(`SELECT goal FROM journal_entries WHERE type='checkin' AND date(created_at)=? ORDER BY id DESC LIMIT 1`).get(today)?.goal ?? null,
+    streak: currentStreak(),
   }
-  if (checkin?.goal) lines.push(`Цель дня была: «${checkin.goal}».`)
-  lines.push(streak > 0 ? `Серия: ${streak} дн. подряд.` : `Серия прервалась — начнём заново завтра.`)
+}
+
+// Шаблонный (детерминированный) текст — фолбэк, если AI выключен/недоступен
+function eveningTemplate(f) {
+  const lines = [`🌆 Итог дня`]
+  if (f.seconds === 0 && f.tasksDone === 0 && f.subs === 0) lines.push(`Сегодня подходов не было. Бывает — завтра новый день.`)
+  else lines.push(`${f.sessions} подход(ов), ${fmtHM(f.seconds)} в фокусе, закрыто задач: ${f.tasksDone}, шагов: ${f.subs}.`)
+  if (f.goal) lines.push(`Цель дня была: «${f.goal}».`)
+  lines.push(f.streak > 0 ? `Серия: ${f.streak} дн. подряд.` : `Серия прервалась — начнём заново завтра.`)
   return lines.join('\n')
+}
+
+async function buildEveningReport() {
+  const f = eveningFacts()
+  const ai = await aiPhrase('вечерний итог дня', f)
+  return ai || eveningTemplate(f)
 }
 
 async function sendTelegram(text) {
@@ -100,25 +108,72 @@ async function sendTelegram(text) {
   } catch (e) { return { ok: false, error: e.message } }
 }
 
-function buildCheckpointReport() {
-  const today = todayStr()
-  const seconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s
-  const subs = db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n
-  const tasksDone = db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
-  const inFocus = !!db.prepare(`SELECT id FROM work_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).get()
-  const streak = currentStreak()
-  const hour = new Date().getHours()
-  const part = hour < 15 ? 'Полдень' : 'День к концу'
-  const did = seconds > 0 || tasksDone > 0 || subs > 0
-  const doneStr = did ? `пока ${fmtHM(seconds)} в фокусе, закрыто ${tasksDone} задач и ${subs} шагов` : 'подходов ещё не было'
+// Промпты для тона AI-формулировок
+const TONE_PROMPTS = {
+  supportive: 'тёплый поддерживающий друг: спокойно, по-доброму, с верой в человека',
+  bold: 'дерзкий мотивирующий бро: с лёгким вызовом и юмором, но БЕЗ токсичности, унижения и стыда',
+  neutral: 'спокойный нейтральный ассистент: только факт и мягкий вопрос, без пафоса',
+}
 
-  if (inFocus) {
-    return `⚡ ${part}. Ты сейчас в потоке — красавчик, так держать. Сегодня уже ${fmtHM(seconds)}.`
+// Живая формулировка через OpenAI. Возвращает строку или null (тогда берётся шаблон).
+async function aiPhrase(kind, f) {
+  if (getSettingVal('tg_ai_enabled') !== 'true') return null
+  const key = getSettingVal('openai_api_key')
+  if (!key || !key.startsWith('sk-')) return null
+  const tone = TONE_PROMPTS[getSettingVal('tg_ai_tone') || 'supportive'] || TONE_PROMPTS.supportive
+  const facts = [
+    `тип сообщения: ${kind}`,
+    `время в фокусе сегодня: ${fmtHM(f.seconds || 0)}`,
+    `закрыто задач: ${f.tasksDone ?? 0}, шагов: ${f.subs ?? 0}`,
+    f.inFocus ? `прямо сейчас работает таймер (человек в потоке)` : `таймер сейчас не идёт`,
+    `серия дней подряд: ${f.streak ?? 0}`,
+    f.goal ? `цель дня: «${f.goal}»` : `цель дня не задана`,
+    f.part ? `часть дня: ${f.part}` : '',
+  ].filter(Boolean).join('; ')
+  const prompt = `Ты пишешь короткое сообщение в Telegram человеку с СДВГ, помогая ему не потерять день. Тон: ${tone}.
+Данные: ${facts}.
+Правила: 1-2 коротких предложения, по-русски, живо и по-человечески. Хвали, если поработал; мягко подтолкни, если простаивает; не отвлекай, если в потоке. НИКОГДА не стыди и не дави виной. Можно один эмодзи. Верни только текст сообщения.`
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.9, messages: [{ role: 'user', content: prompt }] }),
+    })
+    if (!r.ok) return null
+    const data = await r.json()
+    const text = data.choices?.[0]?.message?.content?.trim()
+    return text || null
+  } catch { return null }
+}
+
+function checkpointFacts() {
+  const today = todayStr()
+  const hour = new Date().getHours()
+  return {
+    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s,
+    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n,
+    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n,
+    inFocus: !!db.prepare(`SELECT id FROM work_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).get(),
+    streak: currentStreak(),
+    part: hour < 15 ? 'Полдень' : 'День к концу',
+  }
+}
+
+function checkpointTemplate(f) {
+  const did = f.seconds > 0 || f.tasksDone > 0 || f.subs > 0
+  const doneStr = did ? `пока ${fmtHM(f.seconds)} в фокусе, закрыто ${f.tasksDone} задач и ${f.subs} шагов` : 'подходов ещё не было'
+  if (f.inFocus) {
+    return `⚡ ${f.part}. Ты сейчас в потоке — красавчик, так держать. Сегодня уже ${fmtHM(f.seconds)}.`
   }
   if (!did) {
-    return `⏰ ${part}, а день ещё не начат.` + (streak > 0 ? ` Один маленький подход — и цепочка из ${streak} дн. жива.` : ` Начни с одного короткого шага — этого достаточно.`)
+    return `⏰ ${f.part}, а день ещё не начат.` + (f.streak > 0 ? ` Один маленький подход — и цепочка из ${f.streak} дн. жива.` : ` Начни с одного короткого шага — этого достаточно.`)
   }
-  return `⏰ ${part} — ${doneStr}. С чего продолжишь?`
+  return `⏰ ${f.part} — ${doneStr}. С чего продолжишь?`
+}
+
+async function buildCheckpointReport() {
+  const f = checkpointFacts()
+  const ai = await aiPhrase('чекпоинт середины дня', f)
+  return ai || checkpointTemplate(f)
 }
 
 function checkCheckpoints() {
@@ -131,7 +186,7 @@ function checkCheckpoints() {
     const stamp = `${todayStr()} ${hhmm}`
     if (getSettingVal('tg_checkpoint_last') === stamp) return // этот чекпоинт уже отправлен
     db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_checkpoint_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(stamp)
-    sendTelegram(buildCheckpointReport()).then(r => { if (!r.ok) console.error('[telegram] checkpoint', r.error) })
+    buildCheckpointReport().then(t => sendTelegram(t)).then(r => { if (!r.ok) console.error('[telegram] checkpoint', r.error) })
   } catch (e) { console.error('[telegram] checkpoint scheduler', e.message) }
 }
 
@@ -144,7 +199,7 @@ function checkEveningReport() {
     if (hhmm !== time) return
     if (getSettingVal('tg_report_last') === todayStr()) return // уже отправлено сегодня
     db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_report_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(todayStr())
-    sendTelegram(buildEveningReport()).then(r => { if (!r.ok) console.error('[telegram]', r.error) })
+    buildEveningReport().then(t => sendTelegram(t)).then(r => { if (!r.ok) console.error('[telegram]', r.error) })
   } catch (e) { console.error('[telegram] scheduler', e.message) }
 }
 setInterval(() => { checkEveningReport(); checkCheckpoints() }, 60 * 1000)
@@ -968,7 +1023,8 @@ app.get('/api/stats', (req, res) => {
 // ─── Telegram ─────────────────────────────────────────────────────────────────
 // POST /api/telegram/test — отправить пробную сводку прямо сейчас
 app.post('/api/telegram/test', async (_req, res) => {
-  const r = await sendTelegram('✅ Focus Board на связи. Так будет выглядеть вечерний отчёт:\n\n' + buildEveningReport())
+  const report = await buildEveningReport()
+  const r = await sendTelegram('✅ Focus Board на связи. Так будет выглядеть вечерний отчёт:\n\n' + report)
   res.json(r)
 })
 

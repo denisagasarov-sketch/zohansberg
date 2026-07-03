@@ -26,6 +26,8 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [tgTime, setTgTime] = useState('21:00')
   const [tgEnabled, setTgEnabled] = useState(false)
   const [tgCheckpoints, setTgCheckpoints] = useState(false)
+  const [tgAi, setTgAi] = useState(false)
+  const [tgTone, setTgTone] = useState('supportive')
   const [tgTest, setTgTest] = useState<'idle' | 'sending' | 'ok' | 'fail'>('idle')
   const [tgErr, setTgErr] = useState('')
   const [newDirName, setNewDirName] = useState('')
@@ -89,6 +91,8 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
       if (s.tg_report_time) setTgTime(s.tg_report_time)
       setTgEnabled(s.tg_report_enabled === 'true')
       setTgCheckpoints(s.tg_checkpoint_enabled === 'true')
+      setTgAi(s.tg_ai_enabled === 'true')
+      if (s.tg_ai_tone) setTgTone(s.tg_ai_tone)
     }).catch(() => {})
   }, [])
 
@@ -358,6 +362,28 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
             </button>
             <span className="text-sm text-[#999]">Чекпоинты в 13:00 и 17:00</span>
           </div>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={() => { const v = !tgAi; setTgAi(v); saveSetting('tg_ai_enabled', String(v)) }}
+              className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${tgAi ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${tgAi ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+            <span className="text-sm text-[#999]">Живые формулировки от AI</span>
+          </div>
+          {tgAi && (
+            <div className="flex items-center gap-2 mb-3 ml-12">
+              <span className="text-xs text-[#666]">Тон:</span>
+              {[['supportive', 'Поддерживающий'], ['bold', 'Дерзкий'], ['neutral', 'Нейтральный']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => { setTgTone(val); saveSetting('tg_ai_tone', val) }}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors border ${tgTone === val ? 'bg-[#5060a0] border-[#5060a0] text-white' : 'border-[#252525] text-[#666] hover:border-[#5060a0]/50'}`}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-[#555] mb-3">AI использует твой OpenAI-ключ. Если выключено или ключа нет — берутся готовые фразы.</p>
           <div className="space-y-2">
             <input
               type="text" value={tgToken} placeholder="Токен бота (от @BotFather)"
