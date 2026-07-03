@@ -21,6 +21,12 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
   const [apiStatus, setApiStatus] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [dbPath, setDbPath] = useState('')
+  const [tgToken, setTgToken] = useState('')
+  const [tgChatId, setTgChatId] = useState('')
+  const [tgTime, setTgTime] = useState('21:00')
+  const [tgEnabled, setTgEnabled] = useState(false)
+  const [tgTest, setTgTest] = useState<'idle' | 'sending' | 'ok' | 'fail'>('idle')
+  const [tgErr, setTgErr] = useState('')
   const [newDirName, setNewDirName] = useState('')
   const [editingDir, setEditingDir] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -77,6 +83,10 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
       if (s.openai_api_key) setApiKey(s.openai_api_key)
       if (s.anthropic_api_key) setAnthropicKey(s.anthropic_api_key)
       if (s.db_path) setDbPath(s.db_path)
+      if (s.tg_token) setTgToken(s.tg_token)
+      if (s.tg_chat_id) setTgChatId(s.tg_chat_id)
+      if (s.tg_report_time) setTgTime(s.tg_report_time)
+      setTgEnabled(s.tg_report_enabled === 'true')
     }).catch(() => {})
   }, [])
 
@@ -322,6 +332,55 @@ export default function SettingsScreen({ directions, onClose, onDirectionChange,
             ))}
           </div>
           <p className="text-[10px] text-[#555] mt-2">Выключенные окна не будут всплывать сами — ничего не удаляется.</p>
+        </section>
+
+        {/* Вечерний отчёт в Telegram */}
+        <section>
+          <h2 className="text-sm font-semibold text-[#f0f0f0] mb-1">Вечернее зеркало в Telegram</h2>
+          <p className="text-[10px] text-[#666] mb-3">Раз в день бот пришлёт честную сводку дня — внешний свидетель без осуждения.</p>
+          <div className="flex items-center gap-3 mb-3">
+            <button
+              onClick={() => { const v = !tgEnabled; setTgEnabled(v); saveSetting('tg_report_enabled', String(v)) }}
+              className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${tgEnabled ? 'bg-[#5060a0]' : 'bg-[#252525]'}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white mt-0.5 transition-transform ${tgEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+            <span className="text-sm text-[#999]">Присылать вечерний отчёт</span>
+          </div>
+          <div className="space-y-2">
+            <input
+              type="text" value={tgToken} placeholder="Токен бота (от @BotFather)"
+              onChange={e => setTgToken(e.target.value)} onBlur={() => saveSetting('tg_token', tgToken.trim())}
+              className="w-full bg-[#141414] border border-[#252525] rounded px-3 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] placeholder-[#383838]"
+            />
+            <div className="flex gap-2">
+              <input
+                type="text" value={tgChatId} placeholder="Твой chat_id"
+                onChange={e => setTgChatId(e.target.value)} onBlur={() => saveSetting('tg_chat_id', tgChatId.trim())}
+                className="flex-1 bg-[#141414] border border-[#252525] rounded px-3 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] placeholder-[#383838]"
+              />
+              <input
+                type="time" value={tgTime}
+                onChange={e => { setTgTime(e.target.value); saveSetting('tg_report_time', e.target.value) }}
+                className="w-28 bg-[#141414] border border-[#252525] rounded px-3 py-1.5 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#5060a0] [color-scheme:dark]"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  setTgTest('sending'); setTgErr('')
+                  const r = await api.testTelegram()
+                  if (r.ok) setTgTest('ok'); else { setTgTest('fail'); setTgErr(r.error ?? 'Ошибка') }
+                }}
+                className="px-3 py-1.5 text-xs bg-[#252525] hover:bg-[#383838] rounded text-[#999] transition-colors"
+              >
+                {tgTest === 'sending' ? 'Отправляю…' : 'Отправить тест'}
+              </button>
+              {tgTest === 'ok' && <span className="text-xs text-[#4a9d5f]">✓ Отправлено — проверь Telegram</span>}
+              {tgTest === 'fail' && <span className="text-xs text-red-400">{tgErr}</span>}
+            </div>
+            <p className="text-[10px] text-[#555]">chat_id можно узнать, написав своему боту — он покажет его в ответ (или через @userinfobot).</p>
+          </div>
         </section>
 
         {/* Anthropic API */}

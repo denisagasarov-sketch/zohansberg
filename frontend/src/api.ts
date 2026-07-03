@@ -83,6 +83,9 @@ export const api = {
   getSettings: () => req<any>('GET', '/settings'),
   updateSetting: (key: string, value: string) => req('PATCH', '/settings', { key, value }),
 
+  // Telegram вечерний отчёт
+  testTelegram: () => req<{ ok: boolean; error?: string }>('POST', '/telegram/test', {}),
+
   // Stats
   getStats: (period: string) => req<any>('GET', `/stats?period=${period}`),
   getWorklog: (period: string) => req<any>('GET', `/sessions/worklog?period=${period}`),

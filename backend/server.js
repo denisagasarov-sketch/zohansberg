@@ -42,6 +42,78 @@ walCheckpoint()
 setInterval(dailyBackup, 6 * 60 * 60 * 1000)  // проверка 4 раза в день, файл на дату один
 setInterval(walCheckpoint, 60 * 60 * 1000)
 
+// ─── Вечернее зеркало в Telegram ──────────────────────────────────────────────
+// Раз в день бот присылает честную сводку — «внешний свидетель», без осуждения.
+function getSettingVal(key) {
+  try { return db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key)?.value ?? null }
+  catch { return null }
+}
+
+function fmtHM(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60)
+  return h > 0 ? `${h} ч ${m} мин` : `${m} мин`
+}
+
+function currentStreak() {
+  const days = new Set()
+  const add = (rows) => rows.forEach(r => r.d && days.add(r.d))
+  add(db.prepare(`SELECT DISTINCT date(started_at) d FROM work_sessions WHERE duration_actual>0`).all())
+  add(db.prepare(`SELECT DISTINCT date(done_at) d FROM tasks WHERE done_at IS NOT NULL`).all())
+  add(db.prepare(`SELECT DISTINCT date(done_at) d FROM subtasks WHERE done_at IS NOT NULL`).all())
+  const ds = (dt) => dt.toISOString().slice(0, 10)
+  let streak = 0; const cur = new Date()
+  if (!days.has(ds(cur))) cur.setDate(cur.getDate() - 1)
+  while (days.has(ds(cur))) { streak++; cur.setDate(cur.getDate() - 1) }
+  return streak
+}
+
+function buildEveningReport() {
+  const today = todayStr()
+  const seconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s
+  const sessions = db.prepare(`SELECT COUNT(*) n FROM work_sessions WHERE date(started_at)=? AND duration_actual>0`).get(today).n
+  const subs = db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n
+  const tasksDone = db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
+  const checkin = db.prepare(`SELECT goal FROM journal_entries WHERE type='checkin' AND date(created_at)=? ORDER BY id DESC LIMIT 1`).get(today)
+  const streak = currentStreak()
+
+  const lines = [`🌆 Итог дня`]
+  if (seconds === 0 && tasksDone === 0 && subs === 0) {
+    lines.push(`Сегодня подходов не было. Бывает — завтра новый день.`)
+  } else {
+    lines.push(`${sessions} подход(ов), ${fmtHM(seconds)} в фокусе, закрыто задач: ${tasksDone}, шагов: ${subs}.`)
+  }
+  if (checkin?.goal) lines.push(`Цель дня была: «${checkin.goal}».`)
+  lines.push(streak > 0 ? `Серия: ${streak} дн. подряд.` : `Серия прервалась — начнём заново завтра.`)
+  return lines.join('\n')
+}
+
+async function sendTelegram(text) {
+  const token = getSettingVal('tg_token'), chat = getSettingVal('tg_chat_id')
+  if (!token || !chat) return { ok: false, error: 'Не заданы токен или chat_id' }
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text }),
+    })
+    const data = await r.json().catch(() => ({}))
+    return r.ok && data.ok ? { ok: true } : { ok: false, error: data.description || `HTTP ${r.status}` }
+  } catch (e) { return { ok: false, error: e.message } }
+}
+
+function checkEveningReport() {
+  try {
+    if (getSettingVal('tg_report_enabled') !== 'true') return
+    const time = getSettingVal('tg_report_time') || '21:00'
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    if (hhmm !== time) return
+    if (getSettingVal('tg_report_last') === todayStr()) return // уже отправлено сегодня
+    db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_report_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(todayStr())
+    sendTelegram(buildEveningReport()).then(r => { if (!r.ok) console.error('[telegram]', r.error) })
+  } catch (e) { console.error('[telegram] scheduler', e.message) }
+}
+setInterval(checkEveningReport, 60 * 1000)
+
 // ─── Recurring helpers ────────────────────────────────────────────────────────
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -856,6 +928,13 @@ app.get('/api/stats', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// ─── Telegram ─────────────────────────────────────────────────────────────────
+// POST /api/telegram/test — отправить пробную сводку прямо сейчас
+app.post('/api/telegram/test', async (_req, res) => {
+  const r = await sendTelegram('✅ Focus Board на связи. Так будет выглядеть вечерний отчёт:\n\n' + buildEveningReport())
+  res.json(r)
 })
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
