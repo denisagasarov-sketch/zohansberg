@@ -30,7 +30,8 @@ export default function TodayGoalBar({ checkin, onCheckin, onOpenJournal }: Prop
     )
   }
 
-  const goalText = checkin.goal?.trim() || checkin.content?.trim() || ''
+  // Показываем только осознанную цель — свободные мысли из чек-ина сюда не подставляем
+  const goalText = checkin.goal?.trim() || ''
   return (
     <div
       onClick={onOpenJournal}

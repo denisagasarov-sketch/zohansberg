@@ -24,6 +24,7 @@ interface Props {
   pomodoroPhase?: 'work' | 'break' | 'idle'
   pomodoroRemaining?: number
   onSkipPomodoro?: () => void
+  lastSessionNote?: { note: string; when: string } | null
 }
 
 function padZ(n: number) { return String(n).padStart(2, '0') }
@@ -42,7 +43,7 @@ function formatTime(s: number): string {
   return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, onPriorityChange, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, onPriorityChange, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro, lastSessionNote }: Props) {
   const [showPrio, setShowPrio] = useState(false)
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const dirColor = direction ? getDirectionColor(direction.id) : null
@@ -128,6 +129,21 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
               <p className="text-xs text-[#8a8a8a] mt-2 whitespace-pre-wrap leading-relaxed max-h-20 overflow-y-auto border-l-2 border-[#333] pl-2">
                 {task.notes}
               </p>
+            )}
+            {/* «Где я остановился» — последняя заметка сессии по этой задаче */}
+            {lastSessionNote && (
+              <div className="mt-2 bg-[#20222c] border border-[#2a2d3c] rounded px-2.5 py-1.5">
+                <div className="text-[10px] text-[#5a6db0] font-semibold uppercase tracking-wide">
+                  В прошлый раз
+                  <span className="text-[#44465a] font-normal normal-case tracking-normal">
+                    {' · '}
+                    {new Date(lastSessionNote.when).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                  </span>
+                </div>
+                <p className="text-xs text-[#9aa4c8] mt-0.5 whitespace-pre-wrap leading-relaxed max-h-16 overflow-y-auto">
+                  {lastSessionNote.note}
+                </p>
+              </div>
             )}
           </div>
 

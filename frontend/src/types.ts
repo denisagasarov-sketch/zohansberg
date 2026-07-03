@@ -37,6 +37,7 @@ export interface WorkSession {
   started_at: string
   ended_at: string | null
   duration_actual: number | null
+  note?: string | null
 }
 
 export interface JournalEntry {

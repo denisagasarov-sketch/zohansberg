@@ -54,6 +54,7 @@ export default function App() {
   const [todayTime, setTodayTime] = useState(0)
   const [weeklyTime, setWeeklyTime] = useState<Record<number, number>>({})
   const [todayCheckin, setTodayCheckin] = useState<TodayCheckin | null>(null)
+  const [lastSessionNote, setLastSessionNote] = useState<{ note: string; when: string } | null>(null)
   const quickInputRef = useRef<HTMLInputElement | null>(null)
 
   const { tasks, directions, refresh, updateTask, deleteTask, takeNow, reorderTasks, undo } = useTasks()
@@ -69,6 +70,16 @@ export default function App() {
     if (!nowTask) { setTodayTime(0); return }
     api.getTodayTime(nowTask.id).then(r => setTodayTime(r.total)).catch(() => setTodayTime(0))
   }, [nowTask?.id])
+
+  // «Где я остановился»: последняя заметка сессии по текущей задаче.
+  // Перезагружается при смене задачи и после закрытия окна заметки (postStopSessionId → null).
+  useEffect(() => {
+    if (!nowTask) { setLastSessionNote(null); return }
+    api.getTaskSessions(nowTask.id).then(rows => {
+      const withNote = (rows as { note?: string | null; started_at: string }[]).find(r => r.note?.trim())
+      setLastSessionNote(withNote ? { note: withNote.note!.trim(), when: withNote.started_at } : null)
+    }).catch(() => setLastSessionNote(null))
+  }, [nowTask?.id, postStopSessionId])
 
   // Load weekly time for direction progress bars
   useEffect(() => {
@@ -389,6 +400,7 @@ export default function App() {
                 directions={directions}
                 timer={timerState}
                 todayTime={todayTime}
+                lastSessionNote={lastSessionNote}
                 onStart={handleStartTimer}
                 onPause={handlePauseTimer}
                 onResume={handleResumeTimer}
