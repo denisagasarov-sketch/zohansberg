@@ -38,6 +38,39 @@ export interface WorkSession {
   ended_at: string | null
   duration_actual: number | null
   note?: string | null
+  subtask_id?: number | null
+}
+
+export interface Subtask {
+  id: number
+  task_id: number
+  title: string
+  done_at: string | null
+  order_index: number
+  created_at: string
+}
+
+export interface Gamification {
+  streak: number
+  best_streak: number
+  active_days_total: number
+  today: { seconds: number; subtasks_done: number; tasks_done: number }
+  heatmap: { day: string; seconds: number }[]
+}
+
+export interface DayThreadEvent {
+  at: string
+  kind: 'subtask_done' | 'session_note' | 'thought' | 'task_done'
+  text: string
+  task?: string
+  seconds?: number | null
+}
+
+export interface DayThread {
+  date: string
+  checkin: { mood: number | null; goal: string | null; content: string | null; created_at: string } | null
+  events: DayThreadEvent[]
+  totals: { seconds: number; subtasks_done: number; tasks_done: number }
 }
 
 export interface JournalEntry {

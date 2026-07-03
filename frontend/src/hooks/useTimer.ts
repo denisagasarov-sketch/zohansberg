@@ -127,7 +127,7 @@ export function useTimer() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const start = useCallback(async (taskId: number) => {
+  const start = useCallback(async (taskId: number, subtaskId?: number | null) => {
     clearTimer()
     const nowMs = Date.now()
     const nowIso = new Date(nowMs).toISOString()
@@ -143,7 +143,7 @@ export function useTimer() {
     startHeartbeat()
 
     try {
-      const session = await api.startSession(taskId, nowIso)
+      const session = await api.startSession(taskId, nowIso, subtaskId ?? null)
       sessionIdRef.current = session.id
       setState(prev => ({ ...prev, sessionId: session.id }))
       saveTimer({ startedAtMs: nowMs, taskId, sessionId: session.id })

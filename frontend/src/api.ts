@@ -41,9 +41,20 @@ export const api = {
   },
   cleanupTrash: () => req('POST', '/tasks/cleanup-trash', {}),
 
+  // Subtasks (шаги)
+  getSubtasks: (task_id: number) => req<any[]>('GET', `/tasks/${task_id}/subtasks`),
+  createSubtask: (task_id: number, title: string) => req<any>('POST', `/tasks/${task_id}/subtasks`, { title }),
+  updateSubtask: (id: number, data: { title?: string; done?: boolean }) => req<any>('PATCH', `/subtasks/${id}`, data),
+  deleteSubtask: (id: number) => req('DELETE', `/subtasks/${id}`),
+  reorderSubtasks: (task_id: number, ordered_ids: number[]) => req('POST', `/tasks/${task_id}/subtasks/reorder`, { ordered_ids }),
+
+  // Gamification & day thread
+  getGamification: () => req<import('./types').Gamification>('GET', '/gamification'),
+  getDayThread: (date: string) => req<import('./types').DayThread>('GET', `/day-thread?date=${date}`),
+
   // Sessions
-  startSession: (task_id: number, started_at: string) =>
-    req<any>('POST', '/sessions', { task_id, started_at }),
+  startSession: (task_id: number, started_at: string, subtask_id?: number | null) =>
+    req<any>('POST', '/sessions', { task_id, started_at, subtask_id: subtask_id ?? null }),
   endSession: (id: number, ended_at: string, duration_actual: number) =>
     req('PATCH', `/sessions/${id}`, { ended_at, duration_actual }),
   heartbeatSession: (id: number, elapsed_seconds: number) =>

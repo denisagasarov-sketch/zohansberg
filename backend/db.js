@@ -84,6 +84,21 @@ function initSchema() {
   try { db.exec(`ALTER TABLE tasks ADD COLUMN direction_order INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE work_sessions ADD COLUMN note TEXT`) } catch {}
   try { db.exec(`ALTER TABLE work_sessions ADD COLUMN elapsed_seconds INTEGER DEFAULT 0`) } catch {}
+  // Микро-подходы: сессия таймера может относиться к конкретному шагу (подзадаче)
+  try { db.exec(`ALTER TABLE work_sessions ADD COLUMN subtask_id INTEGER`) } catch {}
+
+  // Подзадачи (шаги) — дробим задачу на короткие подходы
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subtasks (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id     INTEGER NOT NULL REFERENCES tasks(id),
+      title       TEXT NOT NULL,
+      done_at     TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id);
+  `)
   try { db.exec(`ALTER TABLE tasks ADD COLUMN in_queue INTEGER NOT NULL DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE tasks ADD COLUMN someday INTEGER NOT NULL DEFAULT 0`) } catch {}
 

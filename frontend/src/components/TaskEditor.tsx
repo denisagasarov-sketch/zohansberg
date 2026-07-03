@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import SubtaskList from './SubtaskList'
 import type { Task, Direction } from '../types'
 import { api } from '../api'
 import { playSound } from '../sound'
@@ -448,6 +449,14 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                   + Добавить вручную
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Шаги (подзадачи) — доступны только для сохранённой задачи */}
+          {task && (
+            <div>
+              <label className="block text-[10px] text-[#666] uppercase tracking-wider mb-1.5">Шаги</label>
+              <SubtaskList taskId={task.id} onChanged={() => window.dispatchEvent(new CustomEvent('gamification-updated'))} />
             </div>
           )}
 

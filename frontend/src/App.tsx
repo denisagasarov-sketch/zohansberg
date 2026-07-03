@@ -29,7 +29,8 @@ import TrashScreen from './components/TrashScreen'
 import StatsScreen from './components/StatsScreen'
 import JournalScreen from './components/JournalScreen'
 import TodayGoalBar, { type TodayCheckin } from './components/TodayGoalBar'
-import DoneTodayBlock from './components/DoneTodayBlock'
+import GamificationBar from './components/GamificationBar'
+import DayThreadBlock from './components/DayThreadBlock'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('main')
@@ -219,12 +220,19 @@ export default function App() {
     }
   }, [nowTask, start])
 
+  // Микро-подход: запустить таймер на конкретный шаг (минуя интент-модалку — действие уже осознанное)
+  const handleStartStep = useCallback((subtaskId: number) => {
+    if (!nowTask) return
+    start(nowTask.id, subtaskId)
+  }, [nowTask, start])
+
   const handlePauseTimer = useCallback(() => { pause() }, [pause])
   const handleResumeTimer = useCallback(() => { resume() }, [resume])
 
   const handleStopTimer = useCallback(async () => {
     const { sessionId } = await stop()
     if (sessionId !== null) setPostStopSessionId(sessionId)
+    window.dispatchEvent(new CustomEvent('gamification-updated'))
   }, [stop])
 
   const handleDoneNow = useCallback(async () => {
@@ -308,10 +316,6 @@ export default function App() {
     return () => window.removeEventListener('journal-updated', handler)
   }, [])
 
-  const handleRestoreDone = useCallback(async (taskId: number) => {
-    // Снять «выполнена» и вернуть в очередь «Следом»
-    await updateTask(taskId, { done_at: null, in_queue: true } as any)
-  }, [updateTask])
 
   const handleOpenNewTask = useCallback(() => {
     setSelectedTask(null)
@@ -345,9 +349,11 @@ export default function App() {
   const handleMarkDone = useCallback(async (taskId: number) => {
     if (nowTask && taskId === nowTask.id) {
       await handleDoneNow()
+      window.dispatchEvent(new CustomEvent('gamification-updated'))
       return
     }
     await updateTask(taskId, { done_at: new Date().toISOString() } as any)
+    window.dispatchEvent(new CustomEvent('gamification-updated'))
   }, [nowTask, handleDoneNow, updateTask])
 
   const handlePriorityChange = useCallback(async (taskId: number, priority: string) => {
@@ -395,6 +401,7 @@ export default function App() {
                 onCheckin={() => setShowCheckin(true)}
                 onOpenJournal={() => setScreen('journal')}
               />
+              <GamificationBar />
               <NowBlock
                 task={nowTask}
                 directions={directions}
@@ -414,6 +421,7 @@ export default function App() {
                 pomodoroPhase={pomodoroEnabled ? pomodoroState.phase : 'idle'}
                 pomodoroRemaining={pomodoroState.remaining}
                 onSkipPomodoro={skipPomodoro}
+                onStartStep={handleStartStep}
               />
               <DayPlanBlock
                 planTaskIds={planTaskIds}
@@ -444,12 +452,7 @@ export default function App() {
                 focusMode={timerState.isRunning || timerState.isPaused}
                 nowTaskId={nowTask?.id}
               />
-              <DoneTodayBlock
-                tasks={tasks}
-                directions={directions}
-                onRestore={handleRestoreDone}
-                onTaskClick={handleTaskClick}
-              />
+              <DayThreadBlock />
               <div className="flex-1" />
             </div>
 

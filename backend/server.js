@@ -429,15 +429,82 @@ app.post('/api/tasks/:id/restore', (req, res) => {
   }
 })
 
+// ─── Subtasks (шаги / микро-подходы) ────────────────────────────────────────────
+
+// GET /api/tasks/:id/subtasks
+app.get('/api/tasks/:id/subtasks', (req, res) => {
+  try {
+    const rows = db.prepare(
+      `SELECT * FROM subtasks WHERE task_id = ? ORDER BY order_index ASC, id ASC`
+    ).all(Number(req.params.id))
+    res.json(rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /api/tasks/:id/subtasks — {title}
+app.post('/api/tasks/:id/subtasks', (req, res) => {
+  try {
+    const task_id = Number(req.params.id)
+    const task = db.prepare(`SELECT id FROM tasks WHERE id = ? AND deleted_at IS NULL`).get(task_id)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+    const { title } = req.body
+    if (typeof title !== 'string' || !title.trim()) return res.status(400).json({ error: 'title is required' })
+    const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index), -1) AS m FROM subtasks WHERE task_id = ?`).get(task_id).m
+    const result = db.prepare(`INSERT INTO subtasks (task_id, title, order_index) VALUES (?, ?, ?)`)
+      .run(task_id, title.trim(), maxOrder + 1)
+    res.status(201).json(db.prepare(`SELECT * FROM subtasks WHERE id = ?`).get(result.lastInsertRowid))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// PATCH /api/subtasks/:id — {title?, done?}  (done:true/false переключает done_at)
+app.patch('/api/subtasks/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const existing = db.prepare(`SELECT * FROM subtasks WHERE id = ?`).get(id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const fields = [], vals = []
+    if (typeof req.body.title === 'string' && req.body.title.trim()) { fields.push('title = ?'); vals.push(req.body.title.trim()) }
+    if ('done' in req.body) { fields.push('done_at = ?'); vals.push(req.body.done ? nowIso() : null) }
+    if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
+    vals.push(id)
+    db.prepare(`UPDATE subtasks SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
+    res.json(db.prepare(`SELECT * FROM subtasks WHERE id = ?`).get(id))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// DELETE /api/subtasks/:id
+app.delete('/api/subtasks/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    // Отвязываем сессии от шага (время работы по задаче сохраняется), затем удаляем шаг
+    db.transaction(() => {
+      db.prepare(`UPDATE work_sessions SET subtask_id = NULL WHERE subtask_id = ?`).run(id)
+      db.prepare(`DELETE FROM subtasks WHERE id = ?`).run(id)
+    })()
+    res.json({ ok: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /api/tasks/:id/subtasks/reorder — {ordered_ids}
+app.post('/api/tasks/:id/subtasks/reorder', (req, res) => {
+  try {
+    const { ordered_ids } = req.body
+    if (!Array.isArray(ordered_ids)) return res.status(400).json({ error: 'ordered_ids required' })
+    const upd = db.prepare(`UPDATE subtasks SET order_index = ? WHERE id = ?`)
+    db.transaction(() => ordered_ids.forEach((sid, i) => upd.run(i, Number(sid))))()
+    res.json({ ok: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ─── Work Sessions ────────────────────────────────────────────────────────────
 
 // POST /api/sessions — start session
 app.post('/api/sessions', (req, res) => {
   try {
-    const { task_id, started_at } = req.body
+    const { task_id, started_at, subtask_id } = req.body
     if (!task_id) return res.status(400).json({ error: 'task_id is required' })
-    const result = db.prepare(`INSERT INTO work_sessions (task_id, started_at) VALUES (?, ?)`)
-      .run(Number(task_id), started_at ?? nowIso())
+    const result = db.prepare(`INSERT INTO work_sessions (task_id, started_at, subtask_id) VALUES (?, ?, ?)`)
+      .run(Number(task_id), started_at ?? nowIso(), subtask_id != null ? Number(subtask_id) : null)
     res.status(201).json(db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(result.lastInsertRowid))
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1187,6 +1254,115 @@ app.get('/api/weekly-summary', (_req, res) => {
 
     res.json({ done_count, time_seconds, by_direction, done_tasks })
   } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Day Thread (нить дня) ──────────────────────────────────────────────────
+// GET /api/day-thread?date=YYYY-MM-DD — единая хронологическая лента дня:
+// утренняя цель, закрытые шаги, заметки сессий, мысли, завершённые задачи.
+app.get('/api/day-thread', (req, res) => {
+  try {
+    const date = req.query.date || todayStr()
+
+    const checkin = db.prepare(`
+      SELECT mood, goal, content, created_at FROM journal_entries
+      WHERE type = 'checkin' AND date(created_at) = ? ORDER BY id DESC LIMIT 1
+    `).get(date)
+
+    const events = []
+
+    // Закрытые шаги (микро-победы)
+    db.prepare(`
+      SELECT s.title, s.done_at, t.title AS task_title
+      FROM subtasks s JOIN tasks t ON t.id = s.task_id
+      WHERE date(s.done_at) = ? ORDER BY s.done_at ASC
+    `).all(date).forEach(r => events.push({
+      at: r.done_at, kind: 'subtask_done', text: r.title, task: r.task_title,
+    }))
+
+    // Сессии с заметками
+    db.prepare(`
+      SELECT ws.started_at, ws.duration_actual, ws.note, t.title AS task_title
+      FROM work_sessions ws JOIN tasks t ON t.id = ws.task_id
+      WHERE date(ws.started_at) = ? AND ws.note IS NOT NULL AND ws.note != ''
+      ORDER BY ws.started_at ASC
+    `).all(date).forEach(r => events.push({
+      at: r.started_at, kind: 'session_note', text: r.note, task: r.task_title, seconds: r.duration_actual,
+    }))
+
+    // Свободные мысли
+    db.prepare(`
+      SELECT content, created_at FROM journal_entries
+      WHERE type = 'thought' AND date(created_at) = ? ORDER BY created_at ASC
+    `).all(date).forEach(r => events.push({ at: r.created_at, kind: 'thought', text: r.content }))
+
+    // Завершённые задачи
+    db.prepare(`
+      SELECT title, done_at FROM tasks
+      WHERE date(done_at) = ? AND deleted_at IS NULL ORDER BY done_at ASC
+    `).all(date).forEach(r => events.push({ at: r.done_at, kind: 'task_done', text: r.title }))
+
+    events.sort((a, b) => String(a.at).localeCompare(String(b.at)))
+
+    const totalSeconds = db.prepare(
+      `SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`
+    ).get(date).s
+    const subtasksDone = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at) = ?`).get(date).n
+    const tasksDone = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(date).n
+
+    res.json({ date, checkin: checkin ?? null, events, totals: { seconds: totalSeconds, subtasks_done: subtasksDone, tasks_done: tasksDone } })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Gamification (streak, кольца дня, тепловая карта) ────────────────────────
+// GET /api/gamification — серия дней, показатели сегодня, heatmap за год.
+app.get('/api/gamification', (_req, res) => {
+  try {
+    // Активные дни = были сессии, закрытые задачи/шаги или чек-ин
+    const activeDays = new Set()
+    const collect = (rows) => rows.forEach(r => r.d && activeDays.add(r.d))
+    collect(db.prepare(`SELECT DISTINCT date(started_at) AS d FROM work_sessions WHERE duration_actual > 0`).all())
+    collect(db.prepare(`SELECT DISTINCT date(done_at) AS d FROM tasks WHERE done_at IS NOT NULL`).all())
+    collect(db.prepare(`SELECT DISTINCT date(done_at) AS d FROM subtasks WHERE done_at IS NOT NULL`).all())
+    collect(db.prepare(`SELECT DISTINCT date(created_at) AS d FROM journal_entries WHERE type='checkin'`).all())
+
+    // Текущая серия: считаем назад от сегодня (или вчера, если сегодня ещё пусто)
+    const dstr = (dt) => dt.toISOString().slice(0, 10)
+    let streak = 0
+    const cur = new Date()
+    if (!activeDays.has(dstr(cur))) cur.setDate(cur.getDate() - 1) // серия не рвётся, если сегодня ещё не начал
+    while (activeDays.has(dstr(cur))) { streak++; cur.setDate(cur.getDate() - 1) }
+
+    // Лучшая серия за всё время
+    const sorted = [...activeDays].sort()
+    let best = 0, run = 0, prev = null
+    for (const d of sorted) {
+      if (prev) {
+        const diff = (new Date(d) - new Date(prev)) / 86400000
+        run = diff === 1 ? run + 1 : 1
+      } else run = 1
+      best = Math.max(best, run); prev = d
+    }
+
+    // Сегодня: время в фокусе + закрытые шаги/задачи
+    const today = todayStr()
+    const todaySeconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at)=?`).get(today).s
+    const todaySubtasks = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at)=?`).get(today).n
+    const todayTasks = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
+
+    // Тепловая карта за последние 365 дней (день → секунды)
+    const heatmap = db.prepare(`
+      SELECT date(started_at) AS day, SUM(duration_actual) AS seconds
+      FROM work_sessions
+      WHERE duration_actual > 0 AND date(started_at) >= date('now','-365 days')
+      GROUP BY day
+    `).all()
+
+    res.json({
+      streak, best_streak: best, active_days_total: activeDays.size,
+      today: { seconds: todaySeconds, subtasks_done: todaySubtasks, tasks_done: todayTasks },
+      heatmap,
+    })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 // ─── Day Plan ────────────────────────────────────────────────────────────────

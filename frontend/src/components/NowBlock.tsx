@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Task, Direction } from '../types'
+import SubtaskList from './SubtaskList'
 import type { TimerState } from '../hooks/useTimer'
 import { DRAG_TASK_KEY } from '../hooks/useDragDrop'
 import { getDirectionColor } from '../utils/directionColors'
@@ -25,6 +26,7 @@ interface Props {
   pomodoroRemaining?: number
   onSkipPomodoro?: () => void
   lastSessionNote?: { note: string; when: string } | null
+  onStartStep?: (subtaskId: number) => void
 }
 
 function padZ(n: number) { return String(n).padStart(2, '0') }
@@ -43,7 +45,7 @@ function formatTime(s: number): string {
   return `${m}м`
 }
 
-export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, onPriorityChange, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro, lastSessionNote }: Props) {
+export default function NowBlock({ task, directions, timer, todayTime, onStart, onStop, onPause, onResume, onDone, onSendToQueue, onTaskClick, onAddTask, onDropTask, onPriorityChange, pomodoroPhase = 'idle', pomodoroRemaining = 0, onSkipPomodoro, lastSessionNote, onStartStep }: Props) {
   const [showPrio, setShowPrio] = useState(false)
   const direction = task ? directions.find(d => d.id === task.direction_id) : null
   const dirColor = direction ? getDirectionColor(direction.id) : null
@@ -276,6 +278,18 @@ export default function NowBlock({ task, directions, timer, todayTime, onStart, 
                 </button>
               </>
             )}
+          </div>
+
+          {/* Шаги задачи — разбей на короткие подходы. «▶ подход» запускает таймер на шаг. */}
+          <div className="mt-4 pt-3 border-t border-[#252525]">
+            <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Шаги</div>
+            <SubtaskList
+              key={task.id}
+              taskId={task.id}
+              compact
+              onFocusStep={!timerActive && onStartStep ? (s) => onStartStep(s.id) : undefined}
+              onChanged={() => window.dispatchEvent(new CustomEvent('gamification-updated'))}
+            />
           </div>
         </>
       )}
