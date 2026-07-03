@@ -3,3 +3,8 @@ dist/
 .DS_Store
 src-tauri/target/
 backend/data/
+
+backend/*.log
+backend/*.log.old
+backend/focusboard.db
+backend/data/
