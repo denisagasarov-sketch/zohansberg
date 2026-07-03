@@ -564,14 +564,37 @@ app.patch('/api/sessions/:id', (req, res) => {
     vals.push(id)
     db.prepare(`UPDATE work_sessions SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
 
-    // Начисляем в duration_fact ТОЛЬКО при первом закрытии сессии (open → closed).
-    // Иначе повторный PATCH (ретрай/двойной клик «стоп») задваивал учтённое время.
-    if (durNum != null && session.task_id && session.ended_at == null) {
-      db.prepare(`UPDATE tasks SET duration_fact = COALESCE(duration_fact, 0) + ?, updated_at = ? WHERE id = ?`)
-        .run(durNum, nowIso(), session.task_id)
+    // Пересчёт duration_fact по ДЕЛЬТЕ (новое минус прежнее значение сессии).
+    // Одна формула покрывает три случая: первое закрытие (было null → +ново),
+    // редактирование длительности (+разница) и повторный стоп с тем же значением (дельта 0).
+    if (durNum != null && session.task_id) {
+      const delta = durNum - (session.duration_actual ?? 0)
+      if (delta !== 0) {
+        db.prepare(`UPDATE tasks SET duration_fact = MAX(0, COALESCE(duration_fact, 0) + ?), updated_at = ? WHERE id = ?`)
+          .run(delta, nowIso(), session.task_id)
+      }
     }
 
     res.json(db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(id))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /api/sessions/:id — удалить сессию и вычесть её время из итога задачи
+app.delete('/api/sessions/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const session = db.prepare(`SELECT * FROM work_sessions WHERE id = ?`).get(id)
+    if (!session) return res.status(404).json({ error: 'Not found' })
+    db.transaction(() => {
+      if (session.task_id && session.duration_actual) {
+        db.prepare(`UPDATE tasks SET duration_fact = MAX(0, COALESCE(duration_fact, 0) - ?), updated_at = ? WHERE id = ?`)
+          .run(Number(session.duration_actual) || 0, nowIso(), session.task_id)
+      }
+      db.prepare(`DELETE FROM work_sessions WHERE id = ?`).run(id)
+    })()
+    res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

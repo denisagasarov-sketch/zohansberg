@@ -76,6 +76,8 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [addNote, setAddNote] = useState('')
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState('')
+  const [editId, setEditId] = useState<number | null>(null)
+  const [editMinutes, setEditMinutes] = useState('')
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const notesRef = useRef<HTMLTextAreaElement>(null)
 
@@ -201,6 +203,25 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
     } finally {
       setAddSaving(false)
     }
+  }
+
+  const handleDeleteSession = async (id: number) => {
+    try {
+      await api.deleteSession(id)
+      setSessions(prev => prev.filter(s => s.id !== id))
+      window.dispatchEvent(new CustomEvent('gamification-updated'))
+    } catch (e) { console.error(e) }
+  }
+
+  const handleSaveEdit = async (id: number) => {
+    const mins = parseFloat(editMinutes)
+    if (!Number.isFinite(mins) || mins <= 0) { setEditId(null); return }
+    try {
+      const updated = await api.updateSession(id, { duration_actual: Math.round(mins * 60) })
+      setSessions(prev => prev.map(s => s.id === id ? updated : s))
+      setEditId(null)
+      window.dispatchEvent(new CustomEvent('gamification-updated'))
+    } catch (e) { console.error(e) }
   }
 
   const handleOverlayClick = () => {
@@ -374,9 +395,37 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
                 <p className="text-xs text-[#383838]">Сессий пока нет</p>
               ) : (
                 sessions.map(s => (
-                  <div key={s.id} className="bg-[#141414] border border-[#252525] rounded px-3 py-2">
-                    <span className="text-[10px] text-[#666]">{formatSessionLine(s.started_at, s.ended_at, s.duration_actual)}</span>
-                    {s.note && <p className="text-xs text-[#999] mt-1">{s.note}</p>}
+                  <div key={s.id} className="group bg-[#141414] border border-[#252525] rounded px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      {editId === s.id ? (
+                        <>
+                          <input
+                            type="number" min={1} autoFocus value={editMinutes}
+                            onChange={e => setEditMinutes(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(s.id); if (e.key === 'Escape') setEditId(null) }}
+                            className="w-16 bg-[#1c1c1c] border border-[#5060a0] rounded px-2 py-0.5 text-xs text-[#f0f0f0] focus:outline-none"
+                          />
+                          <span className="text-[10px] text-[#666]">мин</span>
+                          <button onClick={() => handleSaveEdit(s.id)} className="text-[10px] text-[#8090c8] hover:text-white ml-1">сохранить</button>
+                          <button onClick={() => setEditId(null)} className="text-[10px] text-[#666] hover:text-[#999]">отмена</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] text-[#666] flex-1">{formatSessionLine(s.started_at, s.ended_at, s.duration_actual)}</span>
+                          <button
+                            onClick={() => { setEditId(s.id); setEditMinutes(String(Math.round((s.duration_actual ?? 0) / 60))) }}
+                            className="opacity-0 group-hover:opacity-100 text-[10px] text-[#555] hover:text-[#8090c8] transition-opacity"
+                            title="Изменить длительность"
+                          >править</button>
+                          <button
+                            onClick={() => handleDeleteSession(s.id)}
+                            className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#c05555] text-sm leading-none transition-opacity"
+                            title="Удалить сессию (время вычтется из итога)"
+                          >×</button>
+                        </>
+                      )}
+                    </div>
+                    {s.note && editId !== s.id && <p className="text-xs text-[#999] mt-1">{s.note}</p>}
                   </div>
                 ))
               )}

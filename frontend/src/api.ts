@@ -62,6 +62,9 @@ export const api = {
   getActiveSession: () =>
     req<{ id: number; task_id: number; elapsed_seconds: number } | null>('GET', '/sessions/active'),
   updateSessionNote: (id: number, note: string) => req('PATCH', `/sessions/${id}`, { note }),
+  updateSession: (id: number, data: { duration_actual?: number; note?: string; started_at?: string }) =>
+    req<any>('PATCH', `/sessions/${id}`, data),
+  deleteSession: (id: number) => req('DELETE', `/sessions/${id}`),
   getTaskSessions: (task_id: number) => req<any[]>('GET', `/sessions/task/${task_id}`),
   createManualSession: (
     task_id: number,
