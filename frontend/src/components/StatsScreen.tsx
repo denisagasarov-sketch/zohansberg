@@ -63,34 +63,6 @@ function minutesFromMidnight(isoStr: string): number {
   return d.getHours() * 60 + d.getMinutes()
 }
 
-// ─── Block 1 ──────────────────────────────────────────────────────────────────
-
-function MetricsBlock({ data }: { data: DashboardData }) {
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Время в работе</div>
-        <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(data.total_seconds)}</div>
-      </div>
-      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Задач завершено</div>
-        <div className="text-2xl font-bold text-[#f0f0f0]">{data.tasks_done_count}</div>
-      </div>
-      <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Топ направление</div>
-        {data.top_direction ? (
-          <>
-            <div className="text-sm font-semibold text-[#f0f0f0] truncate">{data.top_direction.direction_name}</div>
-            <div className="text-xs text-[#666] mt-1">{fmtDuration(data.top_direction.total_seconds)}</div>
-          </>
-        ) : (
-          <div className="text-sm text-[#383838]">—</div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Block 2 ──────────────────────────────────────────────────────────────────
 
 const TIMELINE_START = 6 * 60
@@ -707,9 +679,6 @@ export default function StatsScreen({ onClose }: Props) {
 
         {!loading && data && (
           <>
-            <MetricsBlock data={data} />
-            <TimelineBlock sessions={data.sessions} colorMap={colorMap} />
-
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
                 <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По направлениям</div>
