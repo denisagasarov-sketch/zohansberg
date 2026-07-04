@@ -91,10 +91,12 @@ export const api = {
   getWorklog: (period: string) => req<any>('GET', `/sessions/worklog?period=${period}`),
   getStatsDashboard: (period: string) => req<any>('GET', `/stats/dashboard?period=${period}`),
   getByHour: () => req<{ hour: number; seconds: number }[]>('GET', '/stats/by-hour'),
+  getDayDirection: (days: number) => req<{ rows: { day: string; direction_id: number | null; seconds: number }[]; directions: { id: number; name: string }[] }>('GET', `/stats/day-direction?days=${days}`),
   getMotivation: () => req<{
     lifetime_seconds: number; tasks_done: number; subtasks_done: number
     this_week_seconds: number; last_week_seconds: number; trend_pct: number
     today_seconds: number; same_day_last_week_seconds: number; day_trend_pct: number
+    yesterday_seconds: number; yday_trend_pct: number
     best_day: { day: string; seconds: number } | null; best_week_seconds: number
     active_days: number; avg_per_active_day: number
   }>('GET', '/stats/motivation'),

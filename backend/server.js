@@ -1572,10 +1572,12 @@ app.get('/api/stats/motivation', (_req, res) => {
     const lastWeek = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= date('now','-13 days') AND date(started_at) < date('now','-6 days')`).s
     const trendPct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0)
 
-    // Сегодня vs тот же день недели неделю назад
+    // Сегодня vs тот же день недели неделю назад, и vs вчера
     const todaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now')`).s
     const sameDaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now','-7 days')`).s
     const dayTrendPct = sameDaySec > 0 ? Math.round(((todaySec - sameDaySec) / sameDaySec) * 100) : (todaySec > 0 ? 100 : 0)
+    const yesterdaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now','-1 days')`).s
+    const ydayTrendPct = yesterdaySec > 0 ? Math.round(((todaySec - yesterdaySec) / yesterdaySec) * 100) : (todaySec > 0 ? 100 : 0)
 
     // Рекорд: лучший день и лучшая неделя (ISO-неделя)
     const bestDay = one(`
@@ -1603,6 +1605,8 @@ app.get('/api/stats/motivation', (_req, res) => {
       today_seconds: todaySec,
       same_day_last_week_seconds: sameDaySec,
       day_trend_pct: dayTrendPct,
+      yesterday_seconds: yesterdaySec,
+      yday_trend_pct: ydayTrendPct,
       best_day: bestDay ? { day: bestDay.day, seconds: bestDay.s } : null,
       best_week_seconds: bestWeek ? bestWeek.s : 0,
       active_days: activeDays,
@@ -1622,6 +1626,21 @@ app.get('/api/stats/by-hour', (_req, res) => {
     const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, seconds: 0 }))
     rows.forEach(r => { if (r.hour != null) hours[r.hour].seconds = r.seconds })
     res.json(hours)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/stats/day-direction?days=28 — время по дню×направлению за N дней (для недель-спринтов)
+app.get('/api/stats/day-direction', (req, res) => {
+  try {
+    const days = Math.min(120, Math.max(7, parseInt(req.query.days) || 28))
+    const rows = db.prepare(`
+      SELECT date(ws.started_at) AS day, t.direction_id AS direction_id, SUM(ws.duration_actual) AS seconds
+      FROM work_sessions ws LEFT JOIN tasks t ON t.id = ws.task_id
+      WHERE ws.duration_actual > 0 AND date(ws.started_at) >= date('now', ?)
+      GROUP BY day, t.direction_id
+    `).all(`-${days - 1} days`)
+    const directions = db.prepare(`SELECT id, name FROM directions WHERE archived = 0 ORDER BY id ASC`).all()
+    res.json({ rows, directions })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

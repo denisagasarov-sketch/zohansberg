@@ -488,96 +488,138 @@ interface Motivation {
   lifetime_seconds: number; tasks_done: number; subtasks_done: number
   this_week_seconds: number; last_week_seconds: number; trend_pct: number
   today_seconds: number; same_day_last_week_seconds: number; day_trend_pct: number
+  yesterday_seconds: number; yday_trend_pct: number
   best_day: { day: string; seconds: number } | null; best_week_seconds: number
   active_days: number; avg_per_active_day: number
 }
 
-function CompareCard({ label, value, pct, prevLabel, prevValue }: {
-  label: string; value: number; pct: number; prevLabel: string; prevValue: number
-}) {
+function TodayCard({ m }: { m: Motivation }) {
+  // Переключатель базы сравнения: тот же день недели назад ↔ вчера
+  const [base, setBase] = useState<'week' | 'yday'>(() => (localStorage.getItem('today_compare_base') as any) || 'week')
+  const setB = (b: 'week' | 'yday') => { setBase(b); localStorage.setItem('today_compare_base', b) }
+  const pct = base === 'week' ? m.day_trend_pct : m.yday_trend_pct
+  const prevVal = base === 'week' ? m.same_day_last_week_seconds : m.yesterday_seconds
+  const prevLabel = base === 'week' ? 'этому дню неделю назад' : 'вчера'
   const up = pct >= 0
   return (
     <div className="bg-[#1c1c1c] border border-[#252525] rounded-xl p-5">
-      <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">{label}</div>
-      <div className="text-3xl font-bold text-[#f0f0f0]">{fmtDuration(value)}</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase">Сегодня</div>
+        <div className="flex gap-1">
+          {([['week', 'нед. назад'], ['yday', 'вчера']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setB(v)}
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors ${base === v ? 'bg-[#5060a0] text-white' : 'text-[#666] hover:text-[#999]'}`}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="text-3xl font-bold text-[#f0f0f0]">{fmtDuration(m.today_seconds)}</div>
       <div className={`text-sm mt-2 ${up ? 'text-[#4a9d5f]' : 'text-[#c07a55]'}`}>
-        {up ? '▲' : '▼'} {Math.abs(pct)}%
-        <span className="text-[#666]"> к {prevLabel} ({fmtDuration(prevValue)})</span>
+        {up ? '▲' : '▼'} {Math.abs(pct)}%<span className="text-[#666]"> к {prevLabel} ({fmtDuration(prevVal)})</span>
       </div>
     </div>
   )
 }
 
 function MotivationHero({ m }: { m: Motivation }) {
+  const up = m.trend_pct >= 0
   return (
     <div className="grid grid-cols-2 gap-3">
-      <CompareCard label="Эта неделя" value={m.this_week_seconds} pct={m.trend_pct}
-        prevLabel="прошлой неделе" prevValue={m.last_week_seconds} />
-      <CompareCard label="Сегодня" value={m.today_seconds} pct={m.day_trend_pct}
-        prevLabel="этому дню неделю назад" prevValue={m.same_day_last_week_seconds} />
+      <div className="bg-[#1c1c1c] border border-[#252525] rounded-xl p-5">
+        <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Эта неделя</div>
+        <div className="text-3xl font-bold text-[#f0f0f0]">{fmtDuration(m.this_week_seconds)}</div>
+        <div className={`text-sm mt-2 ${up ? 'text-[#4a9d5f]' : 'text-[#c07a55]'}`}>
+          {up ? '▲' : '▼'} {Math.abs(m.trend_pct)}%<span className="text-[#666]"> к прошлой неделе ({fmtDuration(m.last_week_seconds)})</span>
+        </div>
+      </div>
+      <TodayCard m={m} />
     </div>
   )
 }
 
-// Круг-неделя: 7 секторов (дни), длина сектора = часы за день, цвета = направления
-function WeekWheel({ data, colorMap, directions }: {
-  data: DashboardData['time_by_day_direction']
-  colorMap: Map<number | null, string>
-  directions: { id: number; name: string }[]
+// Понедельник недели, содержащей дату d
+function mondayOf(d: Date): Date {
+  const x = new Date(d); const dow = (x.getDay() + 6) % 7 // пн=0
+  x.setDate(x.getDate() - dow); x.setHours(0, 0, 0, 0); return x
+}
+function ymd(d: Date) { return d.toISOString().slice(0, 10) }
+
+// Один мини-круг недели: 7 секторов (Пн..Вс), радиус = часы дня (общая шкала), цвета = направления
+function MiniWheel({ weekStart, byDay, colorMap, maxTotal, size = 128 }: {
+  weekStart: Date; byDay: Map<string, { dir: number | null; s: number }[]>
+  colorMap: Map<number | null, string>; maxTotal: number; size?: number
 }) {
-  // Последние 7 дней (Пн..Вс порядок от сегодня назад)
-  const days: string[] = []
-  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)) }
-  const names = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
-  const byDay = new Map<string, { dir: number | null; s: number }[]>()
-  data.forEach(r => {
-    if (!byDay.has(r.day)) byDay.set(r.day, [])
-    byDay.get(r.day)!.push({ dir: r.direction_id, s: r.total_seconds })
-  })
-  const dayTotal = (d: string) => (byDay.get(d) ?? []).reduce((a, b) => a + b.s, 0)
-  const maxTotal = Math.max(1, ...days.map(dayTotal))
-
-  const cx = 130, cy = 130, rInner = 34, rMax = 120
-  const seg = (2 * Math.PI) / 7
-  const gap = 0.06
+  const cx = size / 2, cy = size / 2, rInner = size * 0.11, rMax = size * 0.46
+  const seg = (2 * Math.PI) / 7, gap = 0.05
+  const todayStr = ymd(new Date())
   const arcs: JSX.Element[] = []
-  const labels: JSX.Element[] = []
-
-  days.forEach((d, i) => {
+  const names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart); day.setDate(day.getDate() + i)
+    const ds = ymd(day)
     const a0 = -Math.PI / 2 + i * seg + gap
     const a1 = -Math.PI / 2 + (i + 1) * seg - gap
-    const total = dayTotal(d)
-    const rOuter = rInner + (rMax - rInner) * (total / maxTotal)
-    // стек по направлениям от центра наружу
-    const parts = (byDay.get(d) ?? []).slice().sort((a, b) => b.s - a.s)
+    const parts = (byDay.get(ds) ?? []).slice().sort((a, b) => b.s - a.s)
+    const total = parts.reduce((a, b) => a + b.s, 0)
+    const rOuter = rInner + (rMax - rInner) * Math.min(1, total / maxTotal)
+    if (total === 0) { arcs.push(<path key={`e${i}`} d={annular(cx, cy, rInner, rInner + 2, a0, a1)} fill="#2a2a2a" />); continue }
     let rCur = rInner
     parts.forEach((p, j) => {
-      const frac = total > 0 ? p.s / total : 0
-      const rNext = rCur + (rOuter - rInner) * frac
-      arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'} />)
+      const rNext = rCur + (rOuter - rInner) * (p.s / total)
+      arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'}>
+        <title>{`${names[i]} — ${fmtDuration(total)}`}</title>
+      </path>)
       rCur = rNext
     })
-    // фон-дуга пустого дня
-    if (total === 0) arcs.push(<path key={`${i}-e`} d={annular(cx, cy, rInner, rInner + 3, a0, a1)} fill="#252525" />)
-    const am = (a0 + a1) / 2
-    const lr = rMax + 12
-    labels.push(<text key={`l${i}`} x={cx + lr * Math.cos(am)} y={cy + lr * Math.sin(am)} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill={d === days[6] ? '#8090c8' : '#666'}>{names[new Date(d + 'T12:00:00').getDay()]}</text>)
-  })
+    if (ds === todayStr) arcs.push(<circle key={`t${i}`} cx={cx + (rMax + 5) * Math.cos((a0 + a1) / 2)} cy={cy + (rMax + 5) * Math.sin((a0 + a1) / 2)} r="1.6" fill="#8090c8" />)
+  }
+  return <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">{arcs}</svg>
+}
+
+// Ряд недель как спринты + общая легенда. Общая шкала → недели сравнимы по размеру.
+function WeeksSprints({ rows, directions }: {
+  rows: { day: string; direction_id: number | null; seconds: number }[]
+  directions: { id: number; name: string }[]
+}) {
+  const colorMap = buildColorMap(directions)
+  const byDay = new Map<string, { dir: number | null; s: number }[]>()
+  rows.forEach(r => { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day)!.push({ dir: r.direction_id, s: r.seconds }) })
+
+  const WEEKS = 4
+  const thisMon = mondayOf(new Date())
+  const weekStarts: Date[] = []
+  for (let i = WEEKS - 1; i >= 0; i--) { const d = new Date(thisMon); d.setDate(d.getDate() - i * 7); weekStarts.push(d) }
+
+  // общая максимальная дневная сумма по всем показанным неделям
+  let maxTotal = 1
+  weekStarts.forEach(ws => { for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); const t = (byDay.get(ymd(d)) ?? []).reduce((a, b) => a + b.s, 0); if (t > maxTotal) maxTotal = t } })
+
+  const weekLabel = (ws: Date) => {
+    const end = new Date(ws); end.setDate(end.getDate() + 6)
+    const mon = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+    return `${ws.getDate()}–${end.getDate()} ${mon[end.getMonth()]}`
+  }
+  const weekTotal = (ws: Date) => { let s = 0; for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); s += (byDay.get(ymd(d)) ?? []).reduce((a, b) => a + b.s, 0) } return s }
+
+  const usedDirs = directions.filter(d => rows.some(r => r.direction_id === d.id))
 
   return (
-    <div className="flex items-center gap-5 flex-wrap">
-      <svg width="260" height="260" viewBox="0 0 260 260" className="shrink-0">{arcs}{labels}</svg>
-      <div className="space-y-1.5 min-w-[140px]">
-        {directions.filter(d => data.some(r => r.direction_id === d.id)).map(d => {
-          const total = data.filter(r => r.direction_id === d.id).reduce((a, b) => a + b.total_seconds, 0)
-          return (
-            <div key={d.id} className="flex items-center gap-2 text-xs">
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorMap.get(d.id) ?? '#5060a0' }} />
-              <span className="text-[#ccc] flex-1">{d.name}</span>
-              <span className="text-[#666]">{fmtDuration(total)}</span>
-            </div>
-          )
-        })}
+    <div>
+      <div className="flex justify-between gap-2">
+        {weekStarts.map((ws, i) => (
+          <div key={i} className="flex flex-col items-center">
+            <MiniWheel weekStart={ws} byDay={byDay} colorMap={colorMap} maxTotal={maxTotal} />
+            <div className={`text-[11px] mt-1 ${i === WEEKS - 1 ? 'text-[#8090c8]' : 'text-[#888]'}`}>{weekLabel(ws)}</div>
+            <div className="text-[10px] text-[#555]">{fmtDuration(weekTotal(ws))}</div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 pt-3 border-t border-[#252525]">
+        {usedDirs.map(d => (
+          <div key={d.id} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colorMap.get(d.id) ?? '#5060a0' }} />
+            <span className="text-[#999]">{d.name}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -668,6 +710,7 @@ export default function StatsScreen({ onClose }: Props) {
   const [byHour, setByHour] = useState<{ hour: number; seconds: number }[]>([])
   const [heatmap, setHeatmap] = useState<{ day: string; seconds: number }[]>([])
   const [consistency, setConsistency] = useState<{ streak: number; best: number; active: number } | null>(null)
+  const [dayDir, setDayDir] = useState<{ rows: { day: string; direction_id: number | null; seconds: number }[]; directions: { id: number; name: string }[] } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -682,9 +725,8 @@ export default function StatsScreen({ onClose }: Props) {
     api.getMotivation().then(setMotivation).catch(() => {})
     api.getByHour().then(setByHour).catch(() => {})
     api.getGamification().then(g => { setHeatmap(g.heatmap); setConsistency({ streak: g.streak, best: g.best_streak, active: g.active_days_total }) }).catch(() => {})
+    api.getDayDirection(28).then(setDayDir).catch(() => {})
   }, [])
-
-  const colorMap = data ? buildColorMap(data.directions) : new Map()
 
   return (
     <div className="h-full flex flex-col bg-[#181818] text-[#f0f0f0]">
@@ -715,13 +757,13 @@ export default function StatsScreen({ onClose }: Props) {
 
         {!loading && data && (
           <>
-            {/* Круг недели: дни × направления */}
+            {/* Недели как спринты: круги дни × направления */}
             <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Неделя по направлениям</div>
-              {data.time_by_day_direction.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных за период</div>
+              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Недели по направлениям</div>
+              {!dayDir || dayDir.rows.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных</div>
               ) : (
-                <WeekWheel data={data.time_by_day_direction} colorMap={colorMap} directions={data.directions} />
+                <WeeksSprints rows={dayDir.rows} directions={dayDir.directions} />
               )}
             </div>
 
