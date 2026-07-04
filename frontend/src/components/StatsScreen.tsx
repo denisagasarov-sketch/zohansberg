@@ -544,35 +544,47 @@ function mondayOf(d: Date): Date {
 function ymd(d: Date) { return d.toISOString().slice(0, 10) }
 
 // Один мини-круг недели: 7 секторов (Пн..Вс), радиус = часы дня (общая шкала), цвета = направления
-function MiniWheel({ weekStart, byDay, colorMap, maxTotal, size = 128 }: {
+function MiniWheel({ weekStart, byDay, colorMap, maxTotal, size = 132 }: {
   weekStart: Date; byDay: Map<string, { dir: number | null; s: number }[]>
   colorMap: Map<number | null, string>; maxTotal: number; size?: number
 }) {
-  const cx = size / 2, cy = size / 2, rInner = size * 0.11, rMax = size * 0.46
+  const cx = size / 2, cy = size / 2, rInner = size * 0.1, rMax = size * 0.4
   const seg = (2 * Math.PI) / 7, gap = 0.05
+  const M = 16 // запас под подписи, чтобы не обрезались
   const todayStr = ymd(new Date())
   const arcs: JSX.Element[] = []
+  const labels: JSX.Element[] = []
   const names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart); day.setDate(day.getDate() + i)
     const ds = ymd(day)
     const a0 = -Math.PI / 2 + i * seg + gap
     const a1 = -Math.PI / 2 + (i + 1) * seg - gap
+    const am = (a0 + a1) / 2
     const parts = (byDay.get(ds) ?? []).slice().sort((a, b) => b.s - a.s)
     const total = parts.reduce((a, b) => a + b.s, 0)
     const rOuter = rInner + (rMax - rInner) * Math.min(1, total / maxTotal)
-    if (total === 0) { arcs.push(<path key={`e${i}`} d={annular(cx, cy, rInner, rInner + 2, a0, a1)} fill="#2a2a2a" />); continue }
-    let rCur = rInner
-    parts.forEach((p, j) => {
-      const rNext = rCur + (rOuter - rInner) * (p.s / total)
-      arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'}>
-        <title>{`${names[i]} — ${fmtDuration(total)}`}</title>
-      </path>)
-      rCur = rNext
-    })
-    if (ds === todayStr) arcs.push(<circle key={`t${i}`} cx={cx + (rMax + 5) * Math.cos((a0 + a1) / 2)} cy={cy + (rMax + 5) * Math.sin((a0 + a1) / 2)} r="1.6" fill="#8090c8" />)
+    const tip = <title>{`${names[i]}, ${day.getDate()} ${months[day.getMonth()]} — ${total > 0 ? fmtDuration(total) : 'нет работы'}`}</title>
+    if (total === 0) {
+      arcs.push(<path key={`e${i}`} d={annular(cx, cy, rInner, rInner + 2, a0, a1)} fill="#2a2a2a">{tip}</path>)
+    } else {
+      let rCur = rInner
+      parts.forEach((p, j) => {
+        const rNext = rCur + (rOuter - rInner) * (p.s / total)
+        arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'}>{tip}</path>)
+        rCur = rNext
+      })
+    }
+    // подпись дня недели по краю
+    const lr = rMax + 9
+    const isToday = ds === todayStr
+    labels.push(
+      <text key={`l${i}`} x={cx + lr * Math.cos(am)} y={cy + lr * Math.sin(am)} textAnchor="middle" dominantBaseline="middle"
+        fontSize="9" fill={isToday ? '#8090c8' : '#666'} fontWeight={isToday ? 600 : 400}>{names[i]}</text>
+    )
   }
-  return <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">{arcs}</svg>
+  return <svg width={size} height={size} viewBox={`${-M} ${-M} ${size + 2 * M} ${size + 2 * M}`} className="shrink-0">{arcs}{labels}</svg>
 }
 
 // Ряд недель как спринты + общая легенда. Общая шкала → недели сравнимы по размеру.
@@ -604,7 +616,7 @@ function WeeksSprints({ rows, directions }: {
 
   return (
     <div>
-      <div className="flex justify-between gap-2">
+      <div className="flex justify-around gap-2">
         {weekStarts.map((ws, i) => (
           <div key={i} className="flex flex-col items-center">
             <MiniWheel weekStart={ws} byDay={byDay} colorMap={colorMap} maxTotal={maxTotal} />
