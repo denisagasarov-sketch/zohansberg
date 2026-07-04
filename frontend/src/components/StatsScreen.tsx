@@ -543,51 +543,38 @@ function mondayOf(d: Date): Date {
 }
 function ymd(d: Date) { return d.toISOString().slice(0, 10) }
 
-// Один мини-круг недели: 7 секторов (Пн..Вс), радиус = часы дня (общая шкала), цвета = направления
-function MiniWheel({ weekStart, byDay, colorMap, maxTotal, size = 132 }: {
+const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+
+// Круг недели: 7 секторов, радиус дня = часы (общая шкала), цвета = направления.
+// showLabels — крупный круг с подписями дней; иначе чистый мини-круг для выбора.
+function WeekWheelSvg({ weekStart, byDay, colorMap, maxTotal, size, showLabels }: {
   weekStart: Date; byDay: Map<string, { dir: number | null; s: number }[]>
-  colorMap: Map<number | null, string>; maxTotal: number; size?: number
+  colorMap: Map<number | null, string>; maxTotal: number; size: number; showLabels: boolean
 }) {
-  const cx = size / 2, cy = size / 2, rInner = size * 0.1, rMax = size * 0.4
+  const cx = size / 2, cy = size / 2, rInner = size * 0.11, rMax = size * (showLabels ? 0.38 : 0.46)
   const seg = (2 * Math.PI) / 7, gap = 0.05
-  const M = 16 // запас под подписи, чтобы не обрезались
+  const M = showLabels ? 18 : 3
   const todayStr = ymd(new Date())
-  const arcs: JSX.Element[] = []
-  const labels: JSX.Element[] = []
-  const names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
-  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  const arcs: JSX.Element[] = [], labels: JSX.Element[] = []
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart); day.setDate(day.getDate() + i)
     const ds = ymd(day)
-    const a0 = -Math.PI / 2 + i * seg + gap
-    const a1 = -Math.PI / 2 + (i + 1) * seg - gap
-    const am = (a0 + a1) / 2
+    const a0 = -Math.PI / 2 + i * seg + gap, a1 = -Math.PI / 2 + (i + 1) * seg - gap, am = (a0 + a1) / 2
     const parts = (byDay.get(ds) ?? []).slice().sort((a, b) => b.s - a.s)
     const total = parts.reduce((a, b) => a + b.s, 0)
     const rOuter = rInner + (rMax - rInner) * Math.min(1, total / maxTotal)
-    const tip = <title>{`${names[i]}, ${day.getDate()} ${months[day.getMonth()]} — ${total > 0 ? fmtDuration(total) : 'нет работы'}`}</title>
-    if (total === 0) {
-      arcs.push(<path key={`e${i}`} d={annular(cx, cy, rInner, rInner + 2, a0, a1)} fill="#2a2a2a">{tip}</path>)
-    } else {
-      let rCur = rInner
-      parts.forEach((p, j) => {
-        const rNext = rCur + (rOuter - rInner) * (p.s / total)
-        arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'}>{tip}</path>)
-        rCur = rNext
-      })
+    if (total === 0) { arcs.push(<path key={`e${i}`} d={annular(cx, cy, rInner, rInner + 2, a0, a1)} fill="#2a2a2a" />) }
+    else { let rCur = rInner; parts.forEach((p, j) => { const rNext = rCur + (rOuter - rInner) * (p.s / total); arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'} />); rCur = rNext }) }
+    if (showLabels) {
+      const lr = rMax + 10, isToday = ds === todayStr
+      labels.push(<text key={`l${i}`} x={cx + lr * Math.cos(am)} y={cy + lr * Math.sin(am)} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={isToday ? '#8090c8' : '#777'} fontWeight={isToday ? 600 : 400}>{DOW[i]}</text>)
     }
-    // подпись дня недели по краю
-    const lr = rMax + 9
-    const isToday = ds === todayStr
-    labels.push(
-      <text key={`l${i}`} x={cx + lr * Math.cos(am)} y={cy + lr * Math.sin(am)} textAnchor="middle" dominantBaseline="middle"
-        fontSize="9" fill={isToday ? '#8090c8' : '#666'} fontWeight={isToday ? 600 : 400}>{names[i]}</text>
-    )
   }
   return <svg width={size} height={size} viewBox={`${-M} ${-M} ${size + 2 * M} ${size + 2 * M}`} className="shrink-0">{arcs}{labels}</svg>
 }
 
-// Ряд недель как спринты + общая легенда. Общая шкала → недели сравнимы по размеру.
+// Крупный круг выбранной недели + список дней с часами, снизу — недели-переключатели.
 function WeeksSprints({ rows, directions }: {
   rows: { day: string; direction_id: number | null; seconds: number }[]
   directions: { id: number; name: string }[]
@@ -600,31 +587,55 @@ function WeeksSprints({ rows, directions }: {
   const thisMon = mondayOf(new Date())
   const weekStarts: Date[] = []
   for (let i = WEEKS - 1; i >= 0; i--) { const d = new Date(thisMon); d.setDate(d.getDate() - i * 7); weekStarts.push(d) }
+  const [sel, setSel] = useState(WEEKS - 1) // по умолчанию текущая неделя
 
-  // общая максимальная дневная сумма по всем показанным неделям
   let maxTotal = 1
   weekStarts.forEach(ws => { for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); const t = (byDay.get(ymd(d)) ?? []).reduce((a, b) => a + b.s, 0); if (t > maxTotal) maxTotal = t } })
 
-  const weekLabel = (ws: Date) => {
-    const end = new Date(ws); end.setDate(end.getDate() + 6)
-    const mon = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
-    return `${ws.getDate()}–${end.getDate()} ${mon[end.getMonth()]}`
-  }
+  const weekLabel = (ws: Date) => { const e = new Date(ws); e.setDate(e.getDate() + 6); return `${ws.getDate()}–${e.getDate()} ${MON[e.getMonth()]}` }
   const weekTotal = (ws: Date) => { let s = 0; for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); s += (byDay.get(ymd(d)) ?? []).reduce((a, b) => a + b.s, 0) } return s }
 
+  const selWeek = weekStarts[sel]
+  const selDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(selWeek); d.setDate(d.getDate() + i)
+    return { i, date: d, total: (byDay.get(ymd(d)) ?? []).reduce((a, b) => a + b.s, 0) }
+  })
+  const todayStr = ymd(new Date())
   const usedDirs = directions.filter(d => rows.some(r => r.direction_id === d.id))
 
   return (
     <div>
-      <div className="flex justify-around gap-2">
-        {weekStarts.map((ws, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <MiniWheel weekStart={ws} byDay={byDay} colorMap={colorMap} maxTotal={maxTotal} />
-            <div className={`text-[11px] mt-1 ${i === WEEKS - 1 ? 'text-[#8090c8]' : 'text-[#888]'}`}>{weekLabel(ws)}</div>
-            <div className="text-[10px] text-[#555]">{fmtDuration(weekTotal(ws))}</div>
+      {/* Крупный круг выбранной недели + дни с часами */}
+      <div className="flex items-center gap-6 flex-wrap">
+        <WeekWheelSvg weekStart={selWeek} byDay={byDay} colorMap={colorMap} maxTotal={maxTotal} size={150} showLabels />
+        <div className="flex-1 min-w-[180px]">
+          <div className="text-sm text-[#f0f0f0] mb-2">{weekLabel(selWeek)} · {fmtDuration(weekTotal(selWeek))}</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {selDays.map(d => {
+              const isToday = ymd(d.date) === todayStr
+              return (
+                <div key={d.i} className="flex items-center justify-between text-xs">
+                  <span className={isToday ? 'text-[#8090c8]' : 'text-[#888]'}>{DOW[d.i]} {d.date.getDate()}</span>
+                  <span className={d.total > 0 ? 'text-[#ccc]' : 'text-[#555]'}>{d.total > 0 ? fmtDuration(d.total) : '—'}</span>
+                </div>
+              )
+            })}
           </div>
+        </div>
+      </div>
+
+      {/* Недели-переключатели */}
+      <div className="flex justify-around gap-2 mt-4 pt-4 border-t border-[#252525]">
+        {weekStarts.map((ws, i) => (
+          <button key={i} onClick={() => setSel(i)} className={`flex flex-col items-center rounded-lg px-2 py-1 transition-colors ${i === sel ? 'bg-[#252525]' : 'hover:bg-[#222]'}`}>
+            <WeekWheelSvg weekStart={ws} byDay={byDay} colorMap={colorMap} maxTotal={maxTotal} size={58} showLabels={false} />
+            <div className={`text-[10px] mt-1 ${i === sel ? 'text-[#8090c8]' : 'text-[#777]'}`}>{weekLabel(ws)}</div>
+            <div className="text-[10px] text-[#555]">{fmtDuration(weekTotal(ws))}</div>
+          </button>
         ))}
       </div>
+
+      {/* Легенда направлений */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 pt-3 border-t border-[#252525]">
         {usedDirs.map(d => (
           <div key={d.id} className="flex items-center gap-1.5 text-xs">
