@@ -1572,6 +1572,11 @@ app.get('/api/stats/motivation', (_req, res) => {
     const lastWeek = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) >= date('now','-13 days') AND date(started_at) < date('now','-6 days')`).s
     const trendPct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0)
 
+    // Сегодня vs тот же день недели неделю назад
+    const todaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now')`).s
+    const sameDaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now','-7 days')`).s
+    const dayTrendPct = sameDaySec > 0 ? Math.round(((todaySec - sameDaySec) / sameDaySec) * 100) : (todaySec > 0 ? 100 : 0)
+
     // Рекорд: лучший день и лучшая неделя (ISO-неделя)
     const bestDay = one(`
       SELECT date(started_at) AS day, SUM(duration_actual) AS s
@@ -1595,6 +1600,9 @@ app.get('/api/stats/motivation', (_req, res) => {
       this_week_seconds: thisWeek,
       last_week_seconds: lastWeek,
       trend_pct: trendPct,
+      today_seconds: todaySec,
+      same_day_last_week_seconds: sameDaySec,
+      day_trend_pct: dayTrendPct,
       best_day: bestDay ? { day: bestDay.day, seconds: bestDay.s } : null,
       best_week_seconds: bestWeek ? bestWeek.s : 0,
       active_days: activeDays,

@@ -94,6 +94,7 @@ export const api = {
   getMotivation: () => req<{
     lifetime_seconds: number; tasks_done: number; subtasks_done: number
     this_week_seconds: number; last_week_seconds: number; trend_pct: number
+    today_seconds: number; same_day_last_week_seconds: number; day_trend_pct: number
     best_day: { day: string; seconds: number } | null; best_week_seconds: number
     active_days: number; avg_per_active_day: number
   }>('GET', '/stats/motivation'),

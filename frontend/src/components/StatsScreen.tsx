@@ -487,95 +487,139 @@ function BarChart({
 interface Motivation {
   lifetime_seconds: number; tasks_done: number; subtasks_done: number
   this_week_seconds: number; last_week_seconds: number; trend_pct: number
+  today_seconds: number; same_day_last_week_seconds: number; day_trend_pct: number
   best_day: { day: string; seconds: number } | null; best_week_seconds: number
   active_days: number; avg_per_active_day: number
 }
 
-function MotivationHero({ m }: { m: Motivation }) {
-  const up = m.trend_pct >= 0
-  const bestDayStr = m.best_day ? new Date(m.best_day.day + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '—'
+function CompareCard({ label, value, pct, prevLabel, prevValue }: {
+  label: string; value: number; pct: number; prevLabel: string; prevValue: number
+}) {
+  const up = pct >= 0
   return (
-    <div className="space-y-3">
-      {/* Вклад за всё время — крупно */}
-      <div className="bg-gradient-to-br from-[#20223a] to-[#1c1c1c] border border-[#2a2d4a] rounded-xl p-5">
-        <div className="text-[10px] font-semibold tracking-widest text-[#6a72a0] uppercase mb-1">Всего в фокусе</div>
-        <div className="text-4xl font-bold text-[#f0f0f0]">{fmtDuration(m.lifetime_seconds)}</div>
-        <div className="text-xs text-[#666] mt-1.5">
-          за {m.active_days} {m.active_days % 10 === 1 && m.active_days % 100 !== 11 ? 'активный день' : 'активных дней'} ·
-          {' '}{m.tasks_done} задач и {m.subtasks_done} шагов закрыто
-        </div>
-      </div>
-
-      {/* Динамика недели + рекорды */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Эта неделя</div>
-          <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(m.this_week_seconds)}</div>
-          <div className={`text-xs mt-1 ${up ? 'text-[#4a9d5f]' : 'text-[#c07a55]'}`}>
-            {up ? '▲' : '▼'} {Math.abs(m.trend_pct)}% к прошлой ({fmtDuration(m.last_week_seconds)})
-          </div>
-        </div>
-        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">Рекорд дня</div>
-          <div className="text-2xl font-bold text-[#f0f0f0]">{m.best_day ? fmtDuration(m.best_day.seconds) : '—'}</div>
-          <div className="text-xs text-[#666] mt-1">{bestDayStr}</div>
-        </div>
-        <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-          <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">В среднем в день</div>
-          <div className="text-2xl font-bold text-[#f0f0f0]">{fmtDuration(m.avg_per_active_day)}</div>
-          <div className="text-xs text-[#666] mt-1">рекорд недели {fmtDuration(m.best_week_seconds)}</div>
-        </div>
+    <div className="bg-[#1c1c1c] border border-[#252525] rounded-xl p-5">
+      <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-2">{label}</div>
+      <div className="text-3xl font-bold text-[#f0f0f0]">{fmtDuration(value)}</div>
+      <div className={`text-sm mt-2 ${up ? 'text-[#4a9d5f]' : 'text-[#c07a55]'}`}>
+        {up ? '▲' : '▼'} {Math.abs(pct)}%
+        <span className="text-[#666]"> к {prevLabel} ({fmtDuration(prevValue)})</span>
       </div>
     </div>
   )
 }
 
-// ─── Когда я продуктивен (фокус по часам суток) ───────────────────────────────
-function ByHourChart({ data }: { data: { hour: number; seconds: number }[] }) {
-  const max = Math.max(1, ...data.map(d => d.seconds))
-  const peak = data.reduce((a, b) => (b.seconds > a.seconds ? b : a), data[0])
+function MotivationHero({ m }: { m: Motivation }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <CompareCard label="Эта неделя" value={m.this_week_seconds} pct={m.trend_pct}
+        prevLabel="прошлой неделе" prevValue={m.last_week_seconds} />
+      <CompareCard label="Сегодня" value={m.today_seconds} pct={m.day_trend_pct}
+        prevLabel="этому дню неделю назад" prevValue={m.same_day_last_week_seconds} />
+    </div>
+  )
+}
+
+// Круг-неделя: 7 секторов (дни), длина сектора = часы за день, цвета = направления
+function WeekWheel({ data, colorMap, directions }: {
+  data: DashboardData['time_by_day_direction']
+  colorMap: Map<number | null, string>
+  directions: { id: number; name: string }[]
+}) {
+  // Последние 7 дней (Пн..Вс порядок от сегодня назад)
+  const days: string[] = []
+  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)) }
+  const names = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+  const byDay = new Map<string, { dir: number | null; s: number }[]>()
+  data.forEach(r => {
+    if (!byDay.has(r.day)) byDay.set(r.day, [])
+    byDay.get(r.day)!.push({ dir: r.direction_id, s: r.total_seconds })
+  })
+  const dayTotal = (d: string) => (byDay.get(d) ?? []).reduce((a, b) => a + b.s, 0)
+  const maxTotal = Math.max(1, ...days.map(dayTotal))
+
+  const cx = 130, cy = 130, rInner = 34, rMax = 120
+  const seg = (2 * Math.PI) / 7
+  const gap = 0.06
+  const arcs: JSX.Element[] = []
+  const labels: JSX.Element[] = []
+
+  days.forEach((d, i) => {
+    const a0 = -Math.PI / 2 + i * seg + gap
+    const a1 = -Math.PI / 2 + (i + 1) * seg - gap
+    const total = dayTotal(d)
+    const rOuter = rInner + (rMax - rInner) * (total / maxTotal)
+    // стек по направлениям от центра наружу
+    const parts = (byDay.get(d) ?? []).slice().sort((a, b) => b.s - a.s)
+    let rCur = rInner
+    parts.forEach((p, j) => {
+      const frac = total > 0 ? p.s / total : 0
+      const rNext = rCur + (rOuter - rInner) * frac
+      arcs.push(<path key={`${i}-${j}`} d={annular(cx, cy, rCur, rNext, a0, a1)} fill={colorMap.get(p.dir) ?? '#5060a0'} />)
+      rCur = rNext
+    })
+    // фон-дуга пустого дня
+    if (total === 0) arcs.push(<path key={`${i}-e`} d={annular(cx, cy, rInner, rInner + 3, a0, a1)} fill="#252525" />)
+    const am = (a0 + a1) / 2
+    const lr = rMax + 12
+    labels.push(<text key={`l${i}`} x={cx + lr * Math.cos(am)} y={cy + lr * Math.sin(am)} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill={d === days[6] ? '#8090c8' : '#666'}>{names[new Date(d + 'T12:00:00').getDay()]}</text>)
+  })
+
+  return (
+    <div className="flex items-center gap-5 flex-wrap">
+      <svg width="260" height="260" viewBox="0 0 260 260" className="shrink-0">{arcs}{labels}</svg>
+      <div className="space-y-1.5 min-w-[140px]">
+        {directions.filter(d => data.some(r => r.direction_id === d.id)).map(d => {
+          const total = data.filter(r => r.direction_id === d.id).reduce((a, b) => a + b.total_seconds, 0)
+          return (
+            <div key={d.id} className="flex items-center gap-2 text-xs">
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: colorMap.get(d.id) ?? '#5060a0' }} />
+              <span className="text-[#ccc] flex-1">{d.name}</span>
+              <span className="text-[#666]">{fmtDuration(total)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// SVG-путь кольцевого сектора (annular sector)
+function annular(cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string {
+  const p = (r: number, a: number) => `${cx + r * Math.cos(a)} ${cy + r * Math.sin(a)}`
+  const large = a1 - a0 > Math.PI ? 1 : 0
+  return `M ${p(r0, a0)} L ${p(r1, a0)} A ${r1} ${r1} 0 ${large} 1 ${p(r1, a1)} L ${p(r0, a1)} A ${r0} ${r0} 0 ${large} 0 ${p(r0, a0)} Z`
+}
+
+// ─── Когда я продуктивен (части суток) ────────────────────────────────────────
+const DAY_PARTS = [
+  { key: 'morning', label: 'Утро', sub: '6–12', from: 6, to: 12 },
+  { key: 'day', label: 'День', sub: '12–18', from: 12, to: 18 },
+  { key: 'evening', label: 'Вечер', sub: '18–24', from: 18, to: 24 },
+  { key: 'night', label: 'Ночь', sub: '0–6', from: 0, to: 6 },
+]
+function ByPartOfDay({ data }: { data: { hour: number; seconds: number }[] }) {
+  const parts = DAY_PARTS.map(p => ({
+    ...p, seconds: data.filter(d => d.hour >= p.from && d.hour < p.to).reduce((a, b) => a + b.seconds, 0),
+  }))
+  const total = parts.reduce((a, b) => a + b.seconds, 0)
+  const max = Math.max(1, ...parts.map(p => p.seconds))
+  const best = parts.reduce((a, b) => (b.seconds > a.seconds ? b : a), parts[0])
+  if (total === 0) return <div className="text-xs text-[#666]">Пока нет данных о времени работы.</div>
   return (
     <div>
-      <div className="flex items-end gap-[3px] h-28">
-        {data.map(d => (
-          <div key={d.hour} className="flex-1 flex flex-col justify-end" title={`${d.hour}:00 — ${fmtDuration(d.seconds)}`}>
-            <div className="w-full rounded-t-sm transition-all"
-              style={{ height: `${(d.seconds / max) * 100}%`, minHeight: d.seconds > 0 ? 2 : 0, backgroundColor: d.hour === peak.hour ? '#5060a0' : '#33384d' }} />
+      <div className="grid grid-cols-4 gap-3">
+        {parts.map(p => (
+          <div key={p.key} className="text-center">
+            <div className="h-24 flex items-end justify-center mb-2">
+              <div className="w-8 rounded-t-md transition-all" style={{ height: `${Math.max(4, (p.seconds / max) * 100)}%`, backgroundColor: p.key === best.key ? '#5060a0' : '#33384d' }} />
+            </div>
+            <div className="text-sm text-[#f0f0f0]">{fmtDuration(p.seconds)}</div>
+            <div className="text-[11px] text-[#888]">{p.label}</div>
+            <div className="text-[10px] text-[#555]">{p.sub}</div>
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-[#555] mt-1.5">
-        <span>0</span><span>6</span><span>12</span><span>18</span><span>23</span>
-      </div>
-      {peak.seconds > 0 && (
-        <div className="text-xs text-[#8090c8] mt-2">Пик формы: около {peak.hour}:00 — планируй сложное на это время.</div>
-      )}
-    </div>
-  )
-}
-
-// ─── Цель vs факт по направлениям (текущая неделя) ────────────────────────────
-function GoalVsActual({ directions, weekly }: { directions: { id: number; name: string; weekly_goal_seconds: number }[]; weekly: Record<number, number> }) {
-  const rows = directions.filter(d => d.weekly_goal_seconds > 0)
-  if (rows.length === 0) return <div className="text-xs text-[#666]">Задай цели в «Плане недели», чтобы видеть прогресс.</div>
-  return (
-    <div className="space-y-2.5">
-      {rows.map(d => {
-        const done = weekly[d.id] ?? 0
-        const pct = Math.min(100, Math.round((done / d.weekly_goal_seconds) * 100))
-        const over = done >= d.weekly_goal_seconds
-        return (
-          <div key={d.id}>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-[#ccc]">{d.name}</span>
-              <span className="text-[#666]">{fmtDuration(done)} / {Math.round(d.weekly_goal_seconds / 3600)}ч</span>
-            </div>
-            <div className="h-2 bg-[#252525] rounded-full overflow-hidden">
-              <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: over ? '#4a9d5f' : '#5060a0' }} />
-            </div>
-          </div>
-        )
-      })}
+      <div className="text-xs text-[#8090c8] mt-3">Продуктивнее всего — {best.label.toLowerCase()} ({best.sub}). Ставь сложное на это время.</div>
     </div>
   )
 }
@@ -624,8 +668,6 @@ export default function StatsScreen({ onClose }: Props) {
   const [byHour, setByHour] = useState<{ hour: number; seconds: number }[]>([])
   const [heatmap, setHeatmap] = useState<{ day: string; seconds: number }[]>([])
   const [consistency, setConsistency] = useState<{ streak: number; best: number; active: number } | null>(null)
-  const [dirGoals, setDirGoals] = useState<{ id: number; name: string; weekly_goal_seconds: number }[]>([])
-  const [weekly, setWeekly] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -640,12 +682,6 @@ export default function StatsScreen({ onClose }: Props) {
     api.getMotivation().then(setMotivation).catch(() => {})
     api.getByHour().then(setByHour).catch(() => {})
     api.getGamification().then(g => { setHeatmap(g.heatmap); setConsistency({ streak: g.streak, best: g.best_streak, active: g.active_days_total }) }).catch(() => {})
-    api.getAllDirections().then((d: any[]) => setDirGoals(d.filter(x => !x.archived))).catch(() => {})
-    api.getWeeklyTime().then(rows => {
-      const m: Record<number, number> = {}
-      rows.forEach(r => { if (r.direction_id != null) m[r.direction_id] = r.seconds })
-      setWeekly(m)
-    }).catch(() => {})
   }, [])
 
   const colorMap = data ? buildColorMap(data.directions) : new Map()
@@ -679,45 +715,23 @@ export default function StatsScreen({ onClose }: Props) {
 
         {!loading && data && (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По направлениям</div>
-                <DonutChart data={data.time_by_direction} colorMap={colorMap} sessions={data.sessions} />
-              </div>
-
-              <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-                <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">По дням</div>
-                {data.time_by_day_direction.length === 0 ? (
-                  <div className="flex items-center justify-center h-24 text-[#383838] text-sm">Нет данных</div>
-                ) : (
-                  <BarChart data={data.time_by_day_direction} period={period} colorMap={colorMap} />
-                )}
-                {data.time_by_direction.length > 0 && (
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
-                    {data.time_by_direction.slice(0, 6).map((d, i) => (
-                      <div key={i} className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: colorMap.get(d.direction_id) ?? '#5060a0' }} />
-                        <span className="text-[10px] text-[#383838]">{d.direction_name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* Круг недели: дни × направления */}
+            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
+              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Неделя по направлениям</div>
+              {data.time_by_day_direction.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-[#383838] text-sm">Нет данных за период</div>
+              ) : (
+                <WeekWheel data={data.time_by_day_direction} colorMap={colorMap} directions={data.directions} />
+              )}
             </div>
 
             {/* Когда я продуктивен */}
             {byHour.some(h => h.seconds > 0) && (
               <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
                 <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Когда я продуктивен</div>
-                <ByHourChart data={byHour} />
+                <ByPartOfDay data={byHour} />
               </div>
             )}
-
-            {/* Цель vs факт по направлениям */}
-            <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
-              <div className="text-[10px] font-semibold tracking-widest text-[#383838] uppercase mb-4">Цель недели vs факт</div>
-              <GoalVsActual directions={dirGoals} weekly={weekly} />
-            </div>
 
             {/* Календарь постоянства */}
             <div className="bg-[#1c1c1c] border border-[#252525] rounded-lg p-4">
