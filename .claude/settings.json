@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": ["Bash(*)", "Write(*)", "Edit(*)"]
+  },
+  "worktree": {
+    "baseRef": "head",
+    "bgIsolation": "none"
+  }
+}
