@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Focus Board v2 · «тихая кабина» ─────────────────────────────
+   Тёплый графит, один янтарный акцент, глубина слоями, а не рамками.
+   Токены живут здесь и в tailwind.config.js. */
+
+:root {
+  --bg: #141312;
+  --bg-sunken: #0f0e0d;
+  --surface: #1b1a18;
+  --raised: #232120;
+  --overlay: #292623;
+  --border: #2a2723;
+  --border-strong: #38342e;
+  --text: #ece7df;
+  --text-secondary: #9c958a;
+  --text-muted: #6f695f;
+  --text-faint: #4a463f;
+  --accent: #e0a458;
+  --accent-light: #eab26c;
+  --ok: #82a877;
+  --danger: #c96f5e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'tnum';
+}
+
+::selection { background: rgba(224, 164, 88, 0.28); }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #38342e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #453f37; }
+
+/* ── Анимации ── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 164, 88, 0.0); }
+  50%      { box-shadow: 0 0 24px 0 rgba(224, 164, 88, 0.10); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.75; }
+  50%      { transform: scale(1.18); opacity: 1; }
+}
+.tunnel-breath { animation: breathe 7s ease-in-out infinite; transform-origin: 50% 46%; }
+
+@layer components {
+  /* Слои глубины: карточка и приподнятая поверхность */
+  .card {
+    @apply bg-card rounded-xl border border-border;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .card-raised {
+    @apply bg-raised rounded-xl border border-border-strong;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  }
+
+  /* Заголовок секции — тихий, капсом */
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted select-none;
+  }
+
+  /* Кнопки */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium
+           px-3 py-1.5 transition-colors duration-150 select-none cursor-pointer
+           disabled:opacity-40 disabled:cursor-default;
+  }
+  .btn-primary { @apply btn bg-accent text-[#1c1610] hover:bg-accent-light; }
+  .btn-ghost   { @apply btn text-text-secondary hover:text-text hover:bg-raised; }
+  .btn-outline { @apply btn border border-border-strong text-text-secondary hover:text-text hover:border-[#453f37] hover:bg-raised; }
+  .btn-danger  { @apply btn text-danger hover:bg-[#2b201d]; }
+
+  /* Поля ввода */
+  .input {
+    @apply bg-bg-sunken border border-border rounded-lg px-3 py-2 text-[13px] text-text
+           placeholder:text-text-muted outline-none transition-colors duration-150
+           focus:border-accent/60;
+  }
+
+  /* Оверлей и панель модалки */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center;
+    background: rgba(10, 9, 8, 0.72);
+    backdrop-filter: blur(6px);
+    animation: fadeSlideIn 0.15s ease-out;
+  }
+  .modal-panel {
+    @apply bg-overlay border border-border-strong rounded-2xl;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+    animation: scaleIn 0.16s ease-out;
+  }
+
+  /* Полноэкранный ритуал (утро/вечер/обзоры) */
+  .ritual-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto;
+    background: radial-gradient(80% 60% at 50% 0%, #1b1917 0%, #100f0e 100%);
+    animation: fadeSlideIn 0.2s ease-out;
+  }
+  .ritual-panel {
+    @apply w-full max-w-xl mx-auto px-8 py-10;
+    animation: riseIn 0.25s ease-out;
+  }
+}
+
+/* Полосы приоритетов (легаси-классы) */
+.priority-stripe-high { background-color: #b0684a; }
+.priority-stripe-medium { background-color: #8f7a4e; }
+.priority-stripe-low { background-color: #38342e; }

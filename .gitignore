@@ -8,3 +8,4 @@ backend/*.log
 backend/*.log.old
 backend/focusboard.db
 backend/data/
+release/

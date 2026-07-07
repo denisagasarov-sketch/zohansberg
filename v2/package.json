@@ -1,0 +1,31 @@
+{
+  "name": "focusboard-v2",
+  "version": "0.2.0",
+  "description": "Focusboard V2. Данные общие с v1 (бэкенд :3001).",
+  "author": "Денис",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder --mac dir"
+  },
+  "build": {
+    "appId": "com.denis.tasktracker",
+    "productName": "Focusboard V2",
+    "electronVersion": "31.7.7",
+    "electronDist": "../node_modules/electron/dist",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "icon": "electron/icon.icns",
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "!frontend/dist/**/*.map"
+    ]
+  }
+}
