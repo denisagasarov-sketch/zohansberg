@@ -141,18 +141,25 @@ export default function App() {
   }, [])
 
   // ── Таймер и туннель ────────────────────────────────────────────────────────
+  // Реальный запуск: делаем задачу текущей И включаем таймер. takeNow происходит
+  // ТОЛЬКО здесь — поэтому отмена модалки намерения (Назад/Esc/клик мимо) ничего
+  // не включает и не меняет состояние.
+  const beginSession = useCallback(async (taskId: number) => {
+    await takeNow(taskId)
+    start(taskId)
+  }, [takeNow, start])
+
   const requestStart = useCallback((taskId: number) => {
     const intentEnabled = localStorage.getItem('intent_enabled') !== 'false'
     if (intentEnabled) setPendingStartTaskId(taskId)
-    else start(taskId)
-  }, [start])
+    else beginSession(taskId)
+  }, [beginSession])
 
-  // «В фокус» на миссии/задаче: сделать текущей и запустить
+  // «В фокус» на миссии/задаче: показать намерение (takeNow — при реальном старте)
   const focusOnTask = useCallback(async (taskId: number) => {
     if (timerState.isRunning) { setPendingSwitchTaskId(taskId); setShowTimerSwitch(true); return }
-    await takeNow(taskId)
     requestStart(taskId)
-  }, [timerState.isRunning, takeNow, requestStart])
+  }, [timerState.isRunning, requestStart])
 
   const handleTimerSwitchConfirm = useCallback(async () => {
     setShowTimerSwitch(false)
@@ -160,11 +167,10 @@ export default function App() {
     if (sessionId !== null) setPostStopSessionId(sessionId)
     clearIntent()  // сбросить старое намерение; модалка намерения перезапишет, если включена
     if (pendingSwitchTaskId !== null) {
-      await takeNow(pendingSwitchTaskId)
       requestStart(pendingSwitchTaskId)
       setPendingSwitchTaskId(null)
     }
-  }, [stop, takeNow, requestStart, pendingSwitchTaskId])
+  }, [stop, requestStart, pendingSwitchTaskId])
 
   const handleStop = useCallback(async () => {
     const { sessionId } = await stop()
@@ -421,8 +427,8 @@ export default function App() {
         <SessionIntentModal
           taskId={pendingStartTaskId}
           taskTitle={tasks.find(t => t.id === pendingStartTaskId)?.title ?? ''}
-          onStart={(intent, subId) => { setSessionIntent(intent); setSessionSubtaskId(subId); persistIntent(intent, subId); const id = pendingStartTaskId; setPendingStartTaskId(null); start(id!) }}
-          onSkip={() => { setSessionIntent(''); setSessionSubtaskId(null); persistIntent('', null); const id = pendingStartTaskId; setPendingStartTaskId(null); start(id!) }}
+          onStart={(intent, subId) => { setSessionIntent(intent); setSessionSubtaskId(subId); persistIntent(intent, subId); const id = pendingStartTaskId; setPendingStartTaskId(null); beginSession(id!) }}
+          onCancel={() => setPendingStartTaskId(null)}
         />
       )}
 

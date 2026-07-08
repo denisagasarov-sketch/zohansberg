@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Task, Direction, DayThread } from '../types'
 import { api, api2, type Mission, type TimelineSession } from '../api'
 import { getDirectionColor } from '../utils/directionColors'
+import { getTaskColor } from '../utils/taskColors'
 import { localKey } from '../utils/sprint'
 import Icon, { MoodIcon } from '../components/Icon'
 import SubtaskList from '../components/SubtaskList'
@@ -146,32 +147,64 @@ function MissionCard({ mission, task, dir, active, recommended, onFocus, onMarkD
 const TL_START = 6 * 60   // 06:00, минуты
 const TL_END = 24 * 60    // 24:00
 
-function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSession[]; thread: DayThread | null; directions: Direction[] }) {
+function TimelineBar({ sessions, thread, onOpenTask }: { sessions: TimelineSession[]; thread: DayThread | null; onOpenTask: (taskId: number) => void }) {
   const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() })
+  const [popup, setPopup] = useState<TimelineSession | null>(null)
   useEffect(() => {
     const id = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()) }, 60_000)
     return () => clearInterval(id)
   }, [])
 
   const toPct = (min: number) => Math.max(0, Math.min(100, ((min - TL_START) / (TL_END - TL_START)) * 100))
-  const parseMin = (iso: string) => {
+  const norm = (iso: string) => {
     let s = iso.includes('T') ? iso : iso.replace(' ', 'T')
     if (!/(Z|[+-]\d\d:?\d\d)$/i.test(s)) s += 'Z'   // бэкенд хранит UTC; без пометки зоны → UTC
-    const d = new Date(s)
-    return d.getHours() * 60 + d.getMinutes()
+    return new Date(s)
   }
+  const parseMin = (iso: string) => { const d = norm(iso); return d.getHours() * 60 + d.getMinutes() }
+  const clock = (iso: string) => norm(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 
   const totalSec = sessions.reduce((s, x) => s + (x.duration_actual ?? 0), 0)
-  const events = (thread?.events ?? []).filter(e => e.kind === 'subtask_done' || e.kind === 'task_done')
+  const taskEvents = (thread?.events ?? []).filter(e => e.kind === 'task_done')
+
+  // Исход сессии: шаг закрыт («✓ Выполнено» в заметке), не до конца («✗ Не до конца»),
+  // задача выполнена (событие task_done этой задачи рядом с концом сессии).
+  const outcome = (s: TimelineSession) => {
+    const note = s.note ?? ''
+    const stepDone = note.includes('✓ Выполнено')
+    const partial = note.includes('✗ Не до конца')
+    const a = parseMin(s.started_at)
+    const endWall = s.ended_at ? parseMin(s.ended_at) : nowMin
+    const taskDone = taskEvents.some(e => e.task_id === s.task_id && parseMin(e.at) >= a - 2 && parseMin(e.at) <= endWall + 3)
+    return { stepDone, partial, taskDone }
+  }
+
+  const outcomeLabel = (oc: { stepDone: boolean; partial: boolean; taskDone: boolean }) =>
+    oc.taskDone && oc.stepDone ? '✓ закрыл шаг и задачу'
+      : oc.taskDone ? '✓ задача выполнена'
+      : oc.stepDone ? '✓ шаг закрыт'
+      : oc.partial ? 'шаг не до конца'
+      : 'без отметки'
+
+  const richTitle = (s: TimelineSession) => {
+    const oc = outcome(s)
+    const parts = [
+      s.title,
+      `${clock(s.started_at)}${s.ended_at ? '–' + clock(s.ended_at) : '–…'} · ${fmt(s.duration_actual ?? 0)}`,
+      outcomeLabel(oc),
+    ]
+    if (s.note) parts.push('— ' + s.note.replace(/\n/g, ' · '))
+    return parts.join('\n')
+  }
 
   return (
-    <div className="card px-5 pt-3 pb-4 select-none">
+    <div className="card px-5 pt-3 pb-4 select-none relative">
       <div className="flex items-center gap-2 mb-3">
         <span className="section-label">Нить дня</span>
         <span className="text-[11px] text-text-secondary tabular-nums">{fmt(totalSec)} в фокусе · {sessions.length} сесс.</span>
       </div>
 
-      <div className="relative h-9">
+      <div className="relative h-[46px]">
         {/* Часовые метки */}
         {[6, 9, 12, 15, 18, 21, 24].map(h => (
           <div key={h} className="absolute top-0 bottom-0 flex flex-col justify-between items-center" style={{ left: `${toPct(h * 60)}%` }}>
@@ -180,44 +213,70 @@ function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSessi
           </div>
         ))}
 
-        {/* Сессии */}
+        {/* Сессии (цвет — по задаче) + маркер исхода в конце */}
         {sessions.map(s => {
           const a = parseMin(s.started_at)
-          // Длина полосы = фактическое время в фокусе (duration_actual), а не wall-clock
-          // начало→конец: иначе сессия с долгой паузой/незакрытая растягивается на часы.
           const durMin = s.ended_at ? (s.duration_actual ?? 0) / 60 : Math.max(0, nowMin - a)
           const b = a + durMin
-          const c = s.direction_id != null ? getDirectionColor(s.direction_id) : '#e0a458'
+          const color = getTaskColor(s.task_id)
+          const oc = outcome(s)
+          const endPct = toPct(b)
           return (
-            <div
-              key={s.id}
-              title={`${s.title} · ${fmt(s.duration_actual ?? 0)}${s.note ? `\n${s.note}` : ''}`}
-              className="absolute top-[7px] h-[12px] rounded-[3px] opacity-90 hover:opacity-100 hover:scale-y-110 transition-all"
-              style={{ left: `${toPct(a)}%`, width: `${Math.max(0.6, toPct(b) - toPct(a))}%`, backgroundColor: c }}
-            />
-          )
-        })}
-
-        {/* События: закрытый шаг — маленькая точка, выполненная задача — крупная веха */}
-        {events.map((e, i) => {
-          const isTask = e.kind === 'task_done'
-          return (
-            <div
-              key={i}
-              title={`${isTask ? '✓ задача: ' : 'шаг: '}${e.text}`}
-              className={`absolute rounded-full -translate-x-1/2 ${isTask ? 'top-[-1px] w-[10px] h-[10px] bg-ok ring-2 ring-[#0d0c0b] shadow-[0_0_6px_rgba(130,168,119,0.6)]' : 'top-[2px] w-[5px] h-[5px] bg-ok/80'}`}
-              style={{ left: `${toPct(parseMin(e.at))}%` }}
-            />
+            <div key={s.id}>
+              <div
+                title={richTitle(s)}
+                onClick={() => setPopup(s)}
+                className="absolute top-[22px] h-[12px] rounded-[3px] cursor-pointer opacity-90 hover:opacity-100 hover:brightness-125 transition-all"
+                style={{ left: `${toPct(a)}%`, width: `${Math.max(0.6, endPct - toPct(a))}%`, backgroundColor: color }}
+              />
+              {/* Маркер исхода */}
+              {(oc.taskDone || oc.stepDone) ? (
+                <div
+                  title={outcomeLabel(oc)}
+                  className={`absolute top-[28px] w-[14px] h-[14px] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[9px] text-white
+                    ${oc.taskDone && oc.stepDone ? 'bg-ok ring-2 ring-[#e0489e]' : oc.taskDone ? 'bg-[#e0489e]' : 'bg-ok'}`}
+                  style={{ left: `${endPct}%` }}
+                >✓</div>
+              ) : oc.partial ? (
+                <div title="шаг не до конца" className="absolute top-[28px] w-[13px] h-[13px] rounded-full border-[1.5px] border-accent -translate-x-1/2 -translate-y-1/2 bg-[#241d10]" style={{ left: `${endPct}%` }} />
+              ) : (
+                <div title="без отметки" className="absolute top-[28px] w-[5px] h-[5px] rounded-full bg-text-faint -translate-x-1/2 -translate-y-1/2" style={{ left: `${endPct}%` }} />
+              )}
+            </div>
           )
         })}
 
         {/* Сейчас */}
         {nowMin >= TL_START && nowMin <= TL_END && (
-          <div className="absolute top-0 bottom-2 w-px bg-accent-light" style={{ left: `${toPct(nowMin)}%` }}>
+          <div className="absolute top-0 bottom-4 w-px bg-accent-light" style={{ left: `${toPct(nowMin)}%` }}>
             <div className="w-[5px] h-[5px] rounded-full bg-accent-light -translate-x-1/2" />
           </div>
         )}
       </div>
+
+      {/* Поп-ап по клику: полная инфа; ещё клик — открыть задачу */}
+      {popup && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setPopup(null)} />
+          <div
+            onClick={() => { const id = popup.task_id; setPopup(null); onOpenTask(id) }}
+            className="absolute z-40 bottom-full mb-2 left-1/2 -translate-x-1/2 w-[340px] max-w-[90%] cursor-pointer bg-overlay border border-border-strong rounded-xl p-3.5 shadow-2xl animate-fade-in"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-[9px] h-[9px] rounded-[2px] shrink-0" style={{ backgroundColor: getTaskColor(popup.task_id) }} />
+              <span className="text-[14px] font-medium text-text truncate">{popup.title}</span>
+            </div>
+            <div className="text-[12px] leading-[1.9] text-text-secondary">
+              <div><span className="text-text-faint">время</span>&nbsp;&nbsp;{clock(popup.started_at)}{popup.ended_at ? '–' + clock(popup.ended_at) : '–…'} · {fmt(popup.duration_actual ?? 0)}</div>
+              <div><span className="text-text-faint">исход</span>&nbsp;&nbsp;{outcomeLabel(outcome(popup))}</div>
+              {popup.note && <div className="text-text-muted whitespace-pre-wrap mt-0.5">{popup.note}</div>}
+            </div>
+            <div className="mt-2.5 pt-2 border-t border-border text-[11px] text-accent-light flex items-center gap-1.5">
+              ещё клик — открыть задачу →
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -378,7 +437,7 @@ export default function PhaseDay({ missions, missionsLoaded, tasks, directions, 
         <div className="flex-1" />
 
         {/* Таймлайн */}
-        <TimelineBar sessions={sessions} thread={thread} directions={directions} />
+        <TimelineBar sessions={sessions} thread={thread} onOpenTask={id => { const t = tasks.find(x => x.id === id); if (t) onEdit(t) }} />
 
         {/* Нить дня: шаги, заметки сессий, что сделал — прямо на дне, не только вечером */}
         <div className="mt-3"><DayThreadBlock onOpenTask={id => { const t = tasks.find(x => x.id === id); if (t) onEdit(t) }} /></div>
