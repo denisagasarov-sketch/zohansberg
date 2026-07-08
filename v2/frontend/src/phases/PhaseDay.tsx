@@ -155,7 +155,6 @@ function TimelineBar({ sessions, thread, onOpenTask }: { sessions: TimelineSessi
     return () => clearInterval(id)
   }, [])
 
-  const toPct = (min: number) => Math.max(0, Math.min(100, ((min - TL_START) / (TL_END - TL_START)) * 100))
   const norm = (iso: string) => {
     let s = iso.includes('T') ? iso : iso.replace(' ', 'T')
     if (!/(Z|[+-]\d\d:?\d\d)$/i.test(s)) s += 'Z'   // бэкенд хранит UTC; без пометки зоны → UTC
@@ -163,6 +162,30 @@ function TimelineBar({ sessions, thread, onOpenTask }: { sessions: TimelineSessi
   }
   const parseMin = (iso: string) => { const d = norm(iso); return d.getHours() * 60 + d.getMinutes() }
   const clock = (iso: string) => norm(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+
+  // Адаптивное окно шкалы: подгоняем под реальную активность дня, а не 6:00–24:00.
+  let tlStart = 8 * 60, tlEnd = 20 * 60
+  if (sessions.length > 0) {
+    let lo = Infinity, hi = -Infinity
+    for (const s of sessions) {
+      const a = parseMin(s.started_at)
+      const durMin = s.ended_at ? (s.duration_actual ?? 0) / 60 : Math.max(0, nowMin - a)
+      lo = Math.min(lo, a); hi = Math.max(hi, a + durMin)
+    }
+    hi = Math.max(hi, nowMin)
+    const sH = Math.max(0, Math.floor((lo - 30) / 60))
+    let eH = Math.min(24, Math.ceil((hi + 30) / 60))
+    if (eH - sH < 3) eH = Math.min(24, sH + 3)
+    tlStart = sH * 60; tlEnd = eH * 60
+  } else {
+    const sH = Math.max(0, Math.floor((nowMin - 120) / 60))
+    tlStart = sH * 60; tlEnd = Math.min(24, Math.max(sH + 3, Math.ceil((nowMin + 30) / 60))) * 60
+  }
+  const toPct = (min: number) => Math.max(0, Math.min(100, ((min - tlStart) / (tlEnd - tlStart)) * 100))
+  const span = (tlEnd - tlStart) / 60
+  const tickStep = span <= 7 ? 1 : span <= 13 ? 2 : 3
+  const hourTicks: number[] = []
+  for (let h = tlStart / 60; h <= tlEnd / 60 + 0.001; h += tickStep) hourTicks.push(h)
 
   const totalSec = sessions.reduce((s, x) => s + (x.duration_actual ?? 0), 0)
   const taskEvents = (thread?.events ?? []).filter(e => e.kind === 'task_done')
@@ -205,11 +228,11 @@ function TimelineBar({ sessions, thread, onOpenTask }: { sessions: TimelineSessi
       </div>
 
       <div className="relative h-[46px]">
-        {/* Часовые метки */}
-        {[6, 9, 12, 15, 18, 21, 24].map(h => (
+        {/* Часовые метки — адаптивный шаг под ширину окна */}
+        {hourTicks.map(h => (
           <div key={h} className="absolute top-0 bottom-0 flex flex-col justify-between items-center" style={{ left: `${toPct(h * 60)}%` }}>
             <div className="w-px flex-1 bg-border" />
-            <span className="text-[9px] text-text-faint tabular-nums -translate-x-1/2 absolute -bottom-0.5">{h === 24 ? '00' : h}</span>
+            <span className="text-[9px] text-text-faint tabular-nums -translate-x-1/2 absolute -bottom-0.5">{h >= 24 ? '00' : h}</span>
           </div>
         ))}
 
@@ -247,7 +270,7 @@ function TimelineBar({ sessions, thread, onOpenTask }: { sessions: TimelineSessi
         })}
 
         {/* Сейчас */}
-        {nowMin >= TL_START && nowMin <= TL_END && (
+        {nowMin >= tlStart && nowMin <= tlEnd && (
           <div className="absolute top-0 bottom-4 w-px bg-accent-light" style={{ left: `${toPct(nowMin)}%` }}>
             <div className="w-[5px] h-[5px] rounded-full bg-accent-light -translate-x-1/2" />
           </div>
