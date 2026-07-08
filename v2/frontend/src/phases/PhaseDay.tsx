@@ -178,7 +178,10 @@ function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSessi
         {/* Сессии */}
         {sessions.map(s => {
           const a = parseMin(s.started_at)
-          const b = s.ended_at ? parseMin(s.ended_at) : nowMin
+          // Длина полосы = фактическое время в фокусе (duration_actual), а не wall-clock
+          // начало→конец: иначе сессия с долгой паузой/незакрытая растягивается на часы.
+          const durMin = s.ended_at ? (s.duration_actual ?? 0) / 60 : Math.max(0, nowMin - a)
+          const b = a + durMin
           const c = s.direction_id != null ? getDirectionColor(s.direction_id) : '#e0a458'
           return (
             <div
