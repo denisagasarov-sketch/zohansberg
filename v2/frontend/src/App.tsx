@@ -317,6 +317,11 @@ export default function App() {
             onOpenMorning={() => setPhase('morning')}
             onOpenEvening={() => setPhase('evening')}
             onRemoveMission={async id => { await api2.deleteMission(id).catch(() => {}); refreshMissions() }}
+            onReorder={async ids => {
+              const payload = ids.map(id => ({ task_id: id, hours_budget: missions.find(m => m.task_id === id)?.hours_budget ?? null }))
+              await api2.setMissions(todayStr(), payload).catch(() => {})
+              refreshMissions()
+            }}
           />
         )}
 

@@ -18,7 +18,13 @@ export default function SessionIntentModal({ taskId, taskTitle, onStart, onSkip 
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => {
     api.getSubtasks(taskId)
-      .then(s => setSteps((s as Subtask[]).filter(x => !x.done_at)))
+      .then(s => {
+        const open = (s as Subtask[]).filter(x => !x.done_at)
+        setSteps(open)
+        // Авто-выбор первого незакрытого шага как намерения: тогда «Да, сделал»
+        // в конце сессии сразу закроет именно его. Можно снять тапом или вписать своё.
+        if (open.length > 0) { setSubtaskId(open[0].id); setIntent(open[0].title) }
+      })
       .catch(() => {})
   }, [taskId])
 

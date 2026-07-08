@@ -23,6 +23,7 @@ interface Props {
   onOpenMorning: () => void
   onOpenEvening: () => void
   onRemoveMission: (missionId: number) => void
+  onReorder: (orderedTaskIds: number[]) => void
 }
 
 const todayStr = () => localKey(new Date())
@@ -60,6 +61,11 @@ function MissionCard({ mission, task, dir, active, recommended, onFocus, onMarkD
       .catch(() => {})
   }, [mission.task_id])
   useEffect(() => { loadSubs() }, [loadSubs])
+  useEffect(() => {
+    const h = () => loadSubs()
+    window.addEventListener('gamification-updated', h)
+    return () => window.removeEventListener('gamification-updated', h)
+  }, [loadSubs])
 
   return (
     <div className={`group relative card-raised p-5 flex flex-col gap-3 transition-all duration-200 min-h-[180px]
@@ -202,10 +208,23 @@ function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSessi
 
 // ── Фаза «День» ────────────────────────────────────────────────────────────────
 
-export default function PhaseDay({ missions, missionsLoaded, tasks, directions, checkin, nowTaskId, onFocus, onMarkDone, onEdit, onOpenLibrary, onOpenMorning, onOpenEvening, onRemoveMission }: Props) {
+export default function PhaseDay({ missions, missionsLoaded, tasks, directions, checkin, nowTaskId, onFocus, onMarkDone, onEdit, onOpenLibrary, onOpenMorning, onOpenEvening, onRemoveMission, onReorder }: Props) {
   const [sessions, setSessions] = useState<TimelineSession[]>([])
   const [thread, setThread] = useState<DayThread | null>(null)
   const [streak, setStreak] = useState<number | null>(null)
+  const [dragMissionId, setDragMissionId] = useState<number | null>(null)
+
+  const handleMissionDrop = (targetTaskId: number) => {
+    const from = dragMissionId
+    setDragMissionId(null)
+    if (from == null || from === targetTaskId) return
+    const ids = missions.map(m => m.task_id)
+    const fi = ids.indexOf(from), ti = ids.indexOf(targetTaskId)
+    if (fi === -1 || ti === -1) return
+    ids.splice(fi, 1)
+    ids.splice(ti, 0, from)
+    onReorder(ids)
+  }
 
   const load = useCallback(() => {
     const t = todayStr()
@@ -309,18 +328,26 @@ export default function PhaseDay({ missions, missionsLoaded, tasks, directions, 
           <div>
             <div className={`grid gap-4 ${missions.length === 1 ? 'grid-cols-1 max-w-xl' : missions.length === 2 ? 'grid-cols-2' : 'grid-cols-3 max-lg:grid-cols-1'}`}>
               {missions.map(m => (
-                <MissionCard
+                <div
                   key={m.id}
-                  mission={m}
-                  task={tasks.find(t => t.id === m.task_id)}
-                  dir={directions.find(d => d.id === m.direction_id)}
-                  active={nowTaskId === m.task_id}
-                  recommended={recommendedMissionId === m.id}
-                  onFocus={() => onFocus(m.task_id)}
-                  onMarkDone={() => onMarkDone(m.task_id)}
-                  onEdit={() => { const t = tasks.find(x => x.id === m.task_id); if (t) onEdit(t) }}
-                  onRemove={() => onRemoveMission(m.id)}
-                />
+                  draggable
+                  onDragStart={e => { setDragMissionId(m.task_id); e.dataTransfer.effectAllowed = 'move' }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => handleMissionDrop(m.task_id)}
+                  className={`transition-opacity ${dragMissionId === m.task_id ? 'opacity-40' : ''} ${dragMissionId != null && dragMissionId !== m.task_id ? 'rounded-2xl ring-1 ring-transparent hover:ring-accent/40' : ''}`}
+                >
+                  <MissionCard
+                    mission={m}
+                    task={tasks.find(t => t.id === m.task_id)}
+                    dir={directions.find(d => d.id === m.direction_id)}
+                    active={nowTaskId === m.task_id}
+                    recommended={recommendedMissionId === m.id}
+                    onFocus={() => onFocus(m.task_id)}
+                    onMarkDone={() => onMarkDone(m.task_id)}
+                    onEdit={() => { const t = tasks.find(x => x.id === m.task_id); if (t) onEdit(t) }}
+                    onRemove={() => onRemoveMission(m.id)}
+                  />
+                </div>
               ))}
             </div>
             {missions.length < 3 && (

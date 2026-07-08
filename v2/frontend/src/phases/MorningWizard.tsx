@@ -29,7 +29,7 @@ export default function MorningWizard({ tasks, directions, checkin, onDone, onSk
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState('')
   const [saving, setSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<'dir' | 'sprint'>('dir')
+  const [viewMode, setViewMode] = useState<'dir' | 'sprint'>('sprint')
 
   const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 

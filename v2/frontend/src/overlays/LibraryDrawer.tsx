@@ -71,7 +71,7 @@ export default function LibraryDrawer({ tasks, directions, missions, nowTaskId, 
   const [showSomeday, setShowSomeday] = useState(false)
   const [showDone, setShowDone] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<number | 'none'>>(new Set())
-  const [viewMode, setViewMode] = useState<'dir' | 'sprint'>('dir')
+  const [viewMode, setViewMode] = useState<'dir' | 'sprint'>('sprint')
   const [collapsedSprints, setCollapsedSprints] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<number | null>(null)
   const [showReturnHint, setShowReturnHint] = useState(false)

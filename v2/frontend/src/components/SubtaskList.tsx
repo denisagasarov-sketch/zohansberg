@@ -19,11 +19,18 @@ export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onC
   const [newTitle, setNewTitle] = useState('')
   const [editId, setEditId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [dragId, setDragId] = useState<number | null>(null)
 
   const load = useCallback(() => {
     api.getSubtasks(taskId).then(s => setSubs(s as Subtask[])).catch(() => {})
   }, [taskId])
   useEffect(() => { load() }, [load])
+  // Внешние изменения (напр. «Да, сделал» в модалке итога сессии) — подхватываем сразу.
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener('gamification-updated', h)
+    return () => window.removeEventListener('gamification-updated', h)
+  }, [load])
 
   const add = async () => {
     const t = newTitle.trim()
@@ -50,6 +57,20 @@ export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onC
     await api.updateSubtask(s.id, { title: t }).catch(() => {})
     load(); onChanged?.()
   }
+  const handleDrop = async (targetId: number) => {
+    const from = dragId
+    setDragId(null)
+    if (from == null || from === targetId) return
+    const ids = subs.map(s => s.id)
+    const fi = ids.indexOf(from), ti = ids.indexOf(targetId)
+    if (fi === -1 || ti === -1) return
+    const next = [...subs]
+    const [moved] = next.splice(fi, 1)
+    next.splice(ti, 0, moved)
+    setSubs(next)                                   // оптимистично
+    await api.reorderSubtasks(taskId, next.map(s => s.id)).catch(() => {})
+    onChanged?.()
+  }
 
   const done = subs.filter(s => s.done_at).length
   const pct = subs.length ? Math.round((done / subs.length) * 100) : 0
@@ -67,7 +88,13 @@ export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onC
 
       <ul className="space-y-1">
         {subs.map(s => (
-          <li key={s.id} className="group flex items-center gap-2 text-sm">
+          <li
+            key={s.id}
+            draggable={editId !== s.id}
+            onDragStart={e => { e.stopPropagation(); setDragId(s.id); e.dataTransfer.effectAllowed = 'move' }}
+            onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+            onDrop={e => { e.stopPropagation(); handleDrop(s.id) }}
+            className={`group flex items-center gap-2 text-sm rounded transition-opacity ${dragId === s.id ? 'opacity-40' : ''} ${dragId != null && dragId !== s.id ? 'hover:ring-1 hover:ring-accent/40' : ''}`}>
             <button
               onClick={() => toggle(s)}
               className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center text-[10px] transition-colors ${
