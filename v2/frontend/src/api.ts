@@ -76,6 +76,8 @@ export const api = {
   // Journal
   getJournal: () => req<any[]>('GET', '/journal'),
   createJournalEntry: (data: any) => req('POST', '/journal', data),
+  updateJournalEntry: (id: number, data: { goal?: string | null; content?: string | null; mood?: number | null }) => req('PATCH', `/journal/${id}`, data),
+  deleteJournalEntry: (id: number) => req('DELETE', `/journal/${id}`),
   getTodayCheckin: () =>
     req<{ exists: boolean; mood: number | null; goal: string | null; content: string | null }>('GET', '/journal/today-checkin'),
 

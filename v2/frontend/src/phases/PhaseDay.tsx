@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Task, Direction, DayThread } from '../types'
 import { api, api2, type Mission, type TimelineSession } from '../api'
 import { getDirectionColor } from '../utils/directionColors'
+import { localKey } from '../utils/sprint'
 import Icon, { MoodIcon } from '../components/Icon'
 import SubtaskList from '../components/SubtaskList'
 import DayThreadBlock from '../components/DayThreadBlock'
@@ -24,7 +25,7 @@ interface Props {
   onRemoveMission: (missionId: number) => void
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const todayStr = () => localKey(new Date())
 
 function fmt(s: number): string {
   if (s < 60) return `${s}с`
@@ -337,7 +338,7 @@ export default function PhaseDay({ missions, missionsLoaded, tasks, directions, 
         <TimelineBar sessions={sessions} thread={thread} directions={directions} />
 
         {/* Нить дня: шаги, заметки сессий, что сделал — прямо на дне, не только вечером */}
-        <div className="mt-3"><DayThreadBlock /></div>
+        <div className="mt-3"><DayThreadBlock onOpenTask={id => { const t = tasks.find(x => x.id === id); if (t) onEdit(t) }} /></div>
 
         {/* Нижняя строка */}
         <div className="flex items-center gap-3 text-[13px] -mt-1">

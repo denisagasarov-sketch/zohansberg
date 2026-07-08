@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { DayThread, DayThreadEvent } from '../types'
 import { api } from '../api'
 import Icon, { MoodIcon, type IconName } from './Icon'
+import { localKey } from '../utils/sprint'
 
 function fmt(s: number): string {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
@@ -16,12 +17,12 @@ function eventIcon(k: DayThreadEvent['kind']): IconName {
   return k === 'subtask_done' ? 'check' : k === 'task_done' ? 'target' : k === 'session_note' ? 'note' : 'thought'
 }
 
-export default function DayThreadBlock() {
+export default function DayThreadBlock({ onOpenTask }: { onOpenTask?: (taskId: number) => void } = {}) {
   const [thread, setThread] = useState<DayThread | null>(null)
   const [open, setOpen] = useState(true)
 
   const load = useCallback(() => {
-    api.getDayThread(new Date().toISOString().slice(0, 10)).then(setThread).catch(() => {})
+    api.getDayThread(localKey(new Date())).then(setThread).catch(() => {})
   }, [])
   useEffect(() => {
     load()
@@ -58,8 +59,15 @@ export default function DayThreadBlock() {
             <div className="text-xs text-[#9c958a]">Пока пусто — начни первый подход</div>
           ) : (
             <ul className="space-y-1.5">
-              {events.map((e, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
+              {events.map((e, i) => {
+                const clickable = !!(e.task_id && onOpenTask)
+                return (
+                <li
+                  key={i}
+                  onClick={clickable ? () => onOpenTask!(e.task_id!) : undefined}
+                  title={clickable ? 'Открыть задачу' : undefined}
+                  className={`flex items-start gap-2 text-sm rounded ${clickable ? 'cursor-pointer hover:bg-raised/60 -mx-1 px-1' : ''}`}
+                >
                   <span className="text-[#6f695f] text-[10px] tabular-nums w-9 shrink-0 mt-0.5">{time(e.at)}</span>
                   <span className={`shrink-0 mt-0.5 ${e.kind === 'subtask_done' || e.kind === 'task_done' ? 'text-[#82a877]' : 'text-[#9c958a]'}`}><Icon name={eventIcon(e.kind)} size={13} /></span>
                   <span className="flex-1">
@@ -68,7 +76,8 @@ export default function DayThreadBlock() {
                     {e.seconds ? <span className="text-[10px] text-[#e0a458]"> · {fmt(e.seconds)}</span> : null}
                   </span>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </div>

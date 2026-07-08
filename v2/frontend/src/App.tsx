@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Task } from './types'
 import { api, api2, type Mission } from './api'
 import { useTasks } from './hooks/useTasks'
+import { localKey } from './utils/sprint'
 import { useTimer } from './hooks/useTimer'
 import { usePomodoro } from './hooks/usePomodoro'
 
@@ -34,7 +35,7 @@ import CreditWorkModal from './components/modals/CreditWorkModal'
 export type Phase = 'morning' | 'day' | 'evening'
 export type Layer = null | 'library' | 'stats' | 'stats-classic' | 'journal' | 'settings' | 'archive' | 'trash' | 'weekplan'
 
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const todayStr = () => localKey(new Date())
 
 // ── Намерение сессии переживает перезагрузку окна ──────────────────────────────
 const INTENT_KEY = 'focusboard_intent'
@@ -309,6 +310,7 @@ export default function App() {
             directions={directions}
             missions={missions}
             onClose={finishEvening}
+            onEdit={t => setSelectedTask(t)}
           />
         )}
 
@@ -366,7 +368,7 @@ export default function App() {
       {layer === 'stats-classic' && <div className="absolute inset-0 top-0 z-40 bg-bg"><StatsScreen onClose={() => setLayer('stats')} /></div>}
       {layer === 'journal' && <div className="absolute inset-0 z-40 bg-bg"><JournalScreen onClose={() => setLayer(null)} /></div>}
       {layer === 'settings' && <div className="absolute inset-0 z-40 bg-bg"><SettingsScreen directions={directions} onClose={() => setLayer(null)} onDirectionChange={refresh} onNavigate={s => setLayer((s as string) === 'archive' ? 'archive' : (s as string) === 'trash' ? 'trash' : null)} /></div>}
-      {layer === 'archive' && <div className="absolute inset-0 z-40 bg-bg"><ArchiveScreen directions={directions} onClose={() => setLayer(null)} onChanged={() => { refresh(); refreshMissions() }} /></div>}
+      {layer === 'archive' && <div className="absolute inset-0 z-40 bg-bg"><ArchiveScreen directions={directions} onClose={() => setLayer(null)} onChanged={() => { refresh(); refreshMissions() }} onEditTask={t => setSelectedTask(t)} /></div>}
       {layer === 'trash' && <div className="absolute inset-0 z-40 bg-bg"><TrashScreen onClose={() => setLayer(null)} onRestored={refresh} /></div>}
       {layer === 'weekplan' && <div className="absolute inset-0 z-40 bg-bg"><WeekPlanScreen directions={directions} onClose={() => setLayer(null)} onChanged={refresh} /></div>}
 

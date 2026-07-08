@@ -17,6 +17,8 @@ interface Props {
 export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onChanged }: Props) {
   const [subs, setSubs] = useState<Subtask[]>([])
   const [newTitle, setNewTitle] = useState('')
+  const [editId, setEditId] = useState<number | null>(null)
+  const [editTitle, setEditTitle] = useState('')
 
   const load = useCallback(() => {
     api.getSubtasks(taskId).then(s => setSubs(s as Subtask[])).catch(() => {})
@@ -38,6 +40,14 @@ export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onC
   }
   const remove = async (s: Subtask) => {
     await api.deleteSubtask(s.id).catch(() => {})
+    load(); onChanged?.()
+  }
+  const startEdit = (s: Subtask) => { setEditId(s.id); setEditTitle(s.title) }
+  const saveEdit = async (s: Subtask) => {
+    const t = editTitle.trim()
+    setEditId(null)
+    if (!t || t === s.title) return
+    await api.updateSubtask(s.id, { title: t }).catch(() => {})
     load(); onChanged?.()
   }
 
@@ -64,7 +74,29 @@ export default function SubtaskList({ taskId, compact, hideAdd, onFocusStep, onC
                 s.done_at ? 'bg-[#82a877] border-[#82a877] text-white' : 'border-[#453f37] hover:border-[#82a877]'
               }`}
             >{s.done_at ? '✓' : ''}</button>
-            <span className={`flex-1 ${s.done_at ? 'text-[#9c958a] line-through decoration-[#453f37]' : 'text-[#ddd6cb]'}`}>{s.title}</span>
+            {editId === s.id ? (
+              <input
+                autoFocus
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                onBlur={() => saveEdit(s)}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(s); if (e.key === 'Escape') setEditId(null) }}
+                className="flex-1 bg-[#0f0e0d] border border-[#e0a458] rounded px-1.5 py-0.5 text-sm text-[#ece7df] focus:outline-none"
+              />
+            ) : (
+              <span
+                onDoubleClick={() => startEdit(s)}
+                title="Двойной клик — переименовать"
+                className={`flex-1 cursor-text ${s.done_at ? 'text-[#9c958a] line-through decoration-[#453f37]' : 'text-[#ddd6cb]'}`}
+              >{s.title}</span>
+            )}
+            {editId !== s.id && (
+              <button
+                onClick={() => startEdit(s)}
+                className="opacity-0 group-hover:opacity-100 text-[10px] text-[#6f695f] hover:text-[#eab26c] shrink-0 transition-opacity"
+                title="Переименовать шаг"
+              >✎</button>
+            )}
             {!s.done_at && onFocusStep && (
               <button
                 onClick={() => onFocusStep(s)}

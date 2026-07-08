@@ -36,6 +36,9 @@ export default function JournalScreen({ onClose }: Props) {
   const [analyzing, setAnalyzing] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [showCheckin, setShowCheckin] = useState(false)
+  const [editId, setEditId] = useState<number | null>(null)
+  const [editGoal, setEditGoal] = useState('')
+  const [editContent, setEditContent] = useState('')
 
   useEffect(() => {
     const k = localStorage.getItem('openai_api_key')
@@ -57,6 +60,32 @@ export default function JournalScreen({ onClose }: Props) {
     window.addEventListener('journal-updated', handler)
     return () => window.removeEventListener('journal-updated', handler)
   }, [load])
+
+  const startEdit = (entry: JournalEntry) => {
+    setEditId(entry.id)
+    setEditGoal(entry.goal ?? '')
+    setEditContent(entry.content ?? '')
+  }
+  const saveEdit = async (entry: JournalEntry) => {
+    const id = entry.id
+    setEditId(null)
+    try {
+      const data = entry.type === 'checkin'
+        ? { goal: editGoal.trim() || null, content: editContent.trim() || null }
+        : { content: editContent.trim() || null }
+      await api.updateJournalEntry(id, data)
+      window.dispatchEvent(new CustomEvent('journal-updated'))
+      load()
+    } catch (e) { console.error(e) }
+  }
+  const delEntry = async (id: number) => {
+    if (!window.confirm('Удалить запись дневника?')) return
+    try {
+      await api.deleteJournalEntry(id)
+      window.dispatchEvent(new CustomEvent('journal-updated'))
+      load()
+    } catch (e) { console.error(e) }
+  }
 
   const handleAddThought = async () => {
     if (!thoughtText.trim()) return
@@ -177,26 +206,63 @@ export default function JournalScreen({ onClose }: Props) {
                 {grouped.get(key)!.map(entry => {
                   if (entry.type === 'checkin') {
                     return (
-                      <div key={entry.id} className="bg-card border border-border rounded-xl px-3 py-2.5">
+                      <div key={entry.id} className="group bg-card border border-border rounded-xl px-3 py-2.5">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[#eab26c]">{entry.mood ? <MoodIcon mood={entry.mood} size={20} /> : <Icon name="sun" size={18} />}</span>
                           <span className="text-xs text-[#9c958a]">Чекин</span>
                           <span className="text-[10px] text-[#4a463f] ml-auto">
                             {new Date(entry.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {editId !== entry.id && (
+                            <span className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => startEdit(entry)} className="text-[10px] text-[#6f695f] hover:text-[#eab26c]" title="Править">✎</button>
+                              <button onClick={() => delEntry(entry.id)} className="text-[12px] text-[#6f695f] hover:text-[#c05555] leading-none" title="Удалить">×</button>
+                            </span>
+                          )}
                         </div>
-                        {entry.goal && <p className="text-sm text-[#ece7df] mb-1 font-medium">{entry.goal}</p>}
-                        {entry.content && <p className="text-sm text-[#9c958a]">{entry.content}</p>}
+                        {editId === entry.id ? (
+                          <div className="space-y-2">
+                            <input value={editGoal} onChange={e => setEditGoal(e.target.value)} placeholder="Цель дня" className="w-full bg-[#0f0e0d] border border-[#2a2723] rounded px-2 py-1.5 text-sm text-[#ece7df] focus:outline-none focus:border-[#e0a458]" />
+                            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={3} placeholder="Мысли" className="w-full bg-[#0f0e0d] border border-[#2a2723] rounded px-2 py-1.5 text-sm text-[#ece7df] focus:outline-none focus:border-[#e0a458] resize-none" />
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setEditId(null)} className="text-xs text-[#9c958a] hover:text-[#ece7df]">Отмена</button>
+                              <button onClick={() => saveEdit(entry)} className="text-xs px-3 py-1 bg-accent hover:bg-accent-light rounded text-[#1c1610] font-medium">Сохранить</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {entry.goal && <p className="text-sm text-[#ece7df] mb-1 font-medium">{entry.goal}</p>}
+                            {entry.content && <p className="text-sm text-[#9c958a]">{entry.content}</p>}
+                          </>
+                        )}
                       </div>
                     )
                   }
                   return (
-                    <div key={entry.id} className="bg-card border border-border rounded-xl px-3 py-2">
+                    <div key={entry.id} className="group bg-card border border-border rounded-xl px-3 py-2">
                       <div className="flex items-start gap-2">
                         <span className="text-[#6f695f] mt-0.5"><Icon name="thought" size={15} /></span>
-                        <p className="flex-1 text-sm text-[#ece7df]">{entry.content}</p>
-                        <span className="text-[10px] text-[#4a463f] shrink-0 mt-0.5">
-                          {new Date(entry.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        {editId === entry.id ? (
+                          <div className="flex-1 space-y-2">
+                            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={3} className="w-full bg-[#0f0e0d] border border-[#2a2723] rounded px-2 py-1.5 text-sm text-[#ece7df] focus:outline-none focus:border-[#e0a458] resize-none" />
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setEditId(null)} className="text-xs text-[#9c958a] hover:text-[#ece7df]">Отмена</button>
+                              <button onClick={() => saveEdit(entry)} className="text-xs px-3 py-1 bg-accent hover:bg-accent-light rounded text-[#1c1610] font-medium">Сохранить</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="flex-1 text-sm text-[#ece7df]">{entry.content}</p>
+                        )}
+                        <span className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                          {editId !== entry.id && (
+                            <span className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => startEdit(entry)} className="text-[10px] text-[#6f695f] hover:text-[#eab26c]" title="Править">✎</button>
+                              <button onClick={() => delEntry(entry.id)} className="text-[12px] text-[#6f695f] hover:text-[#c05555] leading-none" title="Удалить">×</button>
+                            </span>
+                          )}
+                          <span className="text-[10px] text-[#4a463f]">
+                            {new Date(entry.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </span>
                       </div>
                     </div>

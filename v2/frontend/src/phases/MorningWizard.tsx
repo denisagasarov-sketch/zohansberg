@@ -5,7 +5,7 @@ import { api, api2 } from '../api'
 import { playSound } from '../sound'
 import { MoodIcon } from '../components/Icon'
 import { getDirectionColor } from '../utils/directionColors'
-import { groupBySprint, fmtDM, thisMondayKey } from '../utils/sprint'
+import { groupBySprint, fmtDM, thisMondayKey, localKey } from '../utils/sprint'
 import { priorityLabel, priorityColor } from '../utils/priority'
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
   onCheckinSaved: (mood: number, goal: string) => void
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const todayStr = () => localKey(new Date())
 
 export default function MorningWizard({ tasks, directions, checkin, onDone, onSkip, onCheckinSaved }: Props) {
   const [step, setStep] = useState<1 | 2>(checkin?.exists ? 2 : 1)

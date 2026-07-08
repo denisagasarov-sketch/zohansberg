@@ -64,6 +64,7 @@ export interface DayThreadEvent {
   kind: 'subtask_done' | 'session_note' | 'thought' | 'task_done'
   text: string
   task?: string
+  task_id?: number | null
   seconds?: number | null
 }
 

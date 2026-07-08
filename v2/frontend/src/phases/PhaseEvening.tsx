@@ -5,12 +5,14 @@ import { api, api2, type Mission } from '../api'
 import { playSound } from '../sound'
 import DayThreadBlock from '../components/DayThreadBlock'
 import { getDirectionColor } from '../utils/directionColors'
+import { localKey } from '../utils/sprint'
 
 interface Props {
   tasks: Task[]
   directions: Direction[]
   missions: Mission[]
   onClose: () => void
+  onEdit?: (task: Task) => void
 }
 
 function fmt(s: number): string {
@@ -19,7 +21,7 @@ function fmt(s: number): string {
   return h > 0 ? `${h}ч ${m}м` : `${m}м`
 }
 
-export default function PhaseEvening({ tasks, directions, missions, onClose }: Props) {
+export default function PhaseEvening({ tasks, directions, missions, onClose, onEdit }: Props) {
   const [summary, setSummary] = useState<{ done_count: number; time_seconds: number } | null>(null)
   const [reflection, setReflection] = useState('')
   const [tomorrowSel, setTomorrowSel] = useState<number[]>([])
@@ -59,7 +61,7 @@ export default function PhaseEvening({ tasks, directions, missions, onClose }: P
   const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowDate = tomorrow.toISOString().slice(0, 10)
+  const tomorrowDate = localKey(tomorrow)
   const tomorrowLabel = tomorrow.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const available = useMemo(() => {
@@ -133,7 +135,7 @@ export default function PhaseEvening({ tasks, directions, missions, onClose }: P
         )}
 
         {/* Лента дня */}
-        <DayThreadBlock />
+        <DayThreadBlock onOpenTask={onEdit ? id => { const t = tasks.find(x => x.id === id); if (t) onEdit(t) } : undefined} />
 
         {/* Рефлексия */}
         <div>

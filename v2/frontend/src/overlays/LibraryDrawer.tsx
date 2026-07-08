@@ -69,6 +69,7 @@ function Row({ task, dirColor, isMission, isNow, missionsFull, onClick, onFocus,
 export default function LibraryDrawer({ tasks, directions, missions, nowTaskId, onClose, onTaskClick, onNewTask, onFocus, onMarkDone, onAddMission, onPriorityChange, onReorderSprint }: Props) {
   const [filter, setFilter] = useState('')
   const [showSomeday, setShowSomeday] = useState(false)
+  const [showDone, setShowDone] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<number | 'none'>>(new Set())
   const [viewMode, setViewMode] = useState<'dir' | 'sprint'>('dir')
   const [collapsedSprints, setCollapsedSprints] = useState<Set<string>>(new Set())
@@ -106,6 +107,14 @@ export default function LibraryDrawer({ tasks, directions, missions, nowTaskId, 
   }, [tasks, filter])
 
   const someday = useMemo(() => tasks.filter(t => t.someday && !t.done_at && !t.deleted_at), [tasks])
+
+  // Завершённые: закрытые задачи (не удалённые). Свежие сверху. Клик — в редактор.
+  const doneTasks = useMemo(() => {
+    const f = filter.trim().toLowerCase()
+    const list = tasks.filter(t => t.done_at && !t.deleted_at)
+    const filtered = f ? list.filter(t => t.title.toLowerCase().includes(f)) : list
+    return [...filtered].sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)))
+  }, [tasks, filter])
 
   const groups = useMemo(() => {
     const gs: { key: number | 'none'; dir: Direction | null; tasks: Task[] }[] = []
@@ -310,6 +319,26 @@ export default function LibraryDrawer({ tasks, directions, missions, nowTaskId, 
               {showSomeday && someday.map(t => (
                 <div key={t.id} onClick={() => onTaskClick(t)} className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-raised/70 transition-colors">
                   <span className="flex-1 text-[12px] italic text-text-secondary truncate">{t.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Завершённые — клик открывает редактор (правка задним числом) */}
+          {doneTasks.length > 0 && (
+            <div className="pt-2">
+              <button onClick={() => setShowDone(v => !v)} className="w-full flex items-center gap-2 px-3 py-1.5 select-none">
+                <span className="text-ok"><Icon name="check" size={13} /></span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Завершённые</span>
+                <span className="text-[10px] text-text-faint tabular-nums">{doneTasks.length}</span>
+                <span className="flex-1 border-t border-border ml-1" />
+                <span className="text-[10px] text-text-faint">{showDone ? '▾' : '▸'}</span>
+              </button>
+              {showDone && doneTasks.map(t => (
+                <div key={t.id} onClick={() => onTaskClick(t)} className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-raised/70 transition-colors">
+                  <span className="text-ok/70 text-[11px] shrink-0">✓</span>
+                  <span className="flex-1 text-[12px] text-text-secondary line-through decoration-border-strong truncate">{t.title}</span>
+                  {t.done_at && <span className="text-[10px] text-text-faint shrink-0">{new Date(t.done_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>}
                 </div>
               ))}
             </div>

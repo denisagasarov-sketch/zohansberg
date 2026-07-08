@@ -6,6 +6,7 @@ interface Props {
   directions: Direction[]
   onClose: () => void
   onChanged?: () => void
+  onEditTask?: (task: Task) => void
 }
 
 function groupByDay(tasks: Task[]): Map<string, Task[]> {
@@ -32,7 +33,7 @@ function formatDuration(s: number) {
   return `${m}м`
 }
 
-export default function ArchiveScreen({ directions, onClose, onChanged }: Props) {
+export default function ArchiveScreen({ directions, onClose, onChanged, onEditTask }: Props) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDir, setFilterDir] = useState<number | null>(null)
@@ -99,7 +100,11 @@ export default function ArchiveScreen({ directions, onClose, onChanged }: Props)
                   <div key={task.id} className="group bg-[#1b1a18] border border-[#2a2723] rounded px-3 py-2">
                     <div className="flex items-center gap-3">
                       <span className="text-[#9c958a] text-sm">✓</span>
-                      <span className="flex-1 text-sm text-[#ece7df]">{task.title}</span>
+                      <button
+                        onClick={() => onEditTask?.(task)}
+                        className="flex-1 text-left text-sm text-[#ece7df] hover:text-white transition-colors truncate"
+                        title="Открыть редактор задачи"
+                      >{task.title}</button>
                       {dir && <span className="text-xs text-[#9c958a]">{dir.name}</span>}
                       {task.duration_fact > 0 && (
                         <span className="text-xs text-[#e0a458]">{formatDuration(task.duration_fact)}</span>

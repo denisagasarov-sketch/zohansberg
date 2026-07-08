@@ -63,6 +63,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
   const [notes, setNotes] = useState(task?.notes ?? '')
   const [someday, setSomeday] = useState(!!task?.someday)
   const [recurrence, setRecurrence] = useState<string>(task?.recurrence ?? '')
+  const [doneAt, setDoneAt] = useState(task?.done_at?.slice(0, 10) ?? '')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -141,6 +142,7 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
         recurrence: (recurrence || null) as Task['recurrence'],
         someday: someday as any,
         ...(someday ? { in_queue: false as any } : {}),
+        ...(task?.done_at && doneAt ? { done_at: new Date(doneAt + 'T12:00:00').toISOString() } as any : {}),
       }
       if (task) {
         await api.updateTask(task.id, data)
@@ -378,6 +380,20 @@ export default function TaskEditor({ task, directions, onClose, onSaved, onDelet
               <span className="text-xs text-[#a49d90]">Когда-нибудь</span>
             </label>
           </div>
+
+          {/* Дата завершения — правка задним числом (только для закрытой задачи) */}
+          {task?.done_at && (
+            <div>
+              <label className="block text-[10px] text-[#9c958a] uppercase tracking-wider mb-1.5">Завершено</label>
+              <input
+                type="date"
+                value={doneAt}
+                onChange={e => setDoneAt(e.target.value)}
+                className="w-full bg-[#0f0e0d] border border-[#2a2723] rounded px-2 py-1.5 text-sm text-[#ece7df] focus:outline-none focus:border-[#e0a458] [color-scheme:dark]"
+              />
+              <p className="text-[10px] text-[#6f695f] mt-1">Меняет день, в котором задача попадёт в «нить дня» и статистику.</p>
+            </div>
+          )}
 
           {/* Sessions block — only for existing tasks */}
           {task && (

@@ -3,6 +3,7 @@ const cors = require('cors')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
+const { execSync } = require('child_process')
 const { db, initSchema, cleanupTrash } = require('./db')
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
@@ -57,10 +58,10 @@ function fmtHM(sec) {
 function currentStreak() {
   const days = new Set()
   const add = (rows) => rows.forEach(r => r.d && days.add(r.d))
-  add(db.prepare(`SELECT DISTINCT date(started_at) d FROM work_sessions WHERE duration_actual>0`).all())
-  add(db.prepare(`SELECT DISTINCT date(done_at) d FROM tasks WHERE done_at IS NOT NULL`).all())
-  add(db.prepare(`SELECT DISTINCT date(done_at) d FROM subtasks WHERE done_at IS NOT NULL`).all())
-  const ds = (dt) => dt.toISOString().slice(0, 10)
+  add(db.prepare(`SELECT DISTINCT date(started_at,'localtime') d FROM work_sessions WHERE duration_actual>0`).all())
+  add(db.prepare(`SELECT DISTINCT date(done_at,'localtime') d FROM tasks WHERE done_at IS NOT NULL`).all())
+  add(db.prepare(`SELECT DISTINCT date(done_at,'localtime') d FROM subtasks WHERE done_at IS NOT NULL`).all())
+  const ds = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
   let streak = 0; const cur = new Date()
   if (!days.has(ds(cur))) cur.setDate(cur.getDate() - 1)
   while (days.has(ds(cur))) { streak++; cur.setDate(cur.getDate() - 1) }
@@ -70,11 +71,11 @@ function currentStreak() {
 function eveningFacts() {
   const today = todayStr()
   return {
-    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s,
-    sessions: db.prepare(`SELECT COUNT(*) n FROM work_sessions WHERE date(started_at)=? AND duration_actual>0`).get(today).n,
-    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n,
-    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n,
-    goal: db.prepare(`SELECT goal FROM journal_entries WHERE type='checkin' AND date(created_at)=? ORDER BY id DESC LIMIT 1`).get(today)?.goal ?? null,
+    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at,'localtime')=?`).get(today).s,
+    sessions: db.prepare(`SELECT COUNT(*) n FROM work_sessions WHERE date(started_at,'localtime')=? AND duration_actual>0`).get(today).n,
+    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at,'localtime')=?`).get(today).n,
+    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at,'localtime')=? AND deleted_at IS NULL`).get(today).n,
+    goal: db.prepare(`SELECT goal FROM journal_entries WHERE type='checkin' AND date(created_at,'localtime')=? ORDER BY id DESC LIMIT 1`).get(today)?.goal ?? null,
     streak: currentStreak(),
   }
 }
@@ -149,9 +150,9 @@ function checkpointFacts() {
   const today = todayStr()
   const hour = new Date().getHours()
   return {
-    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at)=?`).get(today).s,
-    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at)=?`).get(today).n,
-    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n,
+    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at,'localtime')=?`).get(today).s,
+    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at,'localtime')=?`).get(today).n,
+    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at,'localtime')=? AND deleted_at IS NULL`).get(today).n,
     inFocus: !!db.prepare(`SELECT id FROM work_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).get(),
     streak: currentStreak(),
     part: hour < 15 ? 'Полдень' : 'День к концу',
@@ -202,11 +203,194 @@ function checkEveningReport() {
     buildEveningReport().then(t => sendTelegram(t)).then(r => { if (!r.ok) console.error('[telegram]', r.error) })
   } catch (e) { console.error('[telegram] scheduler', e.message) }
 }
-setInterval(() => { checkEveningReport(); checkCheckpoints() }, 60 * 1000)
+// ─── Сводки по запуску курса (утренний фокус + воскресный разбор) ────────────
+// Деньги считает Claude на доске, а доставку делает сервер: он живёт всегда
+// (KeepAlive), поэтому телеграм-сводка не зависит от открытых приложений.
+// Управление: settings tg_launch_enabled ('true'/'false'),
+// tg_launch_morning_time (default 09:30), tg_launch_review_time (default 21:00, вс).
+
+function localDateStr(offsetDays = 0) {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function launchKatyaDirId() {
+  return db.prepare(`SELECT id FROM directions WHERE name = 'Катя'`).get()?.id ?? -1
+}
+
+function fmtDL(deadline) {
+  if (!deadline) return ''
+  const [y, m, d] = deadline.slice(0, 10).split('-')
+  return `${Number(d)}.${m}`
+}
+
+function morningLaunchReport() {
+  const today = localDateStr()
+  const soon = localDateStr(3)
+  const kid = launchKatyaDirId()
+  const active = `done_at IS NULL AND deleted_at IS NULL AND deadline IS NOT NULL`
+
+  const mine = db.prepare(`
+    SELECT title, deadline, priority FROM tasks
+    WHERE ${active} AND (direction_id IS NULL OR direction_id != ?) AND deadline <= ?
+    ORDER BY CASE WHEN deadline < ? THEN 0 ELSE 1 END,
+             CASE WHEN priority = 'high' THEN 0 ELSE 1 END, deadline ASC
+    LIMIT 6
+  `).all(kid, soon, today)
+
+  const overdueCnt = db.prepare(`
+    SELECT COUNT(*) n FROM tasks WHERE ${active} AND (direction_id IS NULL OR direction_id != ?) AND deadline < ?
+  `).get(kid, today).n
+
+  const katya = db.prepare(`
+    SELECT title, deadline FROM tasks
+    WHERE ${active} AND direction_id = ? AND deadline <= ?
+    ORDER BY deadline ASC LIMIT 3
+  `).all(kid, localDateStr(1))
+
+  const doneYesterday = db.prepare(`
+    SELECT COUNT(*) n FROM tasks WHERE date(done_at,'localtime') = ? AND deleted_at IS NULL
+  `).get(localDateStr(-1)).n
+
+  const lines = ['🚀 Запуск — фокус дня']
+  if (mine.length) {
+    const [first, ...rest] = mine
+    lines.push(`🎯 ${first.title} (до ${fmtDL(first.deadline)})`)
+    if (rest.length) lines.push(`Следом: ${rest.slice(0, 2).map(t => `${t.title} (${fmtDL(t.deadline)})`).join('; ')}`)
+  } else {
+    lines.push('🎯 Горящих дедлайнов нет — бери верхнюю задачу из «Следом» на доске.')
+  }
+  if (overdueCnt > 0) lines.push(`🔥 Просрочено: ${overdueCnt}`)
+  if (katya.length) lines.push(`Катя: напомни про «${katya[0].title}» (до ${fmtDL(katya[0].deadline)})`)
+  lines.push(doneYesterday > 0 ? `Вчера закрыто: ${doneYesterday}.` : 'Вчера закрытых задач не было.')
+  if (overdueCnt > 5) lines.push('План толще реальности — скажи Клоду «пересоберём».')
+  return lines.join('\n')
+}
+
+function sundayLaunchReview() {
+  const today = localDateStr()
+  const weekAgo = localDateStr(-7)
+  const weekAhead = localDateStr(7)
+  const kid = launchKatyaDirId()
+  const activeDL = `done_at IS NULL AND deleted_at IS NULL AND deadline IS NOT NULL`
+
+  const closed = db.prepare(`
+    SELECT COUNT(*) n FROM tasks WHERE deleted_at IS NULL AND done_at IS NOT NULL AND date(done_at) > ? AND (direction_id IS NULL OR direction_id != ?)
+  `).get(weekAgo, kid).n
+  const closedK = db.prepare(`
+    SELECT COUNT(*) n FROM tasks WHERE deleted_at IS NULL AND done_at IS NOT NULL AND date(done_at) > ? AND direction_id = ?
+  `).get(weekAgo, kid).n
+  const hours = db.prepare(`
+    SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at) > ?
+  `).get(weekAgo).s
+
+  const over = db.prepare(`
+    SELECT title, deadline FROM tasks WHERE ${activeDL} AND (direction_id IS NULL OR direction_id != ?) AND deadline < ? ORDER BY deadline ASC
+  `).all(kid, today)
+  const overK = db.prepare(`
+    SELECT title, deadline FROM tasks WHERE ${activeDL} AND direction_id = ? AND deadline < ? ORDER BY deadline ASC
+  `).all(kid, today)
+  const next = db.prepare(`
+    SELECT title, deadline FROM tasks WHERE ${activeDL} AND (direction_id IS NULL OR direction_id != ?) AND deadline >= ? AND deadline <= ?
+    ORDER BY CASE WHEN priority = 'high' THEN 0 ELSE 1 END, deadline ASC LIMIT 5
+  `).all(kid, today, weekAhead)
+  const nextK = db.prepare(`
+    SELECT title, deadline FROM tasks WHERE ${activeDL} AND direction_id = ? AND deadline >= ? AND deadline <= ? ORDER BY deadline ASC LIMIT 3
+  `).all(kid, today, weekAhead)
+
+  const li = (arr, n) => arr.slice(0, n).map(t => `• ${t.title} — ${fmtDL(t.deadline)}`).join('\n')
+  const lines = ['📊 Запуск — разбор недели']
+  lines.push(`Закрыто за неделю: у тебя ${closed}, у Кати ${closedK}. В фокусе: ${fmtHM(hours)}.`)
+  lines.push(over.length ? `🔥 Просрочено у тебя (${over.length}):\n${li(over, 4)}` : 'Просрочек у тебя нет.')
+  if (overK.length) lines.push(`Катя просрочила (${overK.length}):\n${li(overK, 3)}\n→ обсуди с ней в понедельник.`)
+  if (next.length) lines.push(`Твоя неделя:\n${li(next, 5)}`)
+  if (nextK.length) lines.push(`Ждём от Кати:\n${li(nextK, 3)}`)
+  if (over.length > 5) lines.push('⚠️ Отставание системное. Кандидаты на урезание: Li-рассылка (7ч), Reels, ленд курса. Дату эфира двигаем последней.')
+  return lines.join('\n')
+}
+
+function checkLaunchDigests() {
+  try {
+    if (getSettingVal('tg_launch_enabled') !== 'true') return
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const today = localDateStr()
+
+    const mTime = getSettingVal('tg_launch_morning_time') || '09:30'
+    if (hhmm === mTime && getSettingVal('tg_launch_morning_last') !== today) {
+      db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_launch_morning_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(today)
+      sendTelegram(morningLaunchReport()).then(r => { if (!r.ok) console.error('[telegram] launch-morning', r.error) })
+    }
+
+    const rTime = getSettingVal('tg_launch_review_time') || '21:00'
+    if (now.getDay() === 0 && hhmm === rTime && getSettingVal('tg_launch_review_last') !== today) {
+      db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_launch_review_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(today)
+      sendTelegram(sundayLaunchReview()).then(r => { if (!r.ok) console.error('[telegram] launch-review', r.error) })
+    }
+  } catch (e) { console.error('[telegram] launch scheduler', e.message) }
+}
+
+// ─── Утреннее «заполни утро» в Telegram (зеркало нативного наджа) ─────────────
+// Нативное уведомление «сядь заполни утро» живёт в приложении и наружу не идёт.
+// Здесь — то же самое, но в телеграм: бэкенд всегда жив (KeepAlive), поэтому
+// напоминание приходит независимо от того, открыто ли приложение.
+// Логика повторяет checkMorningNudge из v2/electron/main.js: пока сегодняшний
+// чек-ин не заполнен и время в окне 07:00–12:00 — раз в 30 минут (слоты :00 и :30)
+// шлём напоминание. Как только чек-ин появился — молчим до завтра.
+// Управление: tg_morning_enabled ('true'/'false'). Текст — живой AI (aiPhrase)
+// с откатом на шаблон, как у чекпоинтов.
+const MORNING_TG_START_HOUR = 7
+const MORNING_TG_END_HOUR = 12
+
+function morningNudgeFacts() {
+  const today = todayStr()
+  return {
+    seconds: db.prepare(`SELECT COALESCE(SUM(duration_actual),0) s FROM work_sessions WHERE date(started_at,'localtime')=?`).get(today).s,
+    tasksDone: db.prepare(`SELECT COUNT(*) n FROM tasks WHERE date(done_at,'localtime')=? AND deleted_at IS NULL`).get(today).n,
+    subs: db.prepare(`SELECT COUNT(*) n FROM subtasks WHERE date(done_at,'localtime')=?`).get(today).n,
+    streak: currentStreak(),
+    part: 'Утро',
+  }
+}
+
+function morningNudgeTemplate(f) {
+  return `☀️ Доброе утро! Открой Focus Board и заполни утренний экран — выбери миссии на сегодня.` +
+    (f.streak > 0 ? ` Серия: ${f.streak} дн. подряд — не теряй.` : '')
+}
+
+async function buildMorningNudge() {
+  const f = morningNudgeFacts()
+  const ai = await aiPhrase('утреннее напоминание сесть за Focus Board, заполнить утренний экран и выбрать миссии дня', f)
+  return ai || morningNudgeTemplate(f)
+}
+
+function checkMorningNudgeTelegram() {
+  try {
+    if (getSettingVal('tg_morning_enabled') !== 'true') return
+    const now = new Date()
+    const hour = now.getHours(), min = now.getMinutes()
+    if (hour < MORNING_TG_START_HOUR || hour >= MORNING_TG_END_HOUR) return
+    if (min !== 0 && min !== 30) return // только слоты :00 и :30 — раз в 30 минут
+    // Утро уже заполнено — молчим до завтра (тот же критерий, что у /api/journal/today-checkin)
+    const filled = db.prepare(`SELECT id FROM journal_entries WHERE type='checkin' AND date(created_at,'localtime')=date('now','localtime') LIMIT 1`).get()
+    if (filled) return
+    const hhmm = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+    const stamp = `${todayStr()} ${hhmm}`
+    if (getSettingVal('tg_morning_last') === stamp) return // этот слот уже отправлен
+    db.prepare(`INSERT INTO settings (key,value) VALUES ('tg_morning_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(stamp)
+    buildMorningNudge().then(t => sendTelegram(t)).then(r => { if (!r.ok) console.error('[telegram] morning-nudge', r.error) })
+  } catch (e) { console.error('[telegram] morning nudge scheduler', e.message) }
+}
+
+setInterval(() => { checkEveningReport(); checkCheckpoints(); checkLaunchDigests(); checkMorningNudgeTelegram() }, 60 * 1000)
 
 // ─── Recurring helpers ────────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 function nextRecurrenceDate(recurrence, fromDate) {
   const d = new Date(fromDate + 'T12:00:00')
@@ -476,6 +660,20 @@ app.post('/api/tasks/reorder-direction', (req, res) => {
   }
 })
 
+// POST /api/tasks/reorder-sprint — порядок задач внутри недели (спринта), перетаскиванием
+app.post('/api/tasks/reorder-sprint', (req, res) => {
+  try {
+    const { ordered_ids } = req.body
+    if (!Array.isArray(ordered_ids)) return res.status(400).json({ error: 'ordered_ids required' })
+    const update = db.prepare(`UPDATE tasks SET sprint_order = ?, updated_at = ? WHERE id = ?`)
+    const now = nowIso()
+    db.transaction(() => { ordered_ids.forEach((id, idx) => update.run(idx, now, id)) })()
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 
 // POST /api/tasks — create task
 app.post('/api/tasks', (req, res) => {
@@ -627,6 +825,7 @@ app.patch('/api/subtasks/:id', (req, res) => {
     const fields = [], vals = []
     if (typeof req.body.title === 'string' && req.body.title.trim()) { fields.push('title = ?'); vals.push(req.body.title.trim()) }
     if ('done' in req.body) { fields.push('done_at = ?'); vals.push(req.body.done ? nowIso() : null) }
+    if ('done_at' in req.body) { fields.push('done_at = ?'); vals.push(req.body.done_at || null) }
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
     vals.push(id)
     db.prepare(`UPDATE subtasks SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
@@ -769,7 +968,7 @@ app.get('/api/sessions/today/:task_id', (req, res) => {
     const row = db.prepare(`
       SELECT COALESCE(SUM(duration_actual), 0) AS total
       FROM work_sessions
-      WHERE task_id = ? AND date(started_at) = date('now')
+      WHERE task_id = ? AND date(started_at,'localtime') = date('now','localtime')
     `).get(task_id)
     res.json({ total: row.total })
   } catch (err) {
@@ -871,7 +1070,7 @@ app.get('/api/journal/today-checkin', (_req, res) => {
   try {
     const row = db.prepare(`
       SELECT id, mood, goal, content FROM journal_entries
-      WHERE type = 'checkin' AND date(created_at) = date('now')
+      WHERE type = 'checkin' AND date(created_at,'localtime') = date('now','localtime')
       ORDER BY id DESC LIMIT 1
     `).get()
     res.json({ exists: !!row, mood: row?.mood ?? null, goal: row?.goal ?? null, content: row?.content ?? null })
@@ -891,6 +1090,32 @@ app.post('/api/journal', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// PATCH /api/journal/:id — правка записи (goal/content/mood)
+app.patch('/api/journal/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const existing = db.prepare(`SELECT * FROM journal_entries WHERE id = ?`).get(id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const fields = [], vals = []
+    if ('goal' in req.body) { fields.push('goal = ?'); vals.push(req.body.goal ?? null) }
+    if ('content' in req.body) { fields.push('content = ?'); vals.push(req.body.content ?? null) }
+    if ('mood' in req.body) { fields.push('mood = ?'); vals.push(req.body.mood ?? null) }
+    if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
+    vals.push(id)
+    db.prepare(`UPDATE journal_entries SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
+    res.json(db.prepare(`SELECT * FROM journal_entries WHERE id = ?`).get(id))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// DELETE /api/journal/:id
+app.delete('/api/journal/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    db.prepare(`DELETE FROM journal_entries WHERE id = ?`).run(id)
+    res.json({ ok: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -917,6 +1142,71 @@ app.patch('/api/settings', (req, res) => {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(key, value ?? null)
     res.json({ key, value })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── Autostart (launchd-агенты com.focusboard.*) ─────────────────────────────
+// Плисты лежат в ~/Library/LaunchAgents; включённость определяем через
+// launchctl print-disabled: если лейбл помечен disabled/true — агент выключен.
+
+const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents')
+
+// GET /api/autostart — [{label, file, enabled}] по всем com.focusboard.*.plist
+app.get('/api/autostart', (_req, res) => {
+  try {
+    const files = fs.existsSync(LAUNCH_AGENTS_DIR)
+      ? fs.readdirSync(LAUNCH_AGENTS_DIR).filter(f => /^com\.focusboard\..+\.plist$/.test(f))
+      : []
+    // Один вызов launchctl на весь список — не по разу на агент
+    let disabledDump = ''
+    try {
+      disabledDump = execSync(`launchctl print-disabled gui/${process.getuid()}`, { encoding: 'utf8' })
+    } catch { /* launchctl недоступен — считаем всё включённым */ }
+    const agents = files.map(file => {
+      let label = file.replace(/\.plist$/, '')
+      try {
+        const xml = fs.readFileSync(path.join(LAUNCH_AGENTS_DIR, file), 'utf8')
+        const m = xml.match(/<key>\s*Label\s*<\/key>\s*<string>([^<]+)<\/string>/)
+        if (m) label = m[1].trim()
+      } catch { /* плист не читается — используем имя файла */ }
+      // Строки вида "com.focusboard.app" => disabled (новые ОС) или => true (старые)
+      const re = new RegExp(`"${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*=>\\s*(disabled|true)`)
+      return { label, file, enabled: !re.test(disabledDump) }
+    })
+    res.json(agents)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PATCH /api/autostart — {label, enabled}: launchctl enable/bootstrap либо disable/bootout
+app.patch('/api/autostart', (req, res) => {
+  try {
+    const { label, enabled } = req.body
+    // Лейбл уходит в шелл — поэтому жёсткая проверка формата, не только префикса
+    if (typeof label !== 'string' || !/^com\.focusboard\.[A-Za-z0-9._-]+$/.test(label))
+      return res.status(400).json({ error: 'label должен начинаться с com.focusboard.' })
+    if (typeof enabled !== 'boolean')
+      return res.status(400).json({ error: 'enabled должен быть boolean' })
+    if (label === 'com.focusboard.backend' && !enabled)
+      return res.status(400).json({ error: 'Бэкенд нельзя выключать из UI: умрут сводки и сама доска. Выключай вручную через launchctl.' })
+
+    const uid = process.getuid()
+    if (enabled) {
+      const plistPath = path.join(LAUNCH_AGENTS_DIR, `${label}.plist`)
+      if (!fs.existsSync(plistPath))
+        return res.status(404).json({ error: `Плист не найден: ${plistPath}` })
+      execSync(`launchctl enable gui/${uid}/${label}`)
+      // bootstrap падает, если агент уже загружен — это не ошибка
+      try { execSync(`launchctl bootstrap gui/${uid} "${plistPath}"`) } catch { /* уже загружен */ }
+    } else {
+      execSync(`launchctl disable gui/${uid}/${label}`)
+      // bootout останавливает процесс; если не был загружен — тоже не ошибка
+      try { execSync(`launchctl bootout gui/${uid}/${label}`) } catch { /* не был загружен */ }
+    }
+    res.json({ label, enabled })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -1026,6 +1316,26 @@ app.post('/api/telegram/test', async (_req, res) => {
   const report = await buildEveningReport()
   const r = await sendTelegram('✅ Focus Board на связи. Так будет выглядеть вечерний отчёт:\n\n' + report)
   res.json(r)
+})
+
+// Тест любой телеграм-сводки по требованию: {kind: morning|review|evening|checkpoint}
+app.post('/api/telegram/preview', async (req, res) => {
+  try {
+    const kind = req.body?.kind || 'morning'
+    const builders = {
+      morning: async () => morningLaunchReport(),
+      review: async () => sundayLaunchReview(),
+      evening: buildEveningReport,
+      checkpoint: buildCheckpointReport,
+    }
+    const build = builders[kind]
+    if (!build) return res.status(400).json({ error: 'kind: morning|review|evening|checkpoint' })
+    const text = await build()
+    const r = await sendTelegram(`🧪 Тест «${kind}»\n\n${text}`)
+    res.json({ kind, sent: r.ok, error: r.error ?? null, preview: text })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
@@ -1370,14 +1680,14 @@ app.get('/api/stats/dashboard', (req, res) => {
 app.get('/api/today-summary', (_req, res) => {
   try {
     const today = todayStr()
-    const done_count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(today).n
-    const time_row = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`).get(today)
+    const done_count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at,'localtime') = ? AND deleted_at IS NULL`).get(today).n
+    const time_row = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime') = ?`).get(today)
 
     // All sessions today
     const sessions_today = db.prepare(`
       SELECT id, task_id, started_at, ended_at, duration_actual, note
       FROM work_sessions
-      WHERE date(started_at) = ? AND ended_at IS NOT NULL
+      WHERE date(started_at,'localtime') = ? AND ended_at IS NOT NULL
       ORDER BY started_at ASC
     `).all(today)
 
@@ -1392,8 +1702,8 @@ app.get('/api/today-summary', (_req, res) => {
       SELECT t.id, t.title, t.done_at,
              COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
       FROM tasks t
-      LEFT JOIN work_sessions ws ON ws.task_id = t.id AND date(ws.started_at) = ?
-      WHERE date(t.done_at) = ? AND t.deleted_at IS NULL
+      LEFT JOIN work_sessions ws ON ws.task_id = t.id AND date(ws.started_at,'localtime') = ?
+      WHERE date(t.done_at,'localtime') = ? AND t.deleted_at IS NULL
       GROUP BY t.id
       ORDER BY t.done_at ASC
     `).all(today, today)
@@ -1405,7 +1715,7 @@ app.get('/api/today-summary', (_req, res) => {
       SELECT t.id, t.title, COALESCE(SUM(ws.duration_actual), 0) AS time_seconds
       FROM work_sessions ws
       JOIN tasks t ON t.id = ws.task_id
-      WHERE date(ws.started_at) = ? AND t.done_at IS NULL AND t.deleted_at IS NULL
+      WHERE date(ws.started_at,'localtime') = ? AND t.done_at IS NULL AND t.deleted_at IS NULL
       GROUP BY t.id
       HAVING time_seconds > 0
       ORDER BY time_seconds DESC
@@ -1458,49 +1768,49 @@ app.get('/api/day-thread', (req, res) => {
 
     const checkin = db.prepare(`
       SELECT mood, goal, content, created_at FROM journal_entries
-      WHERE type = 'checkin' AND date(created_at) = ? ORDER BY id DESC LIMIT 1
+      WHERE type = 'checkin' AND date(created_at,'localtime') = ? ORDER BY id DESC LIMIT 1
     `).get(date)
 
     const events = []
 
     // Закрытые шаги (микро-победы)
     db.prepare(`
-      SELECT s.title, s.done_at, t.title AS task_title
+      SELECT s.title, s.done_at, t.title AS task_title, t.id AS task_id
       FROM subtasks s JOIN tasks t ON t.id = s.task_id
-      WHERE date(s.done_at) = ? ORDER BY s.done_at ASC
+      WHERE date(s.done_at,'localtime') = ? ORDER BY s.done_at ASC
     `).all(date).forEach(r => events.push({
-      at: r.done_at, kind: 'subtask_done', text: r.title, task: r.task_title,
+      at: r.done_at, kind: 'subtask_done', text: r.title, task: r.task_title, task_id: r.task_id,
     }))
 
     // Сессии с заметками
     db.prepare(`
-      SELECT ws.started_at, ws.duration_actual, ws.note, t.title AS task_title
+      SELECT ws.started_at, ws.duration_actual, ws.note, t.title AS task_title, t.id AS task_id
       FROM work_sessions ws JOIN tasks t ON t.id = ws.task_id
-      WHERE date(ws.started_at) = ? AND ws.note IS NOT NULL AND ws.note != ''
+      WHERE date(ws.started_at,'localtime') = ? AND ws.note IS NOT NULL AND ws.note != ''
       ORDER BY ws.started_at ASC
     `).all(date).forEach(r => events.push({
-      at: r.started_at, kind: 'session_note', text: r.note, task: r.task_title, seconds: r.duration_actual,
+      at: r.started_at, kind: 'session_note', text: r.note, task: r.task_title, seconds: r.duration_actual, task_id: r.task_id,
     }))
 
     // Свободные мысли
     db.prepare(`
       SELECT content, created_at FROM journal_entries
-      WHERE type = 'thought' AND date(created_at) = ? ORDER BY created_at ASC
+      WHERE type = 'thought' AND date(created_at,'localtime') = ? ORDER BY created_at ASC
     `).all(date).forEach(r => events.push({ at: r.created_at, kind: 'thought', text: r.content }))
 
     // Завершённые задачи
     db.prepare(`
-      SELECT title, done_at FROM tasks
-      WHERE date(done_at) = ? AND deleted_at IS NULL ORDER BY done_at ASC
-    `).all(date).forEach(r => events.push({ at: r.done_at, kind: 'task_done', text: r.title }))
+      SELECT id, title, done_at FROM tasks
+      WHERE date(done_at,'localtime') = ? AND deleted_at IS NULL ORDER BY done_at ASC
+    `).all(date).forEach(r => events.push({ at: r.done_at, kind: 'task_done', text: r.title, task_id: r.id }))
 
     events.sort((a, b) => String(a.at).localeCompare(String(b.at)))
 
     const totalSeconds = db.prepare(
-      `SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = ?`
+      `SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime') = ?`
     ).get(date).s
-    const subtasksDone = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at) = ?`).get(date).n
-    const tasksDone = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL`).get(date).n
+    const subtasksDone = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at,'localtime') = ?`).get(date).n
+    const tasksDone = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at,'localtime') = ? AND deleted_at IS NULL`).get(date).n
 
     res.json({ date, checkin: checkin ?? null, events, totals: { seconds: totalSeconds, subtasks_done: subtasksDone, tasks_done: tasksDone } })
   } catch (e) { res.status(500).json({ error: e.message }) }
@@ -1513,13 +1823,13 @@ app.get('/api/gamification', (_req, res) => {
     // Активные дни = были сессии, закрытые задачи/шаги или чек-ин
     const activeDays = new Set()
     const collect = (rows) => rows.forEach(r => r.d && activeDays.add(r.d))
-    collect(db.prepare(`SELECT DISTINCT date(started_at) AS d FROM work_sessions WHERE duration_actual > 0`).all())
-    collect(db.prepare(`SELECT DISTINCT date(done_at) AS d FROM tasks WHERE done_at IS NOT NULL`).all())
-    collect(db.prepare(`SELECT DISTINCT date(done_at) AS d FROM subtasks WHERE done_at IS NOT NULL`).all())
-    collect(db.prepare(`SELECT DISTINCT date(created_at) AS d FROM journal_entries WHERE type='checkin'`).all())
+    collect(db.prepare(`SELECT DISTINCT date(started_at,'localtime') AS d FROM work_sessions WHERE duration_actual > 0`).all())
+    collect(db.prepare(`SELECT DISTINCT date(done_at,'localtime') AS d FROM tasks WHERE done_at IS NOT NULL`).all())
+    collect(db.prepare(`SELECT DISTINCT date(done_at,'localtime') AS d FROM subtasks WHERE done_at IS NOT NULL`).all())
+    collect(db.prepare(`SELECT DISTINCT date(created_at,'localtime') AS d FROM journal_entries WHERE type='checkin'`).all())
 
     // Текущая серия: считаем назад от сегодня (или вчера, если сегодня ещё пусто)
-    const dstr = (dt) => dt.toISOString().slice(0, 10)
+    const dstr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
     let streak = 0
     const cur = new Date()
     if (!activeDays.has(dstr(cur))) cur.setDate(cur.getDate() - 1) // серия не рвётся, если сегодня ещё не начал
@@ -1538,9 +1848,9 @@ app.get('/api/gamification', (_req, res) => {
 
     // Сегодня: время в фокусе + закрытые шаги/задачи
     const today = todayStr()
-    const todaySeconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at)=?`).get(today).s
-    const todaySubtasks = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at)=?`).get(today).n
-    const todayTasks = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at)=? AND deleted_at IS NULL`).get(today).n
+    const todaySeconds = db.prepare(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime')=?`).get(today).s
+    const todaySubtasks = db.prepare(`SELECT COUNT(*) AS n FROM subtasks WHERE date(done_at,'localtime')=?`).get(today).n
+    const todayTasks = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE date(done_at,'localtime')=? AND deleted_at IS NULL`).get(today).n
 
     // Тепловая карта за последние 365 дней (день → секунды)
     const heatmap = db.prepare(`
@@ -1573,10 +1883,10 @@ app.get('/api/stats/motivation', (_req, res) => {
     const trendPct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0)
 
     // Сегодня vs тот же день недели неделю назад, и vs вчера
-    const todaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now')`).s
-    const sameDaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now','-7 days')`).s
+    const todaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime') = date('now','localtime')`).s
+    const sameDaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime') = date('now','localtime','-7 days')`).s
     const dayTrendPct = sameDaySec > 0 ? Math.round(((todaySec - sameDaySec) / sameDaySec) * 100) : (todaySec > 0 ? 100 : 0)
-    const yesterdaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at) = date('now','-1 days')`).s
+    const yesterdaySec = one(`SELECT COALESCE(SUM(duration_actual),0) AS s FROM work_sessions WHERE date(started_at,'localtime') = date('now','localtime','-1 days')`).s
     const ydayTrendPct = yesterdaySec > 0 ? Math.round(((todaySec - yesterdaySec) / yesterdaySec) * 100) : (todaySec > 0 ? 100 : 0)
 
     // Рекорд: лучший день и лучшая неделя (ISO-неделя)
@@ -1697,9 +2007,7 @@ app.get('/api/stats/weekly-time', (_req, res) => {
 app.get('/api/standup', (_req, res) => {
   try {
     const today = todayStr()
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const yStr = yesterday.toISOString().slice(0, 10)
+    const yStr = localDateStr(-1)
 
     const fetch = (date) => db.prepare(`
       SELECT t.title, COALESCE(d.name,'') AS direction,
@@ -1708,13 +2016,13 @@ app.get('/api/standup', (_req, res) => {
       FROM work_sessions ws
       JOIN tasks t ON t.id = ws.task_id
       LEFT JOIN directions d ON d.id = t.direction_id
-      WHERE date(ws.started_at) = ? AND ws.duration_actual > 0 AND ws.ended_at IS NOT NULL
+      WHERE date(ws.started_at,'localtime') = ? AND ws.duration_actual > 0 AND ws.ended_at IS NOT NULL
       GROUP BY ws.task_id
       ORDER BY seconds DESC
     `).all(date)
 
     const todayDone = db.prepare(
-      `SELECT title FROM tasks WHERE date(done_at) = ? AND deleted_at IS NULL ORDER BY done_at ASC`
+      `SELECT title FROM tasks WHERE date(done_at,'localtime') = ? AND deleted_at IS NULL ORDER BY done_at ASC`
     ).all(today).map(r => r.title)
 
     const todayPlan = db.prepare(`
