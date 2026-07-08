@@ -380,6 +380,28 @@ function makeTimerIcon() {
   return img;
 }
 
+// Значок перерыва — две вертикальные полосы (пауза-символ), тоже B/W template.
+function makeBreakIcon() {
+  const S = 32, c = S / 2;
+  const buf = Buffer.alloc(S * S * 4, 0);
+  const setPx = (x, y, a) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= S || y >= S) return;
+    const i = (y * S + x) * 4;
+    if (a > buf[i + 3]) buf[i + 3] = a;
+  };
+  const bar = (x0, x1) => { for (let y = 8; y <= 24; y++) for (let x = x0; x <= x1; x++) setPx(x, y, 255); };
+  bar(c - 7, c - 3);
+  bar(c + 3, c + 7);
+  const img = nativeImage.createFromBitmap(buf, { width: S, height: S, scaleFactor: 2 });
+  img.setTemplateImage(true);
+  return img;
+}
+
+let _iconTimer = null, _iconBreak = null;
+const getTimerIcon = () => (_iconTimer || (_iconTimer = makeTimerIcon()));
+const getBreakIcon = () => (_iconBreak || (_iconBreak = makeBreakIcon()));
+
 function mmss(sec) {
   sec = Math.max(0, Math.floor(sec || 0));
   const m = Math.floor(sec / 60), s = sec % 60;
@@ -389,8 +411,11 @@ function mmss(sec) {
 function renderTrayTitle() {
   if (!tray || !trayState) return;
   const st = trayState;
+  const isBreak = !!(st.pomoActive && st.pomoPhase === 'break');
+  try { tray.setImage(isBreak ? getBreakIcon() : getTimerIcon()); } catch {}
   let text;
-  if (st.paused) text = '⏸';
+  if (isBreak) text = mmss(st.pomoRemaining);        // перерыв: значок-пауза + отсчёт
+  else if (st.paused) text = '⏸';
   else {
     const showPomo = trayMode === 'pomo' && st.pomoActive;
     text = mmss(showPomo ? st.pomoRemaining : st.elapsed);
@@ -401,7 +426,7 @@ function renderTrayTitle() {
 function ensureTray() {
   if (tray) return;
   try {
-    tray = new Tray(makeTimerIcon());
+    tray = new Tray(getTimerIcon());
     tray.setToolTip('Focusboard — клик: помодоро / общее время');
     const menu = Menu.buildFromTemplate([
       { label: 'Открыть Focusboard', click: showMainWindow },
