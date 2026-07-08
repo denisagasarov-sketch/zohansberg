@@ -399,8 +399,8 @@ export default function App() {
           task={selectedTask}
           directions={directions}
           onClose={() => setSelectedTask(undefined)}
-          onSaved={async () => { await refresh(); await refreshMissions(); setSelectedTask(undefined) }}
-          onDeleted={async () => { await refresh(); await refreshMissions(); setSelectedTask(undefined) }}
+          onSaved={async () => { await refresh(); await refreshMissions(); window.dispatchEvent(new CustomEvent('gamification-updated')); setSelectedTask(undefined) }}
+          onDeleted={async () => { await refresh(); await refreshMissions(); window.dispatchEvent(new CustomEvent('gamification-updated')); setSelectedTask(undefined) }}
           onTakenNow={() => { if (selectedTask) { setSelectedTask(undefined); focusOnTask(selectedTask.id) } }}
           onMarkDone={selectedTask && !selectedTask.done_at ? async () => { await handleMarkDone(selectedTask.id); setSelectedTask(undefined) } : undefined}
         />

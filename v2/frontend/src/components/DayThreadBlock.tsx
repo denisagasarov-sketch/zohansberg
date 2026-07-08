@@ -63,18 +63,26 @@ export default function DayThreadBlock({ onOpenTask }: { onOpenTask?: (taskId: n
             <ul className="space-y-1.5">
               {events.map((e, i) => {
                 const clickable = !!(e.task_id && onOpenTask)
+                const isTask = e.kind === 'task_done'
+                const isStep = e.kind === 'subtask_done'
                 return (
                 <li
                   key={i}
                   onClick={clickable ? () => onOpenTask!(e.task_id!) : undefined}
                   title={clickable ? 'Открыть задачу' : undefined}
-                  className={`flex items-start gap-2 text-sm rounded ${clickable ? 'cursor-pointer hover:bg-raised/60 -mx-1 px-1' : ''}`}
+                  className={`flex items-start gap-2 text-sm rounded -mx-1 px-1 ${clickable ? 'cursor-pointer hover:bg-raised/60' : ''} ${isTask ? 'bg-[#82a877]/10 ring-1 ring-[#82a877]/25 py-1' : ''}`}
                 >
                   <span className="text-[#6f695f] text-[10px] tabular-nums w-9 shrink-0 mt-0.5">{time(e.at)}</span>
-                  <span className={`shrink-0 mt-0.5 ${e.kind === 'subtask_done' || e.kind === 'task_done' ? 'text-[#82a877]' : 'text-[#9c958a]'}`}><Icon name={eventIcon(e.kind)} size={13} /></span>
+                  {isTask ? (
+                    <span className="shrink-0 mt-[1px] w-[16px] h-[16px] rounded-full bg-[#82a877] text-white flex items-center justify-center"><Icon name="check" size={11} /></span>
+                  ) : (
+                    <span className={`shrink-0 mt-0.5 ${isStep ? 'text-[#82a877]' : 'text-[#9c958a]'}`}><Icon name={eventIcon(e.kind)} size={13} /></span>
+                  )}
                   <span className="flex-1">
-                    <span className={e.kind === 'thought' || e.kind === 'session_note' ? 'text-[#b0a793]' : 'text-[#ddd6cb]'}>{e.text}</span>
-                    {e.task && <span className="text-[10px] text-[#6f695f]"> · {e.task}</span>}
+                    {isTask && <span className="text-[9px] uppercase tracking-[0.12em] text-[#82a877] font-semibold mr-1.5">задача</span>}
+                    {isStep && <span className="text-[9px] uppercase tracking-[0.12em] text-[#6f9e64] mr-1.5">шаг</span>}
+                    <span className={isTask ? 'text-[#ece7df] font-semibold' : e.kind === 'thought' || e.kind === 'session_note' ? 'text-[#b0a793]' : 'text-[#ddd6cb]'}>{e.text}</span>
+                    {e.task && !isTask && <span className="text-[10px] text-[#6f695f]"> · {e.task}</span>}
                     {e.seconds ? <span className="text-[10px] text-[#e0a458]"> · {fmt(e.seconds)}</span> : null}
                   </span>
                 </li>

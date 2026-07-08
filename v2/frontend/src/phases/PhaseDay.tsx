@@ -198,10 +198,18 @@ function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSessi
           )
         })}
 
-        {/* События (закрытые шаги/задачи) */}
-        {events.map((e, i) => (
-          <div key={i} title={e.text} className="absolute top-[2px] w-[5px] h-[5px] rounded-full bg-ok" style={{ left: `${toPct(parseMin(e.at))}%` }} />
-        ))}
+        {/* События: закрытый шаг — маленькая точка, выполненная задача — крупная веха */}
+        {events.map((e, i) => {
+          const isTask = e.kind === 'task_done'
+          return (
+            <div
+              key={i}
+              title={`${isTask ? '✓ задача: ' : 'шаг: '}${e.text}`}
+              className={`absolute rounded-full -translate-x-1/2 ${isTask ? 'top-[-1px] w-[10px] h-[10px] bg-ok ring-2 ring-[#0d0c0b] shadow-[0_0_6px_rgba(130,168,119,0.6)]' : 'top-[2px] w-[5px] h-[5px] bg-ok/80'}`}
+              style={{ left: `${toPct(parseMin(e.at))}%` }}
+            />
+          )
+        })}
 
         {/* Сейчас */}
         {nowMin >= TL_START && nowMin <= TL_END && (
