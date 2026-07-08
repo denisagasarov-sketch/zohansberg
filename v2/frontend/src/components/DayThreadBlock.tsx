@@ -11,7 +11,9 @@ function fmt(s: number): string {
   return h > 0 ? `${h}ч ${m}м` : `${m}м`
 }
 function time(iso: string) {
-  return new Date(iso.replace(' ', 'T')).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  let s = iso.replace(' ', 'T')
+  if (!/(Z|[+-]\d\d:?\d\d)$/i.test(s)) s += 'Z'   // метки без зоны бэкенд хранит в UTC
+  return new Date(s).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
 function eventIcon(k: DayThreadEvent['kind']): IconName {
   return k === 'subtask_done' ? 'check' : k === 'task_done' ? 'target' : k === 'session_note' ? 'note' : 'thought'

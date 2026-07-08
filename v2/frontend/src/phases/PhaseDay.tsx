@@ -154,7 +154,12 @@ function TimelineBar({ sessions, thread, directions }: { sessions: TimelineSessi
   }, [])
 
   const toPct = (min: number) => Math.max(0, Math.min(100, ((min - TL_START) / (TL_END - TL_START)) * 100))
-  const parseMin = (iso: string) => { const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T')); return d.getHours() * 60 + d.getMinutes() }
+  const parseMin = (iso: string) => {
+    let s = iso.includes('T') ? iso : iso.replace(' ', 'T')
+    if (!/(Z|[+-]\d\d:?\d\d)$/i.test(s)) s += 'Z'   // бэкенд хранит UTC; без пометки зоны → UTC
+    const d = new Date(s)
+    return d.getHours() * 60 + d.getMinutes()
+  }
 
   const totalSec = sessions.reduce((s, x) => s + (x.duration_actual ?? 0), 0)
   const events = (thread?.events ?? []).filter(e => e.kind === 'subtask_done' || e.kind === 'task_done')
