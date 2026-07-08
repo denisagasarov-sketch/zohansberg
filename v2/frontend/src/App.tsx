@@ -198,6 +198,22 @@ export default function App() {
     if (sess.length === 0) setCreditTaskId(taskId)
   }, [nowTask, handleDoneNow, updateTask, refreshMissions])
 
+  // Меню-бар macOS: пока идёт фокус — значок-таймер рядом с часами (мост preload).
+  // В покое шлём null → значок исчезает. Форматирование и переключение режима — в main.
+  useEffect(() => {
+    const shell = (window as any).focusboardShell
+    if (!shell?.timerUpdate) return
+    if (!timerState.isRunning && !timerState.isPaused) { shell.timerUpdate(null); return }
+    shell.timerUpdate({
+      running: timerState.isRunning,
+      paused: timerState.isPaused,
+      elapsed: timerState.elapsed,
+      pomoActive: pomodoroEnabled && pomodoroState.phase !== 'idle',
+      pomoPhase: pomodoroState.phase,
+      pomoRemaining: pomodoroState.remaining,
+    })
+  }, [timerState.isRunning, timerState.isPaused, timerState.elapsed, pomodoroEnabled, pomodoroState.phase, pomodoroState.remaining])
+
   // ── Хоткеи: Space таймер, ⌘Z undo, ⌘L библиотека, Esc слой ─────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

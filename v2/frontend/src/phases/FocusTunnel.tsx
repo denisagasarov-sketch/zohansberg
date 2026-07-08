@@ -94,18 +94,10 @@ export default function FocusTunnel({ task, directions, timer, intent, pomodoroP
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
 
-        {/* Интент или подсказка паузы */}
-        <div className={`text-[12px] font-semibold tracking-[0.22em] uppercase mb-2 transition-colors ${paused ? 'text-[#7fa878]' : intent ? 'text-accent/90' : 'text-text-faint'}`}>
+        {/* Интент (намерение сессии) или подсказка паузы — уже переживает перезагрузку окна */}
+        <div className={`text-[12px] font-semibold tracking-[0.22em] uppercase mb-8 max-w-lg text-center transition-colors ${paused ? 'text-[#7fa878]' : intent ? 'text-accent/90' : 'text-text-faint'}`}>
           {paused ? pauseTip : (intent || 'Фокус')}
         </div>
-
-        {/* Напоминание намерения вернувшемуся: только что начатая/возобновлённая сессия */}
-        {intent && !paused && timer.elapsed < 120 && (
-          <div className="text-[11px] text-text-faint mb-6 max-w-lg text-center animate-fade-in">
-            ты начинал: {intent}
-          </div>
-        )}
-        {!(intent && !paused && timer.elapsed < 120) && <div className="mb-6" />}
 
         {/* Таймер */}
         <div className={`font-mono font-semibold tabular-nums leading-none tracking-tight transition-colors duration-500 ${paused ? 'text-[#4d5f45]' : 'text-text'}`}
@@ -163,13 +155,19 @@ export default function FocusTunnel({ task, directions, timer, intent, pomodoroP
           />
         </div>
 
-        {/* Где остановился в прошлый раз */}
+        {/* Где остановился в прошлый раз — короткий превью, максимум 2 строки */}
         {timer.elapsed < 300 && (lastNote || lastSession) && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 max-w-lg text-center animate-fade-in">
-            <span className="text-[10px] uppercase tracking-[0.14em] text-text-faint">в прошлый раз · </span>
-            {lastNote
-              ? <span className="text-[12px] text-text-muted">{lastNote}</span>
-              : <span className="text-[12px] text-text-muted">{fmt(lastSession!.seconds)}{lastSession!.when ? ` · ${lastSession!.when}` : ''}</span>}
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(90vw,42rem)] px-4 text-center animate-fade-in">
+            <p
+              className="text-[12px] text-text-muted leading-snug"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+              title={lastNote ?? undefined}
+            >
+              <span className="text-[10px] uppercase tracking-[0.14em] text-text-faint">в прошлый раз · </span>
+              {lastNote
+                ? lastNote.replace(/\s*\n\s*/g, ' · ')
+                : `${fmt(lastSession!.seconds)}${lastSession!.when ? ` · ${lastSession!.when}` : ''}`}
+            </p>
           </div>
         )}
       </div>

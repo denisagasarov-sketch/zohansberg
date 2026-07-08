@@ -4,7 +4,7 @@
 //   :3002 — v2-api (launchd com.denis-task-tracker.v2api ИЛИ spawn в dev)
 //   :4174 — статика собранного фронтенда (встроенный http-сервер, без зависимостей)
 // Шелл не тянет node_modules вообще — упакованное .app самодостаточно.
-const { app, BrowserWindow, Notification } = require('electron');
+const { app, BrowserWindow, Notification, Tray, Menu, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -242,6 +242,9 @@ function createWindow() {
     title: APP_TITLE,
     backgroundColor: '#141312',
     icon: path.join(__dirname, 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+    },
   });
 
   // В dev-запуске (electron .) ставим иконку дока вручную
@@ -334,6 +337,93 @@ async function checkMorningNudge() {
   n.show();
   writeNudgeState({ date: today, lastAt: Date.now() });
 }
+
+// ── Меню-бар macOS: таймер фокуса рядом с часами ──────────────────────────────
+// Значок — чёрно-белый (template) циферблат, рисуем сами, без ассета.
+// Появляется только во время фокуса; клик по значку переключает режим:
+// помодоро-отсчёт ↔ общее время фокуса. Открыть окно — через правый клик (меню).
+let tray = null;
+let trayMode = 'pomo';        // 'pomo' | 'elapsed'
+let trayState = null;         // последнее состояние от рендерера
+
+function showMainWindow() {
+  if (!win || win.isDestroyed()) createWindow();
+  else { win.show(); win.focus(); }
+  if (app.dock) { try { app.dock.show(); } catch {} }
+}
+
+// Рисуем циферблат 32×32 (retina → 16pt): кольцо + две стрелки, чёрным с альфой.
+function makeTimerIcon() {
+  const S = 32, c = S / 2, R = 13, ring = 2.2;
+  const buf = Buffer.alloc(S * S * 4, 0);
+  const setPx = (x, y, a) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= S || y >= S) return;
+    const i = (y * S + x) * 4;
+    if (a > buf[i + 3]) buf[i + 3] = a;   // альфа; RGB=0 (чёрный, template)
+  };
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const d = Math.hypot(x + 0.5 - c, y + 0.5 - c);
+    const t = ring - Math.abs(d - R);
+    if (t > 0) setPx(x, y, Math.min(255, Math.round(t * 255)));
+  }
+  const hand = (ang, len) => {
+    for (let s = 0; s <= len; s += 0.5) {
+      const x = c + Math.cos(ang) * s, y = c + Math.sin(ang) * s;
+      setPx(x, y, 255); setPx(x + 1, y, 255); setPx(x, y + 1, 255);
+    }
+  };
+  hand(-Math.PI / 2, 8);        // минутная — вверх
+  hand(-Math.PI / 6, 6);        // часовая — вверх-вправо
+  const img = nativeImage.createFromBitmap(buf, { width: S, height: S, scaleFactor: 2 });
+  img.setTemplateImage(true);
+  return img;
+}
+
+function mmss(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function renderTrayTitle() {
+  if (!tray || !trayState) return;
+  const st = trayState;
+  let text;
+  if (st.paused) text = '⏸';
+  else {
+    const showPomo = trayMode === 'pomo' && st.pomoActive;
+    text = mmss(showPomo ? st.pomoRemaining : st.elapsed);
+  }
+  tray.setTitle(' ' + text);
+}
+
+function ensureTray() {
+  if (tray) return;
+  try {
+    tray = new Tray(makeTimerIcon());
+    tray.setToolTip('Focusboard — клик: помодоро / общее время');
+    const menu = Menu.buildFromTemplate([
+      { label: 'Открыть Focusboard', click: showMainWindow },
+      { type: 'separator' },
+      { label: 'Выход', click: () => { app.isQuitting = true; app.quit(); } },
+    ]);
+    tray.on('click', () => { trayMode = trayMode === 'pomo' ? 'elapsed' : 'pomo'; renderTrayTitle(); });
+    tray.on('right-click', () => tray.popUpContextMenu(menu));
+  } catch (e) { console.error('[dtt] tray:', e && e.message); }
+}
+
+function destroyTray() {
+  if (tray) { try { tray.destroy(); } catch {} tray = null; }
+}
+
+// Рендерер шлёт структуру состояния; в покое → null → значок исчезает.
+ipcMain.on('timer-update', (_e, state) => {
+  if (!state || (!state.running && !state.paused)) { trayState = null; destroyTray(); return; }
+  trayState = state;
+  ensureTray();
+  renderTrayTitle();
+});
 
 app.on('before-quit', () => {
   app.isQuitting = true;
